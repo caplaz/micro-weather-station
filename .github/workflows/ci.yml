@@ -1,0 +1,214 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort flake8 mypy
+        pip install homeassistant voluptuous
+    
+    - name: Check code formatting with Black
+      run: black --check --diff custom_components/
+    
+    - name: Check import sorting with isort
+      run: isort --check-only --diff custom_components/
+    
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 custom_components/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 custom_components/ --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+    
+    - name: Type checking with mypy
+      run: mypy custom_components/ --ignore-missing-imports
+
+  validate:
+    name: Home Assistant Validation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Validate HACS
+      uses: hacs/action@main
+      with:
+        category: integration
+        ignore: brands
+    
+    - name: Validate Home Assistant Configuration
+      uses: frenck/action-home-assistant@v1
+      with:
+        path: ./custom_components/micro_weather
+        secrets: ./.github/secrets.yaml
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+        home-assistant-version: ['2023.1.0', '2024.1.0']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install Home Assistant ${{ matrix.home-assistant-version }}
+      run: |
+        python -m pip install --upgrade pip
+        pip install homeassistant==${{ matrix.home-assistant-version }}
+        pip install pytest pytest-asyncio pytest-homeassistant-custom-component
+        pip install voluptuous
+    
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short
+      if: always()
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install bandit
+      run: pip install bandit
+    
+    - name: Run security scan
+      run: bandit -r custom_components/ -f json -o bandit-report.json
+    
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: bandit-report
+        path: bandit-report.json
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check README.md
+      run: |
+        # Check that README exists and has minimum content
+        if [ ! -f README.md ]; then
+          echo "README.md is missing"
+          exit 1
+        fi
+        
+        # Check for required sections
+        if ! grep -q "## Installation" README.md; then
+          echo "README.md missing Installation section"
+          exit 1
+        fi
+        
+        if ! grep -q "## Configuration" README.md; then
+          echo "README.md missing Configuration section"
+          exit 1
+        fi
+    
+    - name: Check manifest.json
+      run: |
+        python -c "
+        import json
+        with open('custom_components/micro_weather/manifest.json') as f:
+            manifest = json.load(f)
+        
+        required_fields = ['domain', 'name', 'version', 'documentation', 'issue_tracker', 'codeowners']
+        for field in required_fields:
+            if field not in manifest:
+                print(f'Missing required field: {field}')
+                exit(1)
+        
+        print('manifest.json validation passed')
+        "
+    
+    - name: Validate CHANGELOG.md
+      run: |
+        if [ ! -f CHANGELOG.md ]; then
+          echo "CHANGELOG.md is missing"
+          exit 1
+        fi
+        
+        if ! grep -q "## " CHANGELOG.md; then
+          echo "CHANGELOG.md appears to be empty or improperly formatted"
+          exit 1
+        fi
+
+  release-check:
+    name: Release Readiness
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [lint, validate, test, security, documentation]
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Check version consistency
+      run: |
+        # Extract version from manifest.json
+        MANIFEST_VERSION=$(python -c "
+        import json
+        with open('custom_components/micro_weather/manifest.json') as f:
+            print(json.load(f)['version'])
+        ")
+        
+        # Extract version from version.py
+        VERSION_PY=$(python -c "
+        import sys
+        sys.path.append('custom_components/micro_weather')
+        from version import __version__
+        print(__version__)
+        ")
+        
+        echo "Manifest version: $MANIFEST_VERSION"
+        echo "Version.py version: $VERSION_PY"
+        
+        if [ "$MANIFEST_VERSION" != "$VERSION_PY" ]; then
+          echo "Version mismatch between manifest.json and version.py"
+          exit 1
+        fi
+        
+        echo "Version consistency check passed"
+    
+    - name: Generate release notes
+      run: |
+        echo "## Release Summary" > release_notes.md
+        echo "" >> release_notes.md
+        echo "### Changes in this release:" >> release_notes.md
+        git log --oneline --since="1 week ago" >> release_notes.md
+    
+    - name: Upload release notes
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-notes
+        path: release_notes.md

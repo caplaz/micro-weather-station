@@ -138,19 +138,22 @@ The algorithm analyzes your sensor readings in real-time to provide accurate wea
 The integration provides both daily and hourly forecasts based on your sensor data:
 
 ### Daily Forecast (5 days)
+
 - **Temperature Trends**: Based on pressure patterns and seasonal variations
 - **Condition Prediction**: Uses pressure trends, humidity, and wind patterns
 - **Precipitation Probability**: Calculated from atmospheric pressure and humidity levels
 - **Wind Speed Forecasting**: Considers current conditions and weather pattern changes
 
-### Hourly Forecast (24 hours)  
+### Hourly Forecast (24 hours)
+
 - **Diurnal Temperature Cycle**: Natural daily temperature variations
 - **Short-term Condition Changes**: Hour-by-hour weather evolution
 - **Microclimate Patterns**: Based on your local sensor data trends
 
 ### Forecast Features
+
 - **Pressure-based Prediction**: High pressure → clear weather, Low pressure → storms
-- **Humidity Analysis**: High humidity + low pressure = increased rain probability  
+- **Humidity Analysis**: High humidity + low pressure = increased rain probability
 - **Wind Pattern Recognition**: Current wind trends influence forecast conditions
 - **Local Calibration**: Adapts to your specific microclimate over time
 
