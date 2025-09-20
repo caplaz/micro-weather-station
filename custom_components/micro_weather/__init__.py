@@ -19,7 +19,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _LOGGER.info("Setting up Micro Weather Station integration")
     
     # Create coordinator for managing updates
-    coordinator = VirtualWeatherCoordinator(hass, entry)
+    coordinator = MicroWeatherCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     
     # Store coordinator in hass data
@@ -42,8 +42,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-class VirtualWeatherCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching virtual weather data."""
+class MicroWeatherCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching micro weather data."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize."""

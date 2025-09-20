@@ -49,10 +49,10 @@ async def async_setup_entry(
     """Set up the Micro Weather Station weather entity."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     
-    async_add_entities([VirtualWeatherEntity(coordinator, config_entry)])
+    async_add_entities([MicroWeatherEntity(coordinator, config_entry)])
 
 
-class VirtualWeatherEntity(CoordinatorEntity, WeatherEntity):
+class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
     """Micro Weather Station weather entity."""
 
     _attr_has_entity_name = True
