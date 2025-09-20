@@ -1,6 +1,6 @@
 {
   "domain": "virtual_weather",
-  "name": "Virtual Weather Station",
+  "name": "Smart Weather Station",
   "version": "1.0.0",
   "documentation": "https://github.com/ace/virtual-weather-station",
   "issue_tracker": "https://github.com/ace/virtual-weather-station/issues",
@@ -8,5 +8,5 @@
   "codeowners": ["@ace"],
   "requirements": [],
   "config_flow": true,
-  "iot_class": "calculated"
+  "iot_class": "local_polling"
 }

@@ -1,23 +1,36 @@
-# Virtual Weather Station for Home Assistant
+# Smart Weather Station for Home Assistant
 
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]](LICENSE)
 [![hacs][hacsbadge]][hacs]
 
-A Home Assistant custom integration that creates a virtual weather station with realistic simulated weather data. Perfect for testing, development, or areas where real weather data isn't available.
+A Home Assistant custom integration that creates a smart weather station by analyzing your existing sensor data to determine accurate weather conditions for your specific location and microclimate. Weather station data from external services can be unreliable or not reflect your specific environment - this integration uses your actual sensor readings to provide weather conditions that truly represent what's happening at your location.
 
-![Virtual Weather Station][logo]
+![Smart Weather Station][logo]
+
+## Why This Integration?
+
+Weather station data can be unreliable or not reflect your specific microclimate. Here are better ways to detect weather conditions using your actual sensor data:
+
+- **🎯 Microclimate Accuracy**: Your backyard might be sunny while the nearest weather station reports cloudy
+- **🌡️ Local Temperature**: Your sensors know the exact temperature in your garden, not 10 miles away
+- **🌧️ Precipitation Detection**: Know immediately when it starts raining at your location
+- **💨 Wind Conditions**: Detect actual wind conditions affected by your local terrain and structures
+- **☀️ Solar Analysis**: Use your solar radiation sensors to accurately detect cloud cover
+- **🏠 Hyperlocal Weather**: Get weather conditions specific to your property and environment
+
+This integration analyzes your real sensor data to provide weather conditions that truly represent what's happening at your exact location.
 
 ## Features
 
-- 🌡️ **Realistic Weather Simulation**: Temperature, humidity, pressure, wind speed and direction
-- 🌤️ **Multiple Weather Patterns**: Sunny, cloudy, rainy, snowy, stormy, and foggy conditions
+- 🌡️ **Smart Weather Detection**: Analyzes real sensor data to determine weather conditions
+- 🧠 **Intelligent Algorithms**: Uses solar radiation, precipitation, wind, and pressure data
 - 📊 **Individual Sensors**: Separate sensor entities for each weather parameter
 - 🌦️ **Weather Entity**: Complete weather entity with current conditions and 5-day forecast
-- ⚙️ **Configurable Parameters**: Customize temperature ranges, update intervals, and enabled weather patterns
-- 🔄 **Realistic Transitions**: Gradual changes between weather conditions with continuity
-- 📱 **Easy Configuration**: Simple setup through Home Assistant UI
+- ⚙️ **Flexible Configuration**: Works with any combination of available sensors
+- 🔄 **Real-time Analysis**: Updates based on actual sensor readings
+- 📱 **Easy Configuration**: Simple setup through Home Assistant UI with sensor selection
 
 ## Installation
 
@@ -26,10 +39,10 @@ A Home Assistant custom integration that creates a virtual weather station with 
 1. Make sure you have [HACS](https://hacs.xyz/) installed
 2. Go to HACS → Integrations
 3. Click the three dots menu → Custom repositories
-4. Add this repository: `https://github.com/ace/virtual-weather-station`
+4. Add this repository: `https://github.com/caplaz/virtual-weather-station`
 5. Category: Integration
 6. Click "Add"
-7. Find "Virtual Weather Station" in the list and install it
+7. Find "Smart Weather Station" in the list and install it
 8. Restart Home Assistant
 
 ### Manual Installation
@@ -44,116 +57,147 @@ A Home Assistant custom integration that creates a virtual weather station with 
 
 1. Go to Settings → Devices & Services
 2. Click "Add Integration"
-3. Search for "Virtual Weather Station"
-4. Follow the configuration steps
+3. Search for "Smart Weather Station"
+4. Select your sensor entities from the dropdown menus
+5. Configure update interval
 
-### Configuration Options
+### Required Sensors
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| Temperature Range | Min/max temperature in °C | -10, 35 |
-| Humidity Range | Min/max humidity in % | 30, 90 |
-| Pressure Range | Min/max pressure in hPa | 990, 1030 |
-| Wind Speed Range | Min/max wind speed in km/h | 0, 25 |
-| Update Interval | How often to update data (minutes) | 5 |
-| Weather Patterns | Which weather conditions to simulate | All |
+| Sensor Type         | Description                   | Required        |
+| ------------------- | ----------------------------- | --------------- |
+| Outdoor Temperature | Temperature sensor (°F or °C) | ✅ **Required** |
 
-### Example Configuration
+### Optional Sensors
+
+| Sensor Type        | Description                   | Used For                          |
+| ------------------ | ----------------------------- | --------------------------------- |
+| Indoor Temperature | Indoor temperature sensor     | Temperature differential analysis |
+| Humidity           | Humidity percentage sensor    | Humidity readings                 |
+| Pressure           | Atmospheric pressure sensor   | Storm detection                   |
+| Wind Speed         | Wind speed sensor             | Wind conditions                   |
+| Wind Direction     | Wind direction sensor         | Wind data                         |
+| Wind Gust          | Wind gust sensor              | Storm detection                   |
+| Rain Rate          | Precipitation rate sensor     | Precipitation detection           |
+| Rain State         | Rain state sensor (dry/wet)   | Precipitation detection           |
+| Solar Radiation    | Solar radiation sensor (W/m²) | Cloud cover detection             |
+| Solar Lux          | Light level sensor (lx)       | Day/night and cloud detection     |
+| UV Index           | UV index sensor               | Clear sky detection               |
+
+### Example Sensor Configuration
 
 ```yaml
-# Example ranges for different climates:
-
-# Tropical Climate
-Temperature: 20, 35
-Humidity: 60, 95
-Pressure: 1005, 1020
-
-# Arctic Climate  
-Temperature: -30, 5
-Humidity: 50, 85
-Pressure: 980, 1030
-
-# Desert Climate
-Temperature: 5, 45
-Humidity: 10, 40
-Pressure: 1000, 1025
+# Example sensor mappings for weather station:
+Outdoor Temperature: sensor.outdoor_temperature
+Indoor Temperature: sensor.indoor_temperature
+Humidity: sensor.indoor_humidity
+Pressure: sensor.relative_pressure
+Wind Speed: sensor.wind_speed
+Wind Direction: sensor.wind_direction
+Wind Gust: sensor.wind_gust
+Rain Rate: sensor.rain_rate_piezo
+Rain State: sensor.rain_state_piezo
+Solar Radiation: sensor.solar_radiation
+Solar Lux: sensor.solar_lux
+UV Index: sensor.uv_index
 ```
 
 ## Entities Created
 
 ### Weather Entity
-- `weather.virtual_weather_station` - Main weather entity with current conditions and forecast
+
+- `weather.smart_weather_station` - Main weather entity with current conditions and forecast
 
 ### Sensor Entities
-- `sensor.virtual_weather_station_temperature` - Current temperature (°C)
-- `sensor.virtual_weather_station_humidity` - Current humidity (%)
-- `sensor.virtual_weather_station_pressure` - Current pressure (hPa)
-- `sensor.virtual_weather_station_wind_speed` - Current wind speed (km/h)
-- `sensor.virtual_weather_station_wind_direction` - Current wind direction (°)
-- `sensor.virtual_weather_station_visibility` - Current visibility (km)
 
-## Weather Patterns
+- `sensor.smart_weather_station_temperature` - Current temperature (°C)
+- `sensor.smart_weather_station_humidity` - Current humidity (%)
+- `sensor.smart_weather_station_pressure` - Current pressure (hPa)
+- `sensor.smart_weather_station_wind_speed` - Current wind speed (km/h)
+- `sensor.smart_weather_station_wind_direction` - Current wind direction (°)
+- `sensor.smart_weather_station_visibility` - Current visibility (km)
 
-The integration simulates the following weather conditions:
+## Weather Detection Logic
 
-| Pattern | Description | Temperature | Humidity | Pressure | Wind |
-|---------|-------------|-------------|----------|----------|------|
-| ☀️ Sunny | Clear skies | +2°C | -10% | +5 hPa | -2 km/h |
-| ☁️ Cloudy | Overcast | -1°C | +5% | 0 hPa | 0 km/h |
-| ⛅ Partly Cloudy | Mixed conditions | 0°C | 0% | +2 hPa | +1 km/h |
-| 🌧️ Rainy | Precipitation | -3°C | +20% | -8 hPa | +3 km/h |
-| ❄️ Snowy | Snow conditions | -8°C | +15% | -5 hPa | +2 km/h |
-| ⛈️ Stormy | Thunderstorms | -2°C | +15% | -15 hPa | +8 km/h |
-| 🌫️ Foggy | Low visibility | -1°C | +25% | -3 hPa | -3 km/h |
+The integration intelligently detects weather conditions using your real sensor data with the following priority system:
+
+| Condition        | Detection Criteria                    | Priority    |
+| ---------------- | ------------------------------------- | ----------- |
+| ⛈️ Stormy        | Rain + High Wind (>25 km/h)           | 1 (Highest) |
+| 🌧️ Rainy         | Active precipitation detected         | 2           |
+| ❄️ Snowy         | Rain + Low temperature (<2°C)         | 3           |
+| �️ Foggy         | Low solar radiation + High humidity   | 4           |
+| ☀️ Sunny         | High solar radiation (>400 W/m²)      | 5           |
+| ⛅ Partly Cloudy | Medium solar radiation (100-400 W/m²) | 6           |
+| ☁️ Cloudy        | Low solar radiation (<100 W/m²)       | 7 (Default) |
+
+The algorithm analyzes your sensor readings in real-time to provide accurate weather condition detection.
 
 ## Automation Examples
 
 ### Weather-Based Lighting
 
-```yaml
+````yaml
 automation:
   - alias: "Cloudy Day Lights"
     trigger:
       - platform: state
-        entity_id: weather.virtual_weather_station
+        entity_id: weather.smart_weather_station
         to: "cloudy"
     action:
       - service: light.turn_on
         target:
           entity_id: light.living_room
         data:
-          brightness_pct: 80
-```
+          brightness: 200
 
-### Temperature Alerts
+### Storm Preparation
+
+```yaml
+automation:
+  - alias: "Storm Alert"
+    trigger:
+      - platform: state
+        entity_id: weather.smart_weather_station
+        to: "lightning-rainy"
+    action:
+      - service: notify.mobile_app
+        data:
+          message: "Storm detected! Secure outdoor items."
+          title: "Weather Alert"
+
+### Smart Irrigation
+
+```yaml
+automation:
+  - alias: "Skip Irrigation on Rain"
+    trigger:
+      - platform: time
+        at: "06:00:00"
+    condition:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: weather.smart_weather_station
+            state: "rainy"
+    action:
+      - service: switch.turn_on
+        target:
+          entity_id: switch.garden_sprinklers
+````
+
+## Temperature Alerts
 
 ```yaml
 automation:
   - alias: "High Temperature Alert"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.virtual_weather_station_temperature
+        entity_id: sensor.smart_weather_station_temperature
         above: 30
     action:
       - service: notify.mobile_app
         data:
-          message: "Temperature is high: {{ states('sensor.virtual_weather_station_temperature') }}°C"
-```
-
-### Storm Warning
-
-```yaml
-automation:
-  - alias: "Storm Warning"
-    trigger:
-      - platform: state
-        entity_id: weather.virtual_weather_station
-        to: "lightning-rainy"
-    action:
-      - service: script.secure_outdoor_furniture
-      - service: notify.family
-        data:
-          message: "Storm detected! Securing outdoor items."
+          message: "Temperature is high: {{ states('sensor.smart_weather_station_temperature') }}°C"
 ```
 
 ## Lovelace Cards
@@ -162,7 +206,7 @@ automation:
 
 ```yaml
 type: weather-forecast
-entity: weather.virtual_weather_station
+entity: weather.smart_weather_station
 ```
 
 ### Sensor Dashboard
@@ -170,13 +214,13 @@ entity: weather.virtual_weather_station
 ```yaml
 type: entities
 entities:
-  - entity: sensor.virtual_weather_station_temperature
+  - entity: sensor.smart_weather_station_temperature
     name: Temperature
-  - entity: sensor.virtual_weather_station_humidity  
+  - entity: sensor.smart_weather_station_humidity
     name: Humidity
-  - entity: sensor.virtual_weather_station_pressure
+  - entity: sensor.smart_weather_station_pressure
     name: Pressure
-  - entity: sensor.virtual_weather_station_wind_speed
+  - entity: sensor.smart_weather_station_wind_speed
     name: Wind Speed
 title: Weather Station
 ```
@@ -186,8 +230,8 @@ title: Weather Station
 ```yaml
 type: history-graph
 entities:
-  - sensor.virtual_weather_station_temperature
-  - sensor.virtual_weather_station_humidity
+  - sensor.smart_weather_station_temperature
+  - sensor.smart_weather_station_humidity
 hours_to_show: 24
 refresh_interval: 300
 ```
@@ -196,28 +240,32 @@ refresh_interval: 300
 
 This integration is perfect for:
 
-- 🧪 **Testing Automations**: Test weather-based automations without waiting for real weather
-- 🏠 **Development**: Develop weather-dependent features in controlled conditions  
-- 📚 **Learning**: Understand how weather entities work in Home Assistant
-- 🎭 **Demonstrations**: Show off weather automations with predictable data
-- 🔧 **Prototyping**: Build weather-related integrations and dashboards
+- 🌡️ **Smart Weather Detection**: Use your existing sensors to get intelligent weather condition detection
+- 🏠 **Enhanced Automations**: Create more accurate weather-based automations using real sensor data
+- � **Data Analysis**: Understand weather patterns based on your actual sensor readings
+- � **Accurate Forecasting**: Get weather conditions that match your local environment
+- 🔧 **Sensor Integration**: Make better use of your weather station investment
 
 ## Troubleshooting
 
 ### Integration Not Loading
+
 - Check Home Assistant logs for errors
 - Ensure all files are in the correct directory
 - Restart Home Assistant after installation
 
-### No Data Showing
-- Verify the integration is configured correctly
-- Check that the update interval isn't too long
-- Review entity states in Developer Tools
+### No Sensor Data
 
-### Weather Patterns Not Changing
-- Patterns change randomly every 30 minutes to 2 hours
-- Check that multiple patterns are enabled in configuration
-- Restart the integration to force a pattern change
+- Verify that your configured sensors exist and have valid states
+- Check sensor entity IDs in the integration configuration
+- Review entity states in Developer Tools → States
+
+### Weather Conditions Not Updating
+
+- Ensure your sensors are providing current data
+- Check that sensor values are within expected ranges
+- Verify the integration update interval in configuration
+- Review logs for any sensor reading errors
 
 ## Contributing
 
@@ -244,16 +292,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Changelog
 
 ### v1.0.0
+
 - Initial release
-- Weather entity with current conditions and forecast
+- Weather entity with intelligent condition detection
 - Individual sensor entities for all weather parameters
-- Configurable weather simulation parameters
-- Support for multiple weather patterns
+- Configurable sensor mapping and detection thresholds
+- Support for multiple weather condition types
 - HACS compatibility
 
 ---
 
-**Note**: This is a virtual weather station that generates simulated data. It does not connect to any real weather services or hardware sensors.
+**Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
 [commits-shield]: https://img.shields.io/github/commit-activity/y/ace/virtual-weather-station.svg?style=for-the-badge
 [commits]: https://github.com/ace/virtual-weather-station/commits/main

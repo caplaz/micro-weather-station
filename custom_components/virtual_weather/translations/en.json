@@ -2,20 +2,28 @@
   "config": {
     "step": {
       "user": {
-        "title": "Virtual Weather Station Setup",
-        "description": "Configure your virtual weather station parameters.",
+        "title": "Weather Station Sensor Setup",
+        "description": "Configure your weather station by selecting sensor entities.",
         "data": {
-          "temperature_range": "Temperature range (min, max) in °C",
-          "humidity_range": "Humidity range (min, max) in %",
-          "pressure_range": "Pressure range (min, max) in hPa",
-          "wind_speed_range": "Wind speed range (min, max) in km/h",
-          "update_interval": "Update interval in minutes",
-          "weather_patterns": "Enabled weather patterns"
+          "outdoor_temp_sensor": "Outdoor Temperature Sensor (Required)",
+          "indoor_temp_sensor": "Indoor Temperature Sensor (Optional)",
+          "humidity_sensor": "Humidity Sensor (Optional)",
+          "pressure_sensor": "Atmospheric Pressure Sensor (Optional)",
+          "wind_speed_sensor": "Wind Speed Sensor (Optional)",
+          "wind_direction_sensor": "Wind Direction Sensor (Optional)",
+          "wind_gust_sensor": "Wind Gust Sensor (Optional)",
+          "rain_rate_sensor": "Rain Rate Sensor (Optional)",
+          "rain_state_sensor": "Rain State Sensor (Optional)",
+          "solar_radiation_sensor": "Solar Radiation Sensor (Optional)",
+          "solar_lux_sensor": "Solar Lux Sensor (Optional)",
+          "uv_index_sensor": "UV Index Sensor (Optional)",
+          "update_interval": "Update interval in minutes"
         }
       }
     },
     "error": {
-      "invalid_range": "Invalid range format. Use 'min, max' format."
+      "missing_outdoor_temp": "Outdoor temperature sensor is required.",
+      "unknown": "Unknown error occurred."
     }
   }
 }

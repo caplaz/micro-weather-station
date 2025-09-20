@@ -1,4 +1,4 @@
-"""Constants for the Virtual Weather Station integration."""
+"""Constants for the Smart Weather Station integration."""
 
 DOMAIN = "virtual_weather"
 
@@ -9,6 +9,20 @@ CONF_PRESSURE_RANGE = "pressure_range"
 CONF_WIND_SPEED_RANGE = "wind_speed_range"
 CONF_UPDATE_INTERVAL = "update_interval"
 CONF_WEATHER_PATTERNS = "weather_patterns"
+
+# Sensor entity configuration
+CONF_OUTDOOR_TEMP_SENSOR = "outdoor_temp_sensor"
+CONF_INDOOR_TEMP_SENSOR = "indoor_temp_sensor"
+CONF_HUMIDITY_SENSOR = "humidity_sensor"
+CONF_PRESSURE_SENSOR = "pressure_sensor"
+CONF_WIND_SPEED_SENSOR = "wind_speed_sensor"
+CONF_WIND_DIRECTION_SENSOR = "wind_direction_sensor"
+CONF_WIND_GUST_SENSOR = "wind_gust_sensor"
+CONF_RAIN_RATE_SENSOR = "rain_rate_sensor"
+CONF_RAIN_STATE_SENSOR = "rain_state_sensor"
+CONF_SOLAR_RADIATION_SENSOR = "solar_radiation_sensor"
+CONF_SOLAR_LUX_SENSOR = "solar_lux_sensor"
+CONF_UV_INDEX_SENSOR = "uv_index_sensor"
 
 # Default configuration values
 DEFAULT_TEMPERATURE_RANGE = (-10, 35)  # Celsius

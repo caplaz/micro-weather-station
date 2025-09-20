@@ -1,4 +1,4 @@
-"""Weather entity for Virtual Weather Station."""
+"""Weather entity for Smart Weather Station."""
 import logging
 from typing import Any
 
@@ -46,14 +46,14 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the Virtual Weather Station weather entity."""
+    """Set up the Smart Weather Station weather entity."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     
     async_add_entities([VirtualWeatherEntity(coordinator, config_entry)])
 
 
 class VirtualWeatherEntity(CoordinatorEntity, WeatherEntity):
-    """Virtual Weather Station weather entity."""
+    """Smart Weather Station weather entity."""
 
     _attr_has_entity_name = True
     _attr_name = None
@@ -72,7 +72,7 @@ class VirtualWeatherEntity(CoordinatorEntity, WeatherEntity):
         self._attr_unique_id = f"{config_entry.entry_id}_weather"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, config_entry.entry_id)},
-            "name": "Virtual Weather Station",
+            "name": "Smart Weather Station",
             "manufacturer": "Virtual Weather",
             "model": "VWS-1",
             "sw_version": "1.0.0",

@@ -1,4 +1,4 @@
-"""Virtual Weather Station integration for Home Assistant."""
+"""Smart Weather Station integration for Home Assistant."""
 import logging
 from datetime import timedelta
 
@@ -15,8 +15,8 @@ PLATFORMS: list[Platform] = [Platform.WEATHER, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Virtual Weather Station from a config entry."""
-    _LOGGER.info("Setting up Virtual Weather Station integration")
+    """Set up Smart Weather Station from a config entry."""
+    _LOGGER.info("Setting up Smart Weather Station integration")
     
     # Create coordinator for managing updates
     coordinator = VirtualWeatherCoordinator(hass, entry)
@@ -56,8 +56,8 @@ class VirtualWeatherCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_update_data(self):
-        """Update virtual weather data."""
-        from .weather_simulator import WeatherSimulator
+        """Update weather data from real sensors."""
+        from .weather_detector import WeatherDetector
         
-        simulator = WeatherSimulator(self.entry.options)
-        return simulator.generate_weather_data()
+        detector = WeatherDetector(self.hass, self.entry.options)
+        return detector.get_weather_data()

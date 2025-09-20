@@ -1,5 +1,5 @@
 {
-  "name": "Virtual Weather Station",
+  "name": "Smart Weather Station",
   "render_readme": true,
   "domains": ["weather", "sensor"]
 }

@@ -5,6 +5,7 @@
 This project is a Home Assistant custom integration that creates a virtual weather station with simulated weather data. The integration is designed to be compatible with HACS (Home Assistant Community Store).
 
 ## Project Structure
+
 - Custom integration following Home Assistant standards
 - HACS compatible manifest and structure
 - Virtual weather data simulation
@@ -12,6 +13,7 @@ This project is a Home Assistant custom integration that creates a virtual weath
 - Support for multiple weather entities (temperature, humidity, pressure, etc.)
 
 ## Development Guidelines
+
 - Follow Home Assistant integration best practices
 - Maintain HACS compatibility requirements
 - Use proper async/await patterns
@@ -20,6 +22,7 @@ This project is a Home Assistant custom integration that creates a virtual weath
 - Ensure proper error handling
 
 ## Features
+
 - Virtual weather station with realistic data simulation
 - Configurable weather patterns
 - Multiple weather sensors
