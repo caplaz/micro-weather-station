@@ -1,6 +1,3 @@
 {
-  "name": "Micro Weather Station",
-  "hacs": "1.6.0",
-  "homeassistant": "2023.1.0",
-  "render_readme": true
+  "name": "Micro Weather Station"
 }
