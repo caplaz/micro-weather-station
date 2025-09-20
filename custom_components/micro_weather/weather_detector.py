@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
@@ -214,7 +214,7 @@ class WeatherDetector:
 
     def _generate_simple_forecast(
         self, current_condition: str, sensor_data: Dict[str, Any]
-    ) -> list:
+    ) -> List[Dict[str, Any]]:
         """Generate an intelligent 5-day forecast based on current sensor data and patterns."""
         forecast = []
         current_temp = sensor_data.get("outdoor_temp", 70)

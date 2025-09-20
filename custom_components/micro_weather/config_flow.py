@@ -31,10 +31,11 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class ConfigFlow(config_entries.ConfigFlow):
     """Handle a config flow for Micro Weather Station."""
 
     VERSION = 1
+    domain = DOMAIN
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
