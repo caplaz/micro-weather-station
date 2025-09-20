@@ -1,5 +1,9 @@
 {
   "name": "Micro Weather Station",
+  "hacs": "1.6.0",
+  "domains": ["weather", "sensor"],
+  "iot_class": "Local Polling",
+  "homeassistant": "2023.1.0",
   "render_readme": true,
-  "domains": ["weather", "sensor"]
+  "persistent_directory": false
 }
