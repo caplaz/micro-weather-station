@@ -356,5 +356,3 @@ class WeatherDetector:
             return round(max(2.0, base_wind * 0.8), 1)
         else:
             return round(base_wind + (day * 0.2), 1)
-
-        return forecast
