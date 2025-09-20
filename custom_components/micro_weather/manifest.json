@@ -10,5 +10,6 @@
   "config_flow": true,
   "integration_type": "device",
   "iot_class": "local_polling",
-  "homeassistant": "2023.1.0"
+  "homeassistant": "2023.1.0",
+  "loggers": ["custom_components.micro_weather"]
 }

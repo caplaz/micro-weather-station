@@ -1,3 +1,9 @@
 {
-  "name": "Micro Weather Station"
+  "name": "Micro Weather Station",
+  "render_readme": true,
+  "filename": "micro_weather.zip",
+  "homeassistant": "2023.1.0",
+  "domains": ["weather", "sensor"],
+  "country": ["US", "CA", "GB", "AU", "NZ"],
+  "integration_type": "device"
 }
