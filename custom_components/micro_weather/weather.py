@@ -58,7 +58,8 @@ class VirtualWeatherEntity(CoordinatorEntity, WeatherEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_supported_features = (
-        WeatherEntityFeature.FORECAST_DAILY
+        WeatherEntityFeature.FORECAST_DAILY |
+        WeatherEntityFeature.FORECAST_HOURLY
     )
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_pressure_unit = UnitOfPressure.HPA
@@ -140,6 +141,48 @@ class VirtualWeatherEntity(CoordinatorEntity, WeatherEntity):
                     "condition": CONDITION_MAP.get(day_data["condition"], day_data["condition"]),
                     "native_precipitation": day_data.get("precipitation", 0),
                     "native_wind_speed": day_data.get("wind_speed", 0),
+                    "humidity": day_data.get("humidity", 50),
                 })
             return forecast_data
         return None
+
+    async def async_forecast_hourly(self) -> list[dict[str, Any]] | None:
+        """Return the hourly forecast."""
+        if not self.coordinator.data:
+            return None
+            
+        # Generate hourly forecast for next 24 hours based on current conditions
+        hourly_data = []
+        current_temp = self.coordinator.data.get("temperature", 20)
+        current_condition = self.coordinator.data.get("condition", "cloudy")
+        current_humidity = self.coordinator.data.get("humidity", 50)
+        current_wind = self.coordinator.data.get("wind_speed", 5)
+        
+        for i in range(24):  # 24 hours
+            from datetime import datetime, timedelta
+            hour_time = datetime.now() + timedelta(hours=i + 1)
+            
+            # Simple hourly temperature variation (diurnal cycle)
+            if 6 <= hour_time.hour <= 18:  # Daytime
+                temp_variation = 2 * (1 - abs(hour_time.hour - 12) / 6)  # Peak at noon
+            else:  # Nighttime
+                temp_variation = -2
+            
+            # Condition persistence with some hourly variation
+            if i < 6:  # Next 6 hours - current condition persists
+                hour_condition = current_condition
+            elif i < 12:  # 6-12 hours - slight variation
+                hour_condition = current_condition if i % 3 != 0 else "partly_cloudy"
+            else:  # 12-24 hours - more variation
+                hour_condition = ["partly_cloudy", "cloudy", current_condition][i % 3]
+            
+            hourly_data.append({
+                "datetime": hour_time.isoformat(),
+                "native_temperature": round(current_temp + temp_variation, 1),
+                "condition": CONDITION_MAP.get(hour_condition, hour_condition),
+                "native_precipitation": 2.0 if hour_condition in ["rainy", "stormy"] else 0.0,
+                "native_wind_speed": max(1, current_wind + (i * 0.1)),
+                "humidity": max(30, min(90, current_humidity + (i * 0.5))),
+            })
+        
+        return hourly_data

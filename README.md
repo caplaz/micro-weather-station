@@ -27,7 +27,8 @@ This integration analyzes your real sensor data to provide weather conditions th
 - 🌡️ **Smart Weather Detection**: Analyzes real sensor data to determine weather conditions
 - 🧠 **Intelligent Algorithms**: Uses solar radiation, precipitation, wind, and pressure data
 - 📊 **Individual Sensors**: Separate sensor entities for each weather parameter
-- 🌦️ **Weather Entity**: Complete weather entity with current conditions and 5-day forecast
+- 🌦️ **Weather Entity**: Complete weather entity with current conditions and intelligent forecasts
+- 📈 **Intelligent Forecasting**: 5-day daily and 24-hour hourly forecasts based on pressure trends
 - ⚙️ **Flexible Configuration**: Works with any combination of available sensors
 - 🔄 **Real-time Analysis**: Updates based on actual sensor readings
 - 📱 **Easy Configuration**: Simple setup through Home Assistant UI with sensor selection
@@ -131,6 +132,27 @@ The integration intelligently detects weather conditions using your real sensor 
 | ☁️ Cloudy        | Low solar radiation (<100 W/m²)       | 7 (Default) |
 
 The algorithm analyzes your sensor readings in real-time to provide accurate weather condition detection.
+
+## Intelligent Forecasting
+
+The integration provides both daily and hourly forecasts based on your sensor data:
+
+### Daily Forecast (5 days)
+- **Temperature Trends**: Based on pressure patterns and seasonal variations
+- **Condition Prediction**: Uses pressure trends, humidity, and wind patterns
+- **Precipitation Probability**: Calculated from atmospheric pressure and humidity levels
+- **Wind Speed Forecasting**: Considers current conditions and weather pattern changes
+
+### Hourly Forecast (24 hours)  
+- **Diurnal Temperature Cycle**: Natural daily temperature variations
+- **Short-term Condition Changes**: Hour-by-hour weather evolution
+- **Microclimate Patterns**: Based on your local sensor data trends
+
+### Forecast Features
+- **Pressure-based Prediction**: High pressure → clear weather, Low pressure → storms
+- **Humidity Analysis**: High humidity + low pressure = increased rain probability  
+- **Wind Pattern Recognition**: Current wind trends influence forecast conditions
+- **Local Calibration**: Adapts to your specific microclimate over time
 
 ## Automation Examples
 

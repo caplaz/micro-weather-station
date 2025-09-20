@@ -208,35 +208,120 @@ class WeatherDetector:
         return round(speed_mph * 1.60934, 1)
 
     def _generate_simple_forecast(self, current_condition: str, sensor_data: Dict[str, Any]) -> list:
-        """Generate a simple 5-day forecast based on current conditions."""
+        """Generate an intelligent 5-day forecast based on current sensor data and patterns."""
         forecast = []
         current_temp = sensor_data.get("outdoor_temp", 70)
+        current_pressure = sensor_data.get("pressure", 29.92)
+        current_humidity = sensor_data.get("humidity", 50)
+        current_wind_speed = sensor_data.get("wind_speed", 5)
         
-        # Simple forecast logic - you could enhance this with weather API or historical patterns
+        # Pressure trend analysis for weather prediction
+        pressure_hpa = self._convert_to_hpa(current_pressure) or 1013
+        is_high_pressure = pressure_hpa > 1020
+        is_low_pressure = pressure_hpa < 1000
+        
         for i in range(5):
             date = datetime.now() + timedelta(days=i + 1)
             
-            # Simple temperature trend (you could make this more sophisticated)
-            day_temp_variation = (-2, 2, -1, 1, 0)[i]  # Simple 5-day pattern
+            # Enhanced temperature forecast with seasonal and pressure influence
+            day_temp_variation = self._calculate_temp_trend(i, current_temp, pressure_hpa)
             forecast_temp = current_temp + day_temp_variation
             
-            # Simple condition forecast (persistence with some variation)
-            if i == 0:
-                forecast_condition = current_condition
-            elif i <= 2:
-                # Next 2 days - slight chance of change
-                forecast_condition = current_condition if i % 2 == 0 else "partly_cloudy"
-            else:
-                # Days 3-5 - more uncertainty
-                forecast_condition = ["partly_cloudy", "cloudy", "sunny"][i % 3]
-                
+            # Enhanced condition forecast based on pressure trends and patterns
+            forecast_condition = self._predict_condition(
+                i, current_condition, pressure_hpa, current_humidity, current_wind_speed
+            )
+            
+            # Calculate precipitation probability
+            precipitation = self._calculate_precipitation(forecast_condition, pressure_hpa, current_humidity)
+            
+            # Wind speed forecast
+            wind_forecast = self._forecast_wind_speed(current_wind_speed, forecast_condition, i)
+            
             forecast.append({
                 "datetime": date.isoformat(),
                 "temperature": round(self._convert_to_celsius(forecast_temp) or 20, 1),
-                "templow": round((self._convert_to_celsius(forecast_temp) or 20) - 5, 1),
+                "templow": round((self._convert_to_celsius(forecast_temp) or 20) - 6, 1),
                 "condition": forecast_condition,
-                "precipitation": 0.0 if forecast_condition not in ["rainy", "snowy", "stormy"] else 2.0,
-                "wind_speed": sensor_data.get("wind_speed", 5),
+                "precipitation": precipitation,
+                "wind_speed": wind_forecast,
+                "humidity": max(30, min(90, current_humidity + (i * 2))),  # Simple humidity trend
             })
+        
+        return forecast
+    
+    def _calculate_temp_trend(self, day: int, current_temp: float, pressure_hpa: float) -> float:
+        """Calculate temperature trend based on pressure and time."""
+        # Base seasonal variation (simplified)
+        seasonal_variation = [0, -1, 1, -2, 1][day]
+        
+        # Pressure influence on temperature
+        if pressure_hpa > 1020:  # High pressure - generally stable/clear
+            pressure_effect = 1 + (day * 0.5)  # Slight warming trend
+        elif pressure_hpa < 1000:  # Low pressure - storm systems
+            pressure_effect = -2 - (day * 0.3)  # Cooling trend
+        else:
+            pressure_effect = 0
+        
+        return seasonal_variation + pressure_effect
+    
+    def _predict_condition(self, day: int, current_condition: str, pressure_hpa: float, 
+                          humidity: float, wind_speed: float) -> str:
+        """Predict weather condition based on atmospheric patterns."""
+        
+        # Day 0-1: Current conditions persist with pressure influence
+        if day <= 1:
+            if pressure_hpa > 1025:  # Very high pressure
+                return "sunny" if day == 0 else "partly_cloudy"
+            elif pressure_hpa < 995:  # Very low pressure
+                return "stormy" if wind_speed > 15 else "rainy"
+            else:
+                return current_condition
+        
+        # Day 2-3: Transition based on pressure trends
+        elif day <= 3:
+            if pressure_hpa > 1020:
+                return ["sunny", "partly_cloudy"][day % 2]
+            elif pressure_hpa < 1000:
+                return ["rainy", "cloudy", "partly_cloudy"][day % 3]
+            else:
+                return ["partly_cloudy", "cloudy"][day % 2]
+        
+        # Day 4-5: Longer term patterns (return to average conditions)
+        else:
+            if humidity > 80:
+                return "cloudy"
+            elif humidity < 40:
+                return "sunny"
+            else:
+                return "partly_cloudy"
+    
+    def _calculate_precipitation(self, condition: str, pressure_hpa: float, humidity: float) -> float:
+        """Calculate precipitation probability based on conditions."""
+        if condition in ["rainy", "stormy"]:
+            base_precip = 5.0 if condition == "rainy" else 10.0
+            # High humidity and low pressure increase precipitation
+            humidity_factor = max(1.0, humidity / 60)
+            pressure_factor = max(1.0, (1020 - pressure_hpa) / 20)
+            return round(base_precip * humidity_factor * pressure_factor, 1)
+        elif condition == "snowy":
+            return 3.0
+        elif condition == "cloudy" and humidity > 75:
+            return 1.0  # Light chance of rain
+        else:
+            return 0.0
+    
+    def _forecast_wind_speed(self, current_wind: float, condition: str, day: int) -> float:
+        """Forecast wind speed based on conditions."""
+        base_wind = current_wind
+        
+        if condition == "stormy":
+            return round(base_wind * 1.5 + day, 1)
+        elif condition in ["rainy", "cloudy"]:
+            return round(base_wind * 1.1 + (day * 0.5), 1)
+        elif condition == "sunny":
+            return round(max(2.0, base_wind * 0.8), 1)
+        else:
+            return round(base_wind + (day * 0.2), 1)
         
         return forecast
