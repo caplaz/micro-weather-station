@@ -32,6 +32,7 @@ This integration analyzes your real sensor data to provide weather conditions th
 - ⚙️ **Flexible Configuration**: Works with any combination of available sensors
 - 🔄 **Real-time Analysis**: Updates based on actual sensor readings
 - 📱 **Easy Configuration**: Simple setup through Home Assistant UI with sensor selection
+- 🌍 **Multilingual Support**: Available in English, Italian, German, Spanish, and French
 
 ## Installation
 

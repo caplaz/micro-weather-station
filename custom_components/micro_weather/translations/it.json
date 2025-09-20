@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurazione Sensori Stazione Meteo",
+        "description": "Configura la tua stazione meteorologica selezionando le entità dei sensori.",
+        "data": {
+          "outdoor_temp_sensor": "Sensore Temperatura Esterna (Obbligatorio)",
+          "indoor_temp_sensor": "Sensore Temperatura Interna (Opzionale)",
+          "humidity_sensor": "Sensore Umidità (Opzionale)",
+          "pressure_sensor": "Sensore Pressione Atmosferica (Opzionale)",
+          "wind_speed_sensor": "Sensore Velocità del Vento (Opzionale)",
+          "wind_direction_sensor": "Sensore Direzione del Vento (Opzionale)",
+          "wind_gust_sensor": "Sensore Raffiche di Vento (Opzionale)",
+          "rain_rate_sensor": "Sensore Intensità Pioggia (Opzionale)",
+          "rain_state_sensor": "Sensore Stato Pioggia (Opzionale)",
+          "solar_radiation_sensor": "Sensore Radiazione Solare (Opzionale)",
+          "solar_lux_sensor": "Sensore Lux Solare (Opzionale)",
+          "uv_index_sensor": "Sensore Indice UV (Opzionale)",
+          "update_interval": "Intervallo di aggiornamento in minuti"
+        }
+      }
+    },
+    "error": {
+      "missing_outdoor_temp": "Il sensore di temperatura esterna è obbligatorio.",
+      "unknown": "Si è verificato un errore sconosciuto."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opzioni Sensori Stazione Meteo",
+        "description": "Aggiorna la configurazione dei sensori della tua stazione meteorologica.",
+        "data": {
+          "outdoor_temp_sensor": "Sensore Temperatura Esterna (Obbligatorio)",
+          "indoor_temp_sensor": "Sensore Temperatura Interna (Opzionale)",
+          "humidity_sensor": "Sensore Umidità (Opzionale)",
+          "pressure_sensor": "Sensore Pressione Atmosferica (Opzionale)",
+          "wind_speed_sensor": "Sensore Velocità del Vento (Opzionale)",
+          "wind_direction_sensor": "Sensore Direzione del Vento (Opzionale)",
+          "wind_gust_sensor": "Sensore Raffiche di Vento (Opzionale)",
+          "rain_rate_sensor": "Sensore Intensità Pioggia (Opzionale)",
+          "rain_state_sensor": "Sensore Stato Pioggia (Opzionale)",
+          "solar_radiation_sensor": "Sensore Radiazione Solare (Opzionale)",
+          "solar_lux_sensor": "Sensore Lux Solare (Opzionale)",
+          "uv_index_sensor": "Sensore Indice UV (Opzionale)",
+          "update_interval": "Intervallo di aggiornamento in minuti"
+        }
+      }
+    },
+    "error": {
+      "missing_outdoor_temp": "Il sensore di temperatura esterna è obbligatorio.",
+      "unknown": "Si è verificato un errore sconosciuto."
+    }
+  }
+}

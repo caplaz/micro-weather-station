@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wetterstation Sensor-Einrichtung",
+        "description": "Konfigurieren Sie Ihre Wetterstation durch Auswahl der Sensor-Entitäten.",
+        "data": {
+          "outdoor_temp_sensor": "Außentemperatur-Sensor (Erforderlich)",
+          "indoor_temp_sensor": "Innentemperatur-Sensor (Optional)",
+          "humidity_sensor": "Luftfeuchtigkeits-Sensor (Optional)",
+          "pressure_sensor": "Luftdruck-Sensor (Optional)",
+          "wind_speed_sensor": "Windgeschwindigkeits-Sensor (Optional)",
+          "wind_direction_sensor": "Windrichtungs-Sensor (Optional)",
+          "wind_gust_sensor": "Windböen-Sensor (Optional)",
+          "rain_rate_sensor": "Niederschlagsraten-Sensor (Optional)",
+          "rain_state_sensor": "Regenstatus-Sensor (Optional)",
+          "solar_radiation_sensor": "Sonneneinstrahlung-Sensor (Optional)",
+          "solar_lux_sensor": "Solar-Lux-Sensor (Optional)",
+          "uv_index_sensor": "UV-Index-Sensor (Optional)",
+          "update_interval": "Aktualisierungsintervall in Minuten"
+        }
+      }
+    },
+    "error": {
+      "missing_outdoor_temp": "Außentemperatur-Sensor ist erforderlich.",
+      "unknown": "Ein unbekannter Fehler ist aufgetreten."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Wetterstation Sensor-Optionen",
+        "description": "Aktualisieren Sie die Sensor-Konfiguration Ihrer Wetterstation.",
+        "data": {
+          "outdoor_temp_sensor": "Außentemperatur-Sensor (Erforderlich)",
+          "indoor_temp_sensor": "Innentemperatur-Sensor (Optional)",
+          "humidity_sensor": "Luftfeuchtigkeits-Sensor (Optional)",
+          "pressure_sensor": "Luftdruck-Sensor (Optional)",
+          "wind_speed_sensor": "Windgeschwindigkeits-Sensor (Optional)",
+          "wind_direction_sensor": "Windrichtungs-Sensor (Optional)",
+          "wind_gust_sensor": "Windböen-Sensor (Optional)",
+          "rain_rate_sensor": "Niederschlagsraten-Sensor (Optional)",
+          "rain_state_sensor": "Regenstatus-Sensor (Optional)",
+          "solar_radiation_sensor": "Sonneneinstrahlung-Sensor (Optional)",
+          "solar_lux_sensor": "Solar-Lux-Sensor (Optional)",
+          "uv_index_sensor": "UV-Index-Sensor (Optional)",
+          "update_interval": "Aktualisierungsintervall in Minuten"
+        }
+      }
+    },
+    "error": {
+      "missing_outdoor_temp": "Außentemperatur-Sensor ist erforderlich.",
+      "unknown": "Ein unbekannter Fehler ist aufgetreten."
+    }
+  }
+}

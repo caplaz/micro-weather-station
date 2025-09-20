@@ -1,0 +1,56 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuration des Capteurs de Station Météo",
+        "description": "Configurez votre station météorologique en sélectionnant les entités de capteurs.",
+        "data": {
+          "outdoor_temp_sensor": "Capteur de Température Extérieure (Requis)",
+          "indoor_temp_sensor": "Capteur de Température Intérieure (Optionnel)",
+          "humidity_sensor": "Capteur d'Humidité (Optionnel)",
+          "pressure_sensor": "Capteur de Pression Atmosphérique (Optionnel)",
+          "wind_speed_sensor": "Capteur de Vitesse du Vent (Optionnel)",
+          "wind_direction_sensor": "Capteur de Direction du Vent (Optionnel)",
+          "wind_gust_sensor": "Capteur de Rafales de Vent (Optionnel)",
+          "rain_rate_sensor": "Capteur de Taux de Précipitation (Optionnel)",
+          "rain_state_sensor": "Capteur d'État de Pluie (Optionnel)",
+          "solar_radiation_sensor": "Capteur de Radiation Solaire (Optionnel)",
+          "solar_lux_sensor": "Capteur de Lux Solaire (Optionnel)",
+          "uv_index_sensor": "Capteur d'Indice UV (Optionnel)",
+          "update_interval": "Intervalle de mise à jour en minutes"
+        }
+      }
+    },
+    "error": {
+      "missing_outdoor_temp": "Le capteur de température extérieure est requis.",
+      "unknown": "Une erreur inconnue s'est produite."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options des Capteurs de Station Météo",
+        "description": "Mettez à jour la configuration des capteurs de votre station météorologique.",
+        "data": {
+          "outdoor_temp_sensor": "Capteur de Température Extérieure (Requis)",
+          "indoor_temp_sensor": "Capteur de Température Intérieure (Optionnel)",
+          "humidity_sensor": "Capteur d'Humidité (Optionnel)",
+          "pressure_sensor": "Capteur de Pression Atmosphérique (Optionnel)",
+          "wind_speed_sensor": "Capteur de Vitesse du Vent (Optionnel)",
+          "wind_direction_sensor": "Capteur de Direction du Vent (Optionnel)",
+          "wind_gust_sensor": "Capteur de Rafales de Vent (Optionnel)",
+          "rain_rate_sensor": "Capteur de Taux de Précipitation (Optionnel)",
+          "rain_state_sensor": "Capteur d'État de Pluie (Optionnel)",
+          "solar_radiation_sensor": "Capteur de Radiation Solaire (Optionnel)",
+          "solar_lux_sensor": "Capteur de Lux Solaire (Optionnel)",
+          "uv_index_sensor": "Capteur d'Indice UV (Optionnel)",
+          "update_interval": "Intervalle de mise à jour en minutes"
+        }
+      }
+    },
+    "error": {
+      "missing_outdoor_temp": "Le capteur de température extérieure est requis.",
+      "unknown": "Une erreur inconnue s'est produite."
+    }
+  }
+}

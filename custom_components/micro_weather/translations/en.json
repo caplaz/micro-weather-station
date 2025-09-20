@@ -25,5 +25,32 @@
       "missing_outdoor_temp": "Outdoor temperature sensor is required.",
       "unknown": "Unknown error occurred."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Weather Station Sensor Options",
+        "description": "Update your weather station sensor configuration.",
+        "data": {
+          "outdoor_temp_sensor": "Outdoor Temperature Sensor (Required)",
+          "indoor_temp_sensor": "Indoor Temperature Sensor (Optional)",
+          "humidity_sensor": "Humidity Sensor (Optional)",
+          "pressure_sensor": "Atmospheric Pressure Sensor (Optional)",
+          "wind_speed_sensor": "Wind Speed Sensor (Optional)",
+          "wind_direction_sensor": "Wind Direction Sensor (Optional)",
+          "wind_gust_sensor": "Wind Gust Sensor (Optional)",
+          "rain_rate_sensor": "Rain Rate Sensor (Optional)",
+          "rain_state_sensor": "Rain State Sensor (Optional)",
+          "solar_radiation_sensor": "Solar Radiation Sensor (Optional)",
+          "solar_lux_sensor": "Solar Lux Sensor (Optional)",
+          "uv_index_sensor": "UV Index Sensor (Optional)",
+          "update_interval": "Update interval in minutes"
+        }
+      }
+    },
+    "error": {
+      "missing_outdoor_temp": "Outdoor temperature sensor is required.",
+      "unknown": "Unknown error occurred."
+    }
   }
 }
