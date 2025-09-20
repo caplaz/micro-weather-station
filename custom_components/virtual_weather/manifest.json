@@ -1,0 +1,12 @@
+{
+  "domain": "virtual_weather",
+  "name": "Virtual Weather Station",
+  "version": "1.0.0",
+  "documentation": "https://github.com/ace/virtual-weather-station",
+  "issue_tracker": "https://github.com/ace/virtual-weather-station/issues",
+  "dependencies": [],
+  "codeowners": ["@ace"],
+  "requirements": [],
+  "config_flow": true,
+  "iot_class": "calculated"
+}

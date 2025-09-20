@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Virtual Weather Station Setup",
+        "description": "Configure your virtual weather station parameters.",
+        "data": {
+          "temperature_range": "Temperature range (min, max) in °C",
+          "humidity_range": "Humidity range (min, max) in %",
+          "pressure_range": "Pressure range (min, max) in hPa",
+          "wind_speed_range": "Wind speed range (min, max) in km/h",
+          "update_interval": "Update interval in minutes",
+          "weather_patterns": "Enabled weather patterns"
+        }
+      }
+    },
+    "error": {
+      "invalid_range": "Invalid range format. Use 'min, max' format."
+    }
+  }
+}
