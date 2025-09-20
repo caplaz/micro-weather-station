@@ -35,32 +35,266 @@ This integration analyzes your real sensor data to provide weather conditions th
 
 ## Installation
 
-### HACS (Recommended)
+### Method 1: HACS (Recommended)
 
-1. Make sure you have [HACS](https://hacs.xyz/) installed
-2. Go to HACS → Integrations
-3. Click the three dots menu → Custom repositories
-4. Add this repository: `https://github.com/caplaz/micro-weather-station`
-5. Category: Integration
-6. Click "Add"
-7. Find "Micro Weather Station" in the list and install it
-8. Restart Home Assistant
+HACS (Home Assistant Community Store) is the easiest way to install and manage custom integrations.
 
-### Manual Installation
+#### Prerequisites
 
-1. Download the `micro_weather` folder from the latest release
-2. Copy the folder to your `custom_components` directory
-3. Restart Home Assistant
+- [HACS](https://hacs.xyz/) must be installed in your Home Assistant instance
+- Home Assistant version 2023.1.0 or higher
+
+#### Installation Steps
+
+1. **Open HACS**: Go to HACS in your Home Assistant sidebar
+2. **Navigate to Integrations**: Click on "Integrations"
+3. **Add Custom Repository**:
+   - Click the three dots menu (⋮) in the top right
+   - Select "Custom repositories"
+   - Add repository URL: `https://github.com/caplaz/micro-weather-station`
+   - Set category to "Integration"
+   - Click "Add"
+4. **Install Integration**:
+   - Search for "Micro Weather Station" in HACS
+   - Click on it and select "Download"
+   - Choose the latest version
+5. **Restart Home Assistant**: Required for the integration to load
+
+### Method 2: Manual Installation
+
+For advanced users or custom setups.
+
+#### Download Options
+
+- **Latest Release**: Download from [GitHub Releases](https://github.com/caplaz/micro-weather-station/releases)
+- **Development Version**: Clone the repository for latest features
+
+#### Installation Steps
+
+1. **Download Files**:
+
+   ```bash
+   # Option A: Download release
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.0.0.zip
+   unzip v1.0.0.zip
+
+   # Option B: Clone repository
+   git clone https://github.com/caplaz/micro-weather-station.git
+   ```
+
+2. **Copy to Home Assistant**:
+
+   ```bash
+   # Copy the integration folder to your custom_components directory
+   cp -r micro-weather-station/custom_components/micro_weather /config/custom_components/
+   ```
+
+3. **Verify Installation**:
+   Your directory structure should look like:
+
+   ```
+   /config/custom_components/micro_weather/
+   ├── __init__.py
+   ├── config_flow.py
+   ├── const.py
+   ├── manifest.json
+   ├── sensor.py
+   ├── strings.json
+   ├── version.py
+   ├── weather_detector.py
+   ├── weather.py
+   └── translations/
+       └── en.json
+   ```
+
+4. **Restart Home Assistant**: Go to Settings → System → Restart
+
+### Method 3: Development/Testing Installation
+
+For developers wanting to test or contribute.
+
+#### Prerequisites
+
+- Git installed
+- Home Assistant development environment
+- Python 3.11+ with virtual environment
+
+#### Development Setup
+
+1. **Clone Repository**:
+
+   ```bash
+   git clone https://github.com/caplaz/micro-weather-station.git
+   cd micro-weather-station
+   ```
+
+2. **Create Symbolic Link** (preserves git history):
+
+   ```bash
+   # Link to your HA config directory
+   ln -s $(pwd)/custom_components/micro_weather /config/custom_components/micro_weather
+   ```
+
+3. **Install Development Dependencies**:
+
+   ```bash
+   pip install -r requirements-dev.txt
+   ```
+
+4. **Run Tests**:
+   ```bash
+   python -m pytest tests/
+   ```
+
+### Verification
+
+After installation, verify the integration is loaded:
+
+1. **Check Logs**: Go to Settings → System → Logs
+
+   - Look for `micro_weather` entries
+   - No errors should be present
+
+2. **Integration Available**: Go to Settings → Devices & Services
+
+   - Click "Add Integration"
+   - Search for "Micro Weather Station"
+   - It should appear in the list
+
+3. **Version Check**: In Developer Tools → States, search for `sensor.micro_weather`
+   - Entities should be available after configuration
 
 ## Configuration
 
-### Adding the Integration
+### Step 1: Adding the Integration
 
-1. Go to Settings → Devices & Services
-2. Click "Add Integration"
-3. Search for "Micro Weather Station"
-4. Select your sensor entities from the dropdown menus
-5. Configure update interval
+1. **Navigate to Integrations**: Go to Settings → Devices & Services
+2. **Add Integration**: Click "Add Integration" button
+3. **Search**: Type "Micro Weather Station" in the search box
+4. **Select**: Click on "Micro Weather Station" from the results
+
+### Step 2: Sensor Configuration
+
+The configuration flow will guide you through selecting your sensors:
+
+#### Required Configuration
+
+- **Outdoor Temperature**: Select your outdoor temperature sensor entity
+- **Update Interval**: Set how often to check sensors (default: 5 minutes)
+
+#### Optional Sensor Mapping
+
+Configure additional sensors for enhanced weather detection:
+
+| Configuration Field | Example Entity ID           | Purpose                             |
+| ------------------- | --------------------------- | ----------------------------------- |
+| Indoor Temperature  | `sensor.indoor_temperature` | Temperature differential analysis   |
+| Humidity            | `sensor.humidity`           | Humidity readings and fog detection |
+| Pressure            | `sensor.pressure`           | Storm prediction and forecasting    |
+| Wind Speed          | `sensor.wind_speed`         | Wind condition detection            |
+| Wind Direction      | `sensor.wind_direction`     | Wind data and storm analysis        |
+| Wind Gust           | `sensor.wind_gust`          | Storm and severe weather detection  |
+| Rain Rate           | `sensor.rain_rate`          | Precipitation rate measurement      |
+| Rain State          | `sensor.rain_detector`      | Precipitation state detection       |
+| Solar Radiation     | `sensor.solar_radiation`    | Cloud cover and solar analysis      |
+| Solar Lux           | `sensor.light_sensor`       | Day/night and cloud detection       |
+| UV Index            | `sensor.uv_index`           | Clear sky and sun intensity         |
+
+### Step 3: Testing Your Configuration
+
+#### Initial Verification
+
+1. **Check Integration Status**:
+
+   - Go to Settings → Devices & Services
+   - Find "Micro Weather Station" integration
+   - Should show status "Configured" with no errors
+
+2. **Verify Entities Created**:
+
+   - Go to Developer Tools → States
+   - Search for `micro_weather`
+   - Should see weather entity and sensor entities
+
+3. **Test Weather Entity**:
+   - Find `weather.micro_weather_station`
+   - Check that it has a valid state (e.g., "sunny", "cloudy")
+   - Verify attributes contain sensor data
+
+#### Advanced Testing
+
+1. **Sensor Data Validation**:
+
+   ```yaml
+   # Check in Developer Tools → States
+   weather.micro_weather_station:
+     state: sunny
+     attributes:
+       temperature: 22.5
+       humidity: 65
+       pressure: 1013.2
+       wind_speed: 10.5
+       wind_bearing: 180
+       visibility: 10
+   ```
+
+2. **Weather Condition Testing**:
+
+   - Change sensor values to test different conditions
+   - Verify weather state updates accordingly
+   - Test with different sensor combinations
+
+3. **Forecast Validation**:
+   - Check `forecast` attribute in weather entity
+   - Verify daily and hourly forecasts are present
+   - Test forecast updates over time
+
+### Step 4: Dashboard Integration
+
+#### Add Weather Card
+
+1. **Edit Dashboard**: Go to your dashboard and click "Edit"
+2. **Add Card**: Click "Add Card" → "Weather Forecast"
+3. **Configure**: Select `weather.micro_weather_station`
+4. **Save**: The weather card should display your data
+
+#### Add Sensor Cards
+
+```yaml
+# Example sensor card configuration
+type: entities
+entities:
+  - entity: sensor.micro_weather_station_temperature
+    name: Temperature
+    icon: mdi:thermometer
+  - entity: sensor.micro_weather_station_humidity
+    name: Humidity
+    icon: mdi:water-percent
+  - entity: sensor.micro_weather_station_pressure
+    name: Pressure
+    icon: mdi:gauge
+title: Weather Sensors
+```
+
+### Step 5: Automation Testing
+
+Create a test automation to verify the integration works:
+
+```yaml
+# Test automation
+automation:
+  - alias: "Test Weather Integration"
+    trigger:
+      - platform: state
+        entity_id: weather.micro_weather_station
+    action:
+      - service: notify.persistent_notification
+        data:
+          message: >
+            Weather changed to: {{ states('weather.micro_weather_station') }}
+            Temperature: {{ state_attr('weather.micro_weather_station', 'temperature') }}°C
+          title: "Weather Update"
+```
 
 ### Required Sensors
 
@@ -273,24 +507,213 @@ This integration is perfect for:
 
 ## Troubleshooting
 
-### Integration Not Loading
+### Common Installation Issues
 
-- Check Home Assistant logs for errors
-- Ensure all files are in the correct directory
-- Restart Home Assistant after installation
+#### Integration Not Found
 
-### No Sensor Data
+**Problem**: "Micro Weather Station" doesn't appear when adding integrations.
 
-- Verify that your configured sensors exist and have valid states
-- Check sensor entity IDs in the integration configuration
-- Review entity states in Developer Tools → States
+**Solutions**:
 
-### Weather Conditions Not Updating
+1. **Verify Installation**:
+   ```bash
+   # Check if files exist
+   ls -la /config/custom_components/micro_weather/
+   ```
+2. **Check Logs**: Settings → System → Logs, search for `micro_weather`
+3. **Restart Required**: Restart Home Assistant after installation
+4. **Clear Browser Cache**: Hard refresh (Ctrl+F5) or clear cache
 
-- Ensure your sensors are providing current data
-- Check that sensor values are within expected ranges
-- Verify the integration update interval in configuration
-- Review logs for any sensor reading errors
+#### Integration Loading Errors
+
+**Problem**: Integration loads but shows errors in logs.
+
+**Solutions**:
+
+1. **Check Python Version**: Requires Python 3.11+
+2. **Verify Dependencies**: All sensors should exist in HA
+3. **Review Manifest**: Check `custom_components/micro_weather/manifest.json`
+4. **File Permissions**: Ensure files are readable by HA user
+
+### Configuration Issues
+
+#### No Sensors Available
+
+**Problem**: Dropdown menus are empty during configuration.
+
+**Solutions**:
+
+1. **Verify Sensor Entities**:
+   - Go to Developer Tools → States
+   - Search for your temperature sensors
+   - Entity IDs must match exactly
+2. **Check Sensor Types**:
+   ```yaml
+   # Valid temperature sensors should have device_class
+   sensor.outdoor_temp:
+     device_class: temperature
+     unit_of_measurement: "°C" # or "°F"
+   ```
+3. **Sensor States**: Ensure sensors have valid numeric values
+
+#### Weather Conditions Not Updating
+
+**Problem**: Weather entity stuck on one condition.
+
+**Diagnostic Steps**:
+
+1. **Check Sensor Values**:
+
+   ```bash
+   # In Developer Tools → States, verify:
+   sensor.outdoor_temperature: 22.5  # Valid number
+   sensor.humidity: 65              # 0-100 range
+   sensor.pressure: 1013.2          # Valid pressure
+   ```
+
+2. **Review Detection Logic**:
+
+   - High solar radiation (>400 W/m²) = Sunny
+   - Active rain sensor = Rainy
+   - Low solar + high humidity = Foggy
+   - Default = Cloudy
+
+3. **Check Update Interval**: Verify sensors update within configured interval
+
+### Testing and Validation
+
+#### Manual Testing Steps
+
+1. **Basic Functionality Test**:
+
+   ```yaml
+   # Developer Tools → Services
+   service: homeassistant.update_entity
+   target:
+     entity_id: weather.micro_weather_station
+   ```
+
+2. **Sensor Response Test**:
+
+   - Manually change a sensor value (if possible)
+   - Wait for update interval
+   - Check if weather condition changes
+
+3. **Forecast Test**:
+   ```python
+   # Check forecast data exists
+   forecast = state_attr('weather.micro_weather_station', 'forecast')
+   # Should return list of forecast periods
+   ```
+
+#### Log Analysis
+
+**Enable Debug Logging**:
+
+```yaml
+# configuration.yaml
+logger:
+  default: info
+  logs:
+    custom_components.micro_weather: debug
+```
+
+**Key Log Messages**:
+
+- `Setting up micro_weather` - Integration loading
+- `Weather condition detected` - Condition changes
+- `Sensor updated` - Individual sensor updates
+- `Forecast generated` - Forecast calculations
+
+#### Performance Monitoring
+
+1. **Resource Usage**:
+
+   - Monitor CPU usage during updates
+   - Check memory consumption
+   - Verify update frequency is appropriate
+
+2. **Sensor Health**:
+   ```yaml
+   # Create automation to monitor sensor availability
+   automation:
+     - alias: "Weather Sensor Health Check"
+       trigger:
+         - platform: state
+           entity_id: sensor.outdoor_temperature
+           to: "unavailable"
+       action:
+         - service: notify.persistent_notification
+           data:
+             message: "Weather sensor offline: outdoor temperature"
+   ```
+
+### Advanced Debugging
+
+#### Integration Reload
+
+```yaml
+# Developer Tools → Services
+service: homeassistant.reload_config_entry
+target:
+  entity_id: weather.micro_weather_station
+```
+
+#### Custom Component Debugging
+
+1. **Check Integration Registry**:
+
+   - Settings → Devices & Services
+   - Find "Micro Weather Station"
+   - Click "Configure" to verify settings
+
+2. **Entity Registry Verification**:
+
+   - Developer Tools → States
+   - All micro_weather entities should be present
+   - Check entity attributes for data consistency
+
+3. **Component State Machine**:
+   ```python
+   # Verify entity states in Developer Tools
+   weather.micro_weather_station:
+     state: "sunny"  # Valid weather condition
+     attributes:
+       temperature: float  # Numeric value
+       humidity: float     # 0-100 range
+       forecast: list      # Array of forecast data
+   ```
+
+### Getting Help
+
+#### Information to Provide
+
+When reporting issues, include:
+
+1. **Home Assistant Version**: Settings → About
+2. **Integration Version**: Check HACS or git tag
+3. **Sensor Configuration**: List of configured sensors
+4. **Error Logs**: Full error messages from logs
+5. **Sensor States**: Current values of configured sensors
+
+#### Useful Commands
+
+```bash
+# Check HA logs for errors
+grep -i "micro_weather" /config/home-assistant.log
+
+# Verify file integrity
+find /config/custom_components/micro_weather -name "*.py" -exec python -m py_compile {} \;
+
+# Check sensor availability
+ha-cli state list | grep temperature
+```
+
+#### Support Channels
+
+- 🐛 [GitHub Issues](https://github.com/caplaz/micro-weather-station/issues) - Bug reports and feature requests
+- 💬 [Home Assistant Community](https://community.home-assistant.io/) - General questions and discussions
+- 📚 [Documentation](https://github.com/caplaz/micro-weather-station#readme) - Complete setup guide
 
 ## Contributing
 
