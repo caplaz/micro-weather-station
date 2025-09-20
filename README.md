@@ -1,4 +1,4 @@
-# Smart Weather Station for Home Assistant
+# Micro Weather Station for Home Assistant
 
 [![GitHub Release][releases-shield]][releases]
 [![GitHub Activity][commits-shield]][commits]
@@ -7,7 +7,7 @@
 
 A Home Assistant custom integration that creates a smart weather station by analyzing your existing sensor data to determine accurate weather conditions for your specific location and microclimate. Weather station data from external services can be unreliable or not reflect your specific environment - this integration uses your actual sensor readings to provide weather conditions that truly represent what's happening at your location.
 
-![Smart Weather Station][logo]
+![Micro Weather Station][logo]
 
 ## Why This Integration?
 
@@ -39,15 +39,15 @@ This integration analyzes your real sensor data to provide weather conditions th
 1. Make sure you have [HACS](https://hacs.xyz/) installed
 2. Go to HACS → Integrations
 3. Click the three dots menu → Custom repositories
-4. Add this repository: `https://github.com/caplaz/virtual-weather-station`
+4. Add this repository: `https://github.com/caplaz/micro-weather-station`
 5. Category: Integration
 6. Click "Add"
-7. Find "Smart Weather Station" in the list and install it
+7. Find "Micro Weather Station" in the list and install it
 8. Restart Home Assistant
 
 ### Manual Installation
 
-1. Download the `virtual_weather` folder from the latest release
+1. Download the `micro_weather` folder from the latest release
 2. Copy the folder to your `custom_components` directory
 3. Restart Home Assistant
 
@@ -57,7 +57,7 @@ This integration analyzes your real sensor data to provide weather conditions th
 
 1. Go to Settings → Devices & Services
 2. Click "Add Integration"
-3. Search for "Smart Weather Station"
+3. Search for "Micro Weather Station"
 4. Select your sensor entities from the dropdown menus
 5. Configure update interval
 
@@ -105,16 +105,16 @@ UV Index: sensor.uv_index
 
 ### Weather Entity
 
-- `weather.smart_weather_station` - Main weather entity with current conditions and forecast
+- `weather.micro_weather_station` - Main weather entity with current conditions and forecast
 
 ### Sensor Entities
 
-- `sensor.smart_weather_station_temperature` - Current temperature (°C)
-- `sensor.smart_weather_station_humidity` - Current humidity (%)
-- `sensor.smart_weather_station_pressure` - Current pressure (hPa)
-- `sensor.smart_weather_station_wind_speed` - Current wind speed (km/h)
-- `sensor.smart_weather_station_wind_direction` - Current wind direction (°)
-- `sensor.smart_weather_station_visibility` - Current visibility (km)
+- `sensor.micro_weather_station_temperature` - Current temperature (°C)
+- `sensor.micro_weather_station_humidity` - Current humidity (%)
+- `sensor.micro_weather_station_pressure` - Current pressure (hPa)
+- `sensor.micro_weather_station_wind_speed` - Current wind speed (km/h)
+- `sensor.micro_weather_station_wind_direction` - Current wind direction (°)
+- `sensor.micro_weather_station_visibility` - Current visibility (km)
 
 ## Weather Detection Logic
 
@@ -141,7 +141,7 @@ automation:
   - alias: "Cloudy Day Lights"
     trigger:
       - platform: state
-        entity_id: weather.smart_weather_station
+        entity_id: weather.micro_weather_station
         to: "cloudy"
     action:
       - service: light.turn_on
@@ -157,7 +157,7 @@ automation:
   - alias: "Storm Alert"
     trigger:
       - platform: state
-        entity_id: weather.smart_weather_station
+        entity_id: weather.micro_weather_station
         to: "lightning-rainy"
     action:
       - service: notify.mobile_app
@@ -177,7 +177,7 @@ automation:
       - condition: not
         conditions:
           - condition: state
-            entity_id: weather.smart_weather_station
+            entity_id: weather.micro_weather_station
             state: "rainy"
     action:
       - service: switch.turn_on
@@ -192,21 +192,21 @@ automation:
   - alias: "High Temperature Alert"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.smart_weather_station_temperature
+        entity_id: sensor.micro_weather_station_temperature
         above: 30
     action:
       - service: notify.mobile_app
         data:
-          message: "Temperature is high: {{ states('sensor.smart_weather_station_temperature') }}°C"
+          message: "Temperature is high: {{ states('sensor.micro_weather_station_temperature') }}°C"
 ```
 
-## Lovelace Cards
+## Lovelcaplaz Cards
 
 ### Weather Card
 
 ```yaml
 type: weather-forecast
-entity: weather.smart_weather_station
+entity: weather.micro_weather_station
 ```
 
 ### Sensor Dashboard
@@ -214,13 +214,13 @@ entity: weather.smart_weather_station
 ```yaml
 type: entities
 entities:
-  - entity: sensor.smart_weather_station_temperature
+  - entity: sensor.micro_weather_station_temperature
     name: Temperature
-  - entity: sensor.smart_weather_station_humidity
+  - entity: sensor.micro_weather_station_humidity
     name: Humidity
-  - entity: sensor.smart_weather_station_pressure
+  - entity: sensor.micro_weather_station_pressure
     name: Pressure
-  - entity: sensor.smart_weather_station_wind_speed
+  - entity: sensor.micro_weather_station_wind_speed
     name: Wind Speed
 title: Weather Station
 ```
@@ -230,8 +230,8 @@ title: Weather Station
 ```yaml
 type: history-graph
 entities:
-  - sensor.smart_weather_station_temperature
-  - sensor.smart_weather_station_humidity
+  - sensor.micro_weather_station_temperature
+  - sensor.micro_weather_station_humidity
 hours_to_show: 24
 refresh_interval: 300
 ```
@@ -281,7 +281,7 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/ace/virtual-weather-station/issues)
+- 🐛 [Report Issues](https://github.com/caplaz/micro-weather-station/issues)
 - 💬 [Community Forum](https://community.home-assistant.io/)
 - 📚 [Home Assistant Documentation](https://www.home-assistant.io/docs/)
 
@@ -304,11 +304,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/ace/virtual-weather-station.svg?style=for-the-badge
-[commits]: https://github.com/ace/virtual-weather-station/commits/main
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge
+[commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
-[license-shield]: https://img.shields.io/github/license/ace/virtual-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/ace/virtual-weather-station.svg?style=for-the-badge
-[releases]: https://github.com/ace/virtual-weather-station/releases
-[logo]: https://raw.githubusercontent.com/ace/virtual-weather-station/main/images/logo.png
+[license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge
+[releases]: https://github.com/caplaz/micro-weather-station/releases
+[logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png

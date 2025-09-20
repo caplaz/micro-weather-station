@@ -1,6 +1,6 @@
 # Weather Detection Algorithm
 
-This document explains how the Smart Weather Station determines weather conditions from your real sensor data.
+This document explains how the Micro Weather Station determines weather conditions from your real sensor data.
 
 ## Your Available Sensors
 

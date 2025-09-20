@@ -1,4 +1,4 @@
-"""Sensor entities for Smart Weather Station."""
+"""Sensor entities for Micro Weather Station."""
 import logging
 from typing import Any
 
@@ -22,18 +22,18 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the Smart Weather Station sensor entities."""
+    """Set up the Micro Weather Station sensor entities."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
     
     sensors = []
     for sensor_type in SENSOR_TYPES:
-        sensors.append(VirtualWeatherSensor(coordinator, config_entry, sensor_type))
+        sensors.append(MicroWeatherSensor(coordinator, config_entry, sensor_type))
     
     async_add_entities(sensors)
 
 
-class VirtualWeatherSensor(CoordinatorEntity, SensorEntity):
-    """Smart Weather Station sensor entity."""
+class MicroWeatherSensor(CoordinatorEntity, SensorEntity):
+    """Micro Weather Station sensor entity."""
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -60,9 +60,9 @@ class VirtualWeatherSensor(CoordinatorEntity, SensorEntity):
         
         self._attr_device_info = {
             "identifiers": {(DOMAIN, config_entry.entry_id)},
-            "name": "Smart Weather Station",
-            "manufacturer": "Virtual Weather",
-            "model": "VWS-1",
+            "name": "Micro Weather Station",
+            "manufacturer": "Micro Weather",
+            "model": "MWS-1",
             "sw_version": "1.0.0",
         }
 

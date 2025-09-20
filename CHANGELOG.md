@@ -2,7 +2,7 @@
 
 ### Features
 
-- Initial release of Smart Weather Station integration
+- Initial release of Micro Weather Station integration
 - Weather entity with intelligent condition detection based on real sensor data
 - Individual sensor entities that relay data from your configured weather sensors
 - Priority-based weather detection algorithm using precipitation, wind, solar radiation, and environmental data

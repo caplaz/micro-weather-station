@@ -1,4 +1,4 @@
-"""Config flow for Smart Weather Station integration."""
+"""Config flow for Micro Weather Station integration."""
 import logging
 from typing import Any
 
@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Smart Weather Station."""
+    """Handle a config flow for Micro Weather Station."""
 
     VERSION = 1
 
@@ -66,7 +66,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
 
                     return self.async_create_entry(
-                        title="Smart Weather Station",
+                        title="Micro Weather Station",
                         data={},
                         options=options,
                     )
@@ -135,7 +135,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options flow for Smart Weather Station."""
+    """Handle options flow for Micro Weather Station."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""

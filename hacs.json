@@ -1,5 +1,5 @@
 {
-  "name": "Smart Weather Station",
+  "name": "Micro Weather Station",
   "render_readme": true,
   "domains": ["weather", "sensor"]
 }

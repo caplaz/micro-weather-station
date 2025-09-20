@@ -1,0 +1,12 @@
+{
+  "domain": "micro_weather",
+  "name": "Micro Weather Station",
+  "version": "1.0.0",
+  "documentation": "https://github.com/caplaz/micro-weather-station",
+  "issue_tracker": "https://github.com/caplaz/micro-weather-station/issues",
+  "dependencies": [],
+  "codeowners": ["@caplaz"],
+  "requirements": [],
+  "config_flow": true,
+  "iot_class": "local_polling"
+}

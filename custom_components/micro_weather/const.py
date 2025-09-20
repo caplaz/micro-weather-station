@@ -1,6 +1,6 @@
-"""Constants for the Smart Weather Station integration."""
+"""Constants for the Micro Weather Station integration."""
 
-DOMAIN = "virtual_weather"
+DOMAIN = "micro_weather"
 
 # Configuration options
 CONF_TEMPERATURE_RANGE = "temperature_range"

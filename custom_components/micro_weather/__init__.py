@@ -1,4 +1,4 @@
-"""Smart Weather Station integration for Home Assistant."""
+"""Micro Weather Station integration for Home Assistant."""
 import logging
 from datetime import timedelta
 
@@ -15,8 +15,8 @@ PLATFORMS: list[Platform] = [Platform.WEATHER, Platform.SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Smart Weather Station from a config entry."""
-    _LOGGER.info("Setting up Smart Weather Station integration")
+    """Set up Micro Weather Station from a config entry."""
+    _LOGGER.info("Setting up Micro Weather Station integration")
     
     # Create coordinator for managing updates
     coordinator = VirtualWeatherCoordinator(hass, entry)
