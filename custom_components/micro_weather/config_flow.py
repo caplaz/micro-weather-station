@@ -138,7 +138,6 @@ class ConfigFlow(config_entries.ConfigFlow):
         )
 
     @staticmethod
-    @config_entries.HANDLERS.register(DOMAIN)
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
