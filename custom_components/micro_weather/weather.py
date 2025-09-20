@@ -4,7 +4,6 @@ import logging
 from typing import Any
 
 from homeassistant.components.weather import (
-    ATTR_CONDITION_SUNNY,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING_RAINY,
@@ -12,6 +11,7 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_RAINY,
     ATTR_CONDITION_SNOWY,
     ATTR_CONDITION_SNOWY_RAINY,
+    ATTR_CONDITION_SUNNY,
     WeatherEntity,
     WeatherEntityFeature,
 )
