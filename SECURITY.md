@@ -49,6 +49,7 @@ When using this integration:
 ## Security Updates
 
 Security updates will be:
+
 - Released as patch versions (e.g., 1.0.1 → 1.0.2)
 - Documented in the CHANGELOG.md
 - Announced in GitHub releases

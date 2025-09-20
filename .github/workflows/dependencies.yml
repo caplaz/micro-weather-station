@@ -3,7 +3,7 @@ name: Dependency Updates
 on:
   schedule:
     # Run every Monday at 10:00 AM UTC
-    - cron: '0 10 * * 1'
+    - cron: "0 10 * * 1"
   workflow_dispatch:
 
 jobs:
@@ -11,97 +11,97 @@ jobs:
     name: Check for Updates
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Check Home Assistant Updates
-      id: ha_check
-      run: |
-        # Get latest Home Assistant version
-        LATEST_HA=$(curl -s https://api.github.com/repos/home-assistant/core/releases/latest | jq -r .tag_name)
-        echo "latest_ha=$LATEST_HA" >> $GITHUB_OUTPUT
-        echo "Latest Home Assistant version: $LATEST_HA"
-        
-        # Check current compatibility in manifest
-        MIN_HA_VERSION=$(python -c "
-        import json
-        with open('custom_components/micro_weather/manifest.json') as f:
-            manifest = json.load(f)
-        print(manifest.get('homeassistant', 'Not specified'))
-        ")
-        
-        echo "Current minimum HA version: $MIN_HA_VERSION"
-        echo "current_ha=$MIN_HA_VERSION" >> $GITHUB_OUTPUT
-    
-    - name: Check if update needed
-      id: update_needed
-      run: |
-        if [ "${{ steps.ha_check.outputs.latest_ha }}" != "${{ steps.ha_check.outputs.current_ha }}" ]; then
-          echo "update_needed=true" >> $GITHUB_OUTPUT
-          echo "Home Assistant update available"
-        else
-          echo "update_needed=false" >> $GITHUB_OUTPUT
-          echo "No Home Assistant update needed"
-        fi
-    
-    - name: Create Issue for Updates
-      if: steps.update_needed.outputs.update_needed == 'true'
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const { data: issues } = await github.rest.issues.listForRepo({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            labels: ['dependencies', 'enhancement'],
-            state: 'open'
-          });
-          
-          const existingIssue = issues.find(issue => 
-            issue.title.includes('Dependency Update')
-          );
-          
-          if (!existingIssue) {
-            await github.rest.issues.create({
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Check Home Assistant Updates
+        id: ha_check
+        run: |
+          # Get latest Home Assistant version
+          LATEST_HA=$(curl -s https://api.github.com/repos/home-assistant/core/releases/latest | jq -r .tag_name)
+          echo "latest_ha=$LATEST_HA" >> $GITHUB_OUTPUT
+          echo "Latest Home Assistant version: $LATEST_HA"
+
+          # Check current compatibility in manifest
+          MIN_HA_VERSION=$(python -c "
+          import json
+          with open('custom_components/micro_weather/manifest.json') as f:
+              manifest = json.load(f)
+          print(manifest.get('homeassistant', 'Not specified'))
+          ")
+
+          echo "Current minimum HA version: $MIN_HA_VERSION"
+          echo "current_ha=$MIN_HA_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if update needed
+        id: update_needed
+        run: |
+          if [ "${{ steps.ha_check.outputs.latest_ha }}" != "${{ steps.ha_check.outputs.current_ha }}" ]; then
+            echo "update_needed=true" >> $GITHUB_OUTPUT
+            echo "Home Assistant update available"
+          else
+            echo "update_needed=false" >> $GITHUB_OUTPUT
+            echo "No Home Assistant update needed"
+          fi
+
+      - name: Create Issue for Updates
+        if: steps.update_needed.outputs.update_needed == 'true'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: 'Dependency Update Available',
-              body: `## Dependency Updates Available
-              
-              ### Home Assistant
-              - **Current**: ${{ steps.ha_check.outputs.current_ha }}
-              - **Latest**: ${{ steps.ha_check.outputs.latest_ha }}
-              
-              ### Actions Required
-              - [ ] Test compatibility with latest Home Assistant version
-              - [ ] Update manifest.json if compatible
-              - [ ] Update documentation if needed
-              - [ ] Create new release if necessary
-              
-              This issue was automatically created by the dependency update workflow.`,
-              labels: ['dependencies', 'enhancement', 'automated']
+              labels: ['dependencies', 'enhancement'],
+              state: 'open'
             });
-          }
+
+            const existingIssue = issues.find(issue => 
+              issue.title.includes('Dependency Update')
+            );
+
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: 'Dependency Update Available',
+                body: `## Dependency Updates Available
+                
+                ### Home Assistant
+                - **Current**: ${{ steps.ha_check.outputs.current_ha }}
+                - **Latest**: ${{ steps.ha_check.outputs.latest_ha }}
+                
+                ### Actions Required
+                - [ ] Test compatibility with latest Home Assistant version
+                - [ ] Update manifest.json if compatible
+                - [ ] Update documentation if needed
+                - [ ] Create new release if necessary
+                
+                This issue was automatically created by the dependency update workflow.`,
+                labels: ['dependencies', 'enhancement', 'automated']
+              });
+            }
 
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-    
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results.sarif"

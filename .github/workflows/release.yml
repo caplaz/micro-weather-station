@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
@@ -13,121 +13,121 @@ jobs:
     name: Create Release
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Get version from tag
-      id: version
-      run: |
-        VERSION=${GITHUB_REF#refs/tags/v}
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-    
-    - name: Validate version consistency
-      run: |
-        TAG_VERSION="${{ steps.version.outputs.version }}"
-        
-        # Check manifest.json version
-        MANIFEST_VERSION=$(python -c "
-        import json
-        with open('custom_components/micro_weather/manifest.json') as f:
-            print(json.load(f)['version'])
-        ")
-        
-        if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
-          echo "Tag version ($TAG_VERSION) doesn't match manifest.json version ($MANIFEST_VERSION)"
-          exit 1
-        fi
-        
-        echo "Version validation passed: $TAG_VERSION"
-    
-    - name: Generate changelog
-      id: changelog
-      run: |
-        # Extract changelog for this version
-        if [ -f CHANGELOG.md ]; then
-          # Get content between this version and next version header
-          awk '/^## '"${{ steps.version.outputs.version }}"'/{flag=1; next} /^## /{flag=0} flag' CHANGELOG.md > current_changelog.md
-          
-          if [ -s current_changelog.md ]; then
-            echo "found_changelog=true" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Validate version consistency
+        run: |
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+
+          # Check manifest.json version
+          MANIFEST_VERSION=$(python -c "
+          import json
+          with open('custom_components/micro_weather/manifest.json') as f:
+              print(json.load(f)['version'])
+          ")
+
+          if [ "$TAG_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) doesn't match manifest.json version ($MANIFEST_VERSION)"
+            exit 1
+          fi
+
+          echo "Version validation passed: $TAG_VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Extract changelog for this version
+          if [ -f CHANGELOG.md ]; then
+            # Get content between this version and next version header
+            awk '/^## '"${{ steps.version.outputs.version }}"'/{flag=1; next} /^## /{flag=0} flag' CHANGELOG.md > current_changelog.md
+            
+            if [ -s current_changelog.md ]; then
+              echo "found_changelog=true" >> $GITHUB_OUTPUT
+            else
+              echo "found_changelog=false" >> $GITHUB_OUTPUT
+            fi
           else
             echo "found_changelog=false" >> $GITHUB_OUTPUT
           fi
-        else
-          echo "found_changelog=false" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Create release archive
-      run: |
-        # Create a clean release archive
-        mkdir -p release/custom_components
-        cp -r custom_components/micro_weather release/custom_components/
-        
-        # Remove any development files
-        find release/ -name "*.pyc" -delete
-        find release/ -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-        find release/ -name ".DS_Store" -delete 2>/dev/null || true
-        
-        # Create zip file
-        cd release && zip -r ../micro_weather-${{ steps.version.outputs.version }}.zip .
-        cd ..
-        
-        # Also create tar.gz
-        cd release && tar -czf ../micro_weather-${{ steps.version.outputs.version }}.tar.gz .
-        cd ..
-    
-    - name: Create GitHub Release
-      uses: ncipollo/release-action@v1
-      with:
-        tag: ${{ steps.version.outputs.tag }}
-        name: Micro Weather Station ${{ steps.version.outputs.version }}
-        bodyFile: ${{ steps.changelog.outputs.found_changelog == 'true' && 'current_changelog.md' || '' }}
-        body: ${{ steps.changelog.outputs.found_changelog == 'false' && 'Release notes not available in CHANGELOG.md' || '' }}
-        draft: false
-        prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-        artifacts: |
-          micro_weather-${{ steps.version.outputs.version }}.zip
-          micro_weather-${{ steps.version.outputs.version }}.tar.gz
-        token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release archive
+        run: |
+          # Create a clean release archive
+          mkdir -p release/custom_components
+          cp -r custom_components/micro_weather release/custom_components/
+
+          # Remove any development files
+          find release/ -name "*.pyc" -delete
+          find release/ -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+          find release/ -name ".DS_Store" -delete 2>/dev/null || true
+
+          # Create zip file
+          cd release && zip -r ../micro_weather-${{ steps.version.outputs.version }}.zip .
+          cd ..
+
+          # Also create tar.gz
+          cd release && tar -czf ../micro_weather-${{ steps.version.outputs.version }}.tar.gz .
+          cd ..
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.version.outputs.tag }}
+          name: Micro Weather Station ${{ steps.version.outputs.version }}
+          bodyFile: ${{ steps.changelog.outputs.found_changelog == 'true' && 'current_changelog.md' || '' }}
+          body: ${{ steps.changelog.outputs.found_changelog == 'false' && 'Release notes not available in CHANGELOG.md' || '' }}
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          artifacts: |
+            micro_weather-${{ steps.version.outputs.version }}.zip
+            micro_weather-${{ steps.version.outputs.version }}.tar.gz
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   validate-release:
     name: Validate Release
     runs-on: ubuntu-latest
     needs: release
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download release assets
-      run: |
-        # Download the release we just created
-        gh release download ${{ github.ref_name }} --pattern "*.zip"
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Validate release archive
-      run: |
-        # Extract and validate the release archive
-        unzip micro_weather-*.zip -d test_release/
-        
-        # Check that required files exist
-        if [ ! -f test_release/custom_components/micro_weather/manifest.json ]; then
-          echo "manifest.json missing from release"
-          exit 1
-        fi
-        
-        if [ ! -f test_release/custom_components/micro_weather/__init__.py ]; then
-          echo "__init__.py missing from release"
-          exit 1
-        fi
-        
-        # Validate manifest.json can be parsed
-        python -c "
-        import json
-        with open('test_release/custom_components/micro_weather/manifest.json') as f:
-            manifest = json.load(f)
-        print(f'Release validation passed for version {manifest[\"version\"]}')
-        "
-        
-        echo "Release archive validation completed successfully"
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        run: |
+          # Download the release we just created
+          gh release download ${{ github.ref_name }} --pattern "*.zip"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate release archive
+        run: |
+          # Extract and validate the release archive
+          unzip micro_weather-*.zip -d test_release/
+
+          # Check that required files exist
+          if [ ! -f test_release/custom_components/micro_weather/manifest.json ]; then
+            echo "manifest.json missing from release"
+            exit 1
+          fi
+
+          if [ ! -f test_release/custom_components/micro_weather/__init__.py ]; then
+            echo "__init__.py missing from release"
+            exit 1
+          fi
+
+          # Validate manifest.json can be parsed
+          python -c "
+          import json
+          with open('test_release/custom_components/micro_weather/manifest.json') as f:
+              manifest = json.load(f)
+          print(f'Release validation passed for version {manifest[\"version\"]}')
+          "
+
+          echo "Release archive validation completed successfully"
