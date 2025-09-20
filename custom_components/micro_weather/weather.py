@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.weather import (
-    ATTR_CONDITION_CLEAR,
+    ATTR_CONDITION_SUNNY,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING_RAINY,
@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # Map our conditions to HA weather conditions
 CONDITION_MAP = {
-    "sunny": ATTR_CONDITION_CLEAR,
+    "sunny": ATTR_CONDITION_SUNNY,
     "cloudy": ATTR_CONDITION_CLOUDY,
     "partly_cloudy": ATTR_CONDITION_PARTLYCLOUDY,
     "rainy": ATTR_CONDITION_RAINY,
