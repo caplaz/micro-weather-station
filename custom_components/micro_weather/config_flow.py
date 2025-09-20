@@ -1,7 +1,7 @@
 """Config flow for Micro Weather Station integration."""
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
@@ -19,7 +19,7 @@ class ConfigFlow(config_entries.ConfigFlow):
     DOMAIN = DOMAIN
 
     async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
         """Handle the initial step."""
         _LOGGER.info("Config flow step_user called")
@@ -38,9 +38,7 @@ class ConfigFlow(config_entries.ConfigFlow):
 
         # Simple schema for testing
         data_schema = vol.Schema({
-            vol.Required(CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL): vol.All(
-                vol.Coerce(int), vol.Range(min=1, max=60)
-            ),
+            vol.Required(CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL): int,
         })
 
         return self.async_show_form(
@@ -53,7 +51,8 @@ class ConfigFlow(config_entries.ConfigFlow):
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Create the options flow."""
-        return OptionsFlowHandler(config_entry)
+        # Temporarily disabled to isolate config flow issue
+        return None
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
@@ -64,7 +63,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self.config_entry = config_entry
 
     async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: Optional[dict[str, Any]] = None
     ) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
@@ -77,7 +76,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             vol.Required(
                 CONF_UPDATE_INTERVAL,
                 default=current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+            ): int,
         })
 
         return self.async_show_form(
