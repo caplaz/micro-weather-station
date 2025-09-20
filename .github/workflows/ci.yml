@@ -55,11 +55,70 @@ jobs:
           category: integration
           ignore: brands
 
-      - name: Validate Home Assistant Configuration
-        uses: frenck/action-home-assistant@v1
-        with:
-          path: ./custom_components/micro_weather
-          secrets: ./.github/secrets.yaml
+      - name: Validate Custom Component Structure
+        run: |
+          # Check required files exist
+          if [ ! -f custom_components/micro_weather/__init__.py ]; then
+            echo "Missing __init__.py"
+            exit 1
+          fi
+
+          if [ ! -f custom_components/micro_weather/manifest.json ]; then
+            echo "Missing manifest.json"
+            exit 1
+          fi
+
+          # Validate manifest.json structure
+          python -c "
+          import json
+          import sys
+
+          try:
+              with open('custom_components/micro_weather/manifest.json') as f:
+                  manifest = json.load(f)
+              
+              required_fields = ['domain', 'name', 'version', 'documentation', 'issue_tracker', 'requirements', 'codeowners']
+              missing_fields = [field for field in required_fields if field not in manifest]
+              
+              if missing_fields:
+                  print(f'Missing required manifest fields: {missing_fields}')
+                  sys.exit(1)
+              
+              print('Custom component validation passed')
+          except Exception as e:
+              print(f'Manifest validation failed: {e}')
+              sys.exit(1)
+          "
+
+      - name: Test Component Import
+        run: |
+          # Set up Python environment
+          python -m pip install --upgrade pip
+          pip install homeassistant==2024.1.0
+
+          # Test that the component can be imported
+          export PYTHONPATH="${PWD}:${PYTHONPATH}"
+          python -c "
+          import sys
+          sys.path.insert(0, 'custom_components')
+
+          try:
+              from micro_weather import DOMAIN
+              print(f'✅ Component import successful, domain: {DOMAIN}')
+              
+              from micro_weather.config_flow import ConfigFlow
+              print('✅ Config flow import successful')
+              
+              from micro_weather.sensor import MicroWeatherSensor
+              print('✅ Sensor import successful')
+              
+              from micro_weather.weather import MicroWeatherEntity
+              print('✅ Weather entity import successful')
+              
+          except Exception as e:
+              print(f'❌ Component import failed: {e}')
+              sys.exit(1)
+          "
 
   test:
     name: Run Tests
