@@ -149,8 +149,8 @@ jobs:
       - name: Run tests
         run: |
           export PYTHONPATH="${PYTHONPATH}:${PWD}"
-          # Run tests excluding config flow tests (they require complex integration setup)
-          python -m pytest tests/test_weather_detector.py -v --tb=short
+          # Run weather detector and validation tests (config flow tests require complex HA setup)
+          python -m pytest tests/test_weather_detector.py tests/test_validation.py -v --tb=short
         env:
           PYTHONPATH: ${{ github.workspace }}
         if: always()
