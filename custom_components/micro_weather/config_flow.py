@@ -1,31 +1,31 @@
 """Config flow for Micro Weather Station integration."""
+
 import logging
 from typing import Any
-
-import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
+import voluptuous as vol
 
 from .const import (
-    DOMAIN,
-    CONF_UPDATE_INTERVAL,
-    CONF_OUTDOOR_TEMP_SENSOR,
-    CONF_INDOOR_TEMP_SENSOR,
     CONF_HUMIDITY_SENSOR,
+    CONF_INDOOR_TEMP_SENSOR,
+    CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
-    CONF_WIND_SPEED_SENSOR,
-    CONF_WIND_DIRECTION_SENSOR,
-    CONF_WIND_GUST_SENSOR,
     CONF_RAIN_RATE_SENSOR,
     CONF_RAIN_STATE_SENSOR,
-    CONF_SOLAR_RADIATION_SENSOR,
     CONF_SOLAR_LUX_SENSOR,
+    CONF_SOLAR_RADIATION_SENSOR,
+    CONF_UPDATE_INTERVAL,
     CONF_UV_INDEX_SENSOR,
+    CONF_WIND_DIRECTION_SENSOR,
+    CONF_WIND_GUST_SENSOR,
+    CONF_WIND_SPEED_SENSOR,
     DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,19 +50,29 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 else:
                     # Prepare options
                     options = {
-                        CONF_OUTDOOR_TEMP_SENSOR: user_input.get(CONF_OUTDOOR_TEMP_SENSOR),
-                        CONF_INDOOR_TEMP_SENSOR: user_input.get(CONF_INDOOR_TEMP_SENSOR),
+                        CONF_OUTDOOR_TEMP_SENSOR: user_input.get(
+                            CONF_OUTDOOR_TEMP_SENSOR
+                        ),
+                        CONF_INDOOR_TEMP_SENSOR: user_input.get(
+                            CONF_INDOOR_TEMP_SENSOR
+                        ),
                         CONF_HUMIDITY_SENSOR: user_input.get(CONF_HUMIDITY_SENSOR),
                         CONF_PRESSURE_SENSOR: user_input.get(CONF_PRESSURE_SENSOR),
                         CONF_WIND_SPEED_SENSOR: user_input.get(CONF_WIND_SPEED_SENSOR),
-                        CONF_WIND_DIRECTION_SENSOR: user_input.get(CONF_WIND_DIRECTION_SENSOR),
+                        CONF_WIND_DIRECTION_SENSOR: user_input.get(
+                            CONF_WIND_DIRECTION_SENSOR
+                        ),
                         CONF_WIND_GUST_SENSOR: user_input.get(CONF_WIND_GUST_SENSOR),
                         CONF_RAIN_RATE_SENSOR: user_input.get(CONF_RAIN_RATE_SENSOR),
                         CONF_RAIN_STATE_SENSOR: user_input.get(CONF_RAIN_STATE_SENSOR),
-                        CONF_SOLAR_RADIATION_SENSOR: user_input.get(CONF_SOLAR_RADIATION_SENSOR),
+                        CONF_SOLAR_RADIATION_SENSOR: user_input.get(
+                            CONF_SOLAR_RADIATION_SENSOR
+                        ),
                         CONF_SOLAR_LUX_SENSOR: user_input.get(CONF_SOLAR_LUX_SENSOR),
                         CONF_UV_INDEX_SENSOR: user_input.get(CONF_UV_INDEX_SENSOR),
-                        CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                        CONF_UPDATE_INTERVAL: user_input.get(
+                            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+                        ),
                     }
 
                     return self.async_create_entry(
@@ -76,48 +86,49 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
 
         # Build schema with entity selectors
-        data_schema = vol.Schema({
-            vol.Required(CONF_OUTDOOR_TEMP_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_INDOOR_TEMP_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_HUMIDITY_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_PRESSURE_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_WIND_SPEED_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_WIND_DIRECTION_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_WIND_GUST_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_RAIN_RATE_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_RAIN_STATE_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_SOLAR_RADIATION_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_SOLAR_LUX_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_UV_INDEX_SENSOR): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Required(
-                CONF_UPDATE_INTERVAL,
-                default=DEFAULT_UPDATE_INTERVAL
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
-        })
+        data_schema = vol.Schema(
+            {
+                vol.Required(CONF_OUTDOOR_TEMP_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_INDOOR_TEMP_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_HUMIDITY_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_PRESSURE_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_WIND_SPEED_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_WIND_DIRECTION_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_WIND_GUST_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_RAIN_RATE_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_RAIN_STATE_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_SOLAR_RADIATION_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_SOLAR_LUX_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_UV_INDEX_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Required(
+                    CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+            }
+        )
 
         return self.async_show_form(
             step_id="user",
@@ -155,19 +166,29 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 else:
                     # Update options
                     options = {
-                        CONF_OUTDOOR_TEMP_SENSOR: user_input.get(CONF_OUTDOOR_TEMP_SENSOR),
-                        CONF_INDOOR_TEMP_SENSOR: user_input.get(CONF_INDOOR_TEMP_SENSOR),
+                        CONF_OUTDOOR_TEMP_SENSOR: user_input.get(
+                            CONF_OUTDOOR_TEMP_SENSOR
+                        ),
+                        CONF_INDOOR_TEMP_SENSOR: user_input.get(
+                            CONF_INDOOR_TEMP_SENSOR
+                        ),
                         CONF_HUMIDITY_SENSOR: user_input.get(CONF_HUMIDITY_SENSOR),
                         CONF_PRESSURE_SENSOR: user_input.get(CONF_PRESSURE_SENSOR),
                         CONF_WIND_SPEED_SENSOR: user_input.get(CONF_WIND_SPEED_SENSOR),
-                        CONF_WIND_DIRECTION_SENSOR: user_input.get(CONF_WIND_DIRECTION_SENSOR),
+                        CONF_WIND_DIRECTION_SENSOR: user_input.get(
+                            CONF_WIND_DIRECTION_SENSOR
+                        ),
                         CONF_WIND_GUST_SENSOR: user_input.get(CONF_WIND_GUST_SENSOR),
                         CONF_RAIN_RATE_SENSOR: user_input.get(CONF_RAIN_RATE_SENSOR),
                         CONF_RAIN_STATE_SENSOR: user_input.get(CONF_RAIN_STATE_SENSOR),
-                        CONF_SOLAR_RADIATION_SENSOR: user_input.get(CONF_SOLAR_RADIATION_SENSOR),
+                        CONF_SOLAR_RADIATION_SENSOR: user_input.get(
+                            CONF_SOLAR_RADIATION_SENSOR
+                        ),
                         CONF_SOLAR_LUX_SENSOR: user_input.get(CONF_SOLAR_LUX_SENSOR),
                         CONF_UV_INDEX_SENSOR: user_input.get(CONF_UV_INDEX_SENSOR),
-                        CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                        CONF_UPDATE_INTERVAL: user_input.get(
+                            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+                        ),
                     }
 
                     return self.async_create_entry(title="", data=options)
@@ -178,85 +199,89 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         # Get current options
         current_options = self.config_entry.options
-        
-        data_schema = vol.Schema({
-            vol.Required(
-                CONF_OUTDOOR_TEMP_SENSOR,
-                default=current_options.get(CONF_OUTDOOR_TEMP_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_INDOOR_TEMP_SENSOR,
-                default=current_options.get(CONF_INDOOR_TEMP_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_HUMIDITY_SENSOR,
-                default=current_options.get(CONF_HUMIDITY_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_PRESSURE_SENSOR,
-                default=current_options.get(CONF_PRESSURE_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_WIND_SPEED_SENSOR,
-                default=current_options.get(CONF_WIND_SPEED_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_WIND_DIRECTION_SENSOR,
-                default=current_options.get(CONF_WIND_DIRECTION_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_WIND_GUST_SENSOR,
-                default=current_options.get(CONF_WIND_GUST_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_RAIN_RATE_SENSOR,
-                default=current_options.get(CONF_RAIN_RATE_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_RAIN_STATE_SENSOR,
-                default=current_options.get(CONF_RAIN_STATE_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_SOLAR_RADIATION_SENSOR,
-                default=current_options.get(CONF_SOLAR_RADIATION_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_SOLAR_LUX_SENSOR,
-                default=current_options.get(CONF_SOLAR_LUX_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(
-                CONF_UV_INDEX_SENSOR,
-                default=current_options.get(CONF_UV_INDEX_SENSOR)
-            ): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Required(
-                CONF_UPDATE_INTERVAL,
-                default=current_options.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
-            ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
-        })
+
+        data_schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_OUTDOOR_TEMP_SENSOR,
+                    default=current_options.get(CONF_OUTDOOR_TEMP_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_INDOOR_TEMP_SENSOR,
+                    default=current_options.get(CONF_INDOOR_TEMP_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_HUMIDITY_SENSOR,
+                    default=current_options.get(CONF_HUMIDITY_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_PRESSURE_SENSOR,
+                    default=current_options.get(CONF_PRESSURE_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_WIND_SPEED_SENSOR,
+                    default=current_options.get(CONF_WIND_SPEED_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_WIND_DIRECTION_SENSOR,
+                    default=current_options.get(CONF_WIND_DIRECTION_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_WIND_GUST_SENSOR,
+                    default=current_options.get(CONF_WIND_GUST_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_RAIN_RATE_SENSOR,
+                    default=current_options.get(CONF_RAIN_RATE_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_RAIN_STATE_SENSOR,
+                    default=current_options.get(CONF_RAIN_STATE_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_SOLAR_RADIATION_SENSOR,
+                    default=current_options.get(CONF_SOLAR_RADIATION_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_SOLAR_LUX_SENSOR,
+                    default=current_options.get(CONF_SOLAR_LUX_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_UV_INDEX_SENSOR,
+                    default=current_options.get(CONF_UV_INDEX_SENSOR),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Required(
+                    CONF_UPDATE_INTERVAL,
+                    default=current_options.get(
+                        CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+                    ),
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+            }
+        )
 
         return self.async_show_form(
             step_id="init",

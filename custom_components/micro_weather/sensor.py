@@ -1,10 +1,11 @@
 """Sensor entities for Micro Weather Station."""
+
 import logging
 from typing import Any
 
 from homeassistant.components.sensor import (
-    SensorEntity,
     SensorDeviceClass,
+    SensorEntity,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -24,11 +25,11 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Micro Weather Station sensor entities."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    
+
     sensors = []
     for sensor_type in SENSOR_TYPES:
         sensors.append(MicroWeatherSensor(coordinator, config_entry, sensor_type))
-    
+
     async_add_entities(sensors)
 
 
@@ -44,20 +45,18 @@ class MicroWeatherSensor(CoordinatorEntity, SensorEntity):
         self._config_entry = config_entry
         self._sensor_type = sensor_type
         self._sensor_config = SENSOR_TYPES[sensor_type]
-        
+
         self._attr_unique_id = f"{config_entry.entry_id}_{sensor_type}"
         self._attr_name = self._sensor_config["name"]
         self._attr_native_unit_of_measurement = self._sensor_config["unit"]
         self._attr_icon = self._sensor_config["icon"]
-        
+
         # Set device class if available
         if "device_class" in self._sensor_config:
             self._attr_device_class = getattr(
-                SensorDeviceClass, 
-                self._sensor_config["device_class"].upper(), 
-                None
+                SensorDeviceClass, self._sensor_config["device_class"].upper(), None
             )
-        
+
         self._attr_device_info = {
             "identifiers": {(DOMAIN, config_entry.entry_id)},
             "name": "Micro Weather Station",

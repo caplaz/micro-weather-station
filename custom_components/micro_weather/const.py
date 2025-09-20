@@ -34,12 +34,12 @@ DEFAULT_UPDATE_INTERVAL = 5  # minutes
 # Weather patterns
 WEATHER_PATTERNS = [
     "sunny",
-    "cloudy", 
+    "cloudy",
     "partly_cloudy",
     "rainy",
     "snowy",
     "stormy",
-    "foggy"
+    "foggy",
 ]
 
 # Sensor types
@@ -51,21 +51,21 @@ SENSOR_TYPES = {
         "icon": "mdi:thermometer",
     },
     "humidity": {
-        "name": "Humidity", 
+        "name": "Humidity",
         "device_class": "humidity",
         "unit": "%",
         "icon": "mdi:water-percent",
     },
     "pressure": {
         "name": "Pressure",
-        "device_class": "pressure", 
+        "device_class": "pressure",
         "unit": "hPa",
         "icon": "mdi:gauge",
     },
     "wind_speed": {
         "name": "Wind Speed",
         "device_class": "wind_speed",
-        "unit": "km/h", 
+        "unit": "km/h",
         "icon": "mdi:weather-windy",
     },
     "wind_direction": {
