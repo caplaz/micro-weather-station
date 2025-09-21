@@ -11,7 +11,7 @@ markers = [
 asyncio_mode = "auto"
 
 [tool.black]
-target-version = ['py311']
+target-version = ['py313']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -34,7 +34,7 @@ known_first_party = ["custom_components.micro_weather"]
 combine_as_imports = true
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 ignore_missing_imports = true
 follow_imports = "silent"
 warn_redundant_casts = true
