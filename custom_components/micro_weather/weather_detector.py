@@ -20,9 +20,11 @@ Author: caplaz
 License: MIT
 """
 
+from collections import deque
 from datetime import datetime, timedelta
 import logging
 import math
+import statistics
 from typing import Any, Dict, List, Mapping, Optional
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
@@ -77,6 +79,18 @@ class WeatherDetector:
         self._last_condition = "partly_cloudy"
         self._condition_start_time = datetime.now()
 
+        # Historical data storage (last 48 hours, 15-minute intervals = ~192 readings)
+        self._history_maxlen = 192  # 48 hours * 4 readings per hour
+        self._sensor_history: Dict[str, deque] = {
+            "outdoor_temp": deque(maxlen=self._history_maxlen),
+            "humidity": deque(maxlen=self._history_maxlen),
+            "pressure": deque(maxlen=self._history_maxlen),
+            "wind_speed": deque(maxlen=self._history_maxlen),
+            "solar_radiation": deque(maxlen=self._history_maxlen),
+            "rain_rate": deque(maxlen=self._history_maxlen),
+        }
+        self._condition_history = deque(maxlen=self._history_maxlen)
+
         # Sensor entity IDs mapping
         self.sensors = {
             "outdoor_temp": options.get(CONF_OUTDOOR_TEMP_SENSOR),
@@ -117,8 +131,16 @@ class WeatherDetector:
         # Get sensor values
         sensor_data = self._get_sensor_values()
 
+        # Store historical data
+        self._store_historical_data(sensor_data)
+
         # Determine weather condition
         condition = self._determine_weather_condition(sensor_data)
+
+        # Store condition history
+        self._condition_history.append(
+            {"timestamp": datetime.now(), "condition": condition}
+        )
 
         # Convert units and prepare data
         weather_data = {
@@ -129,7 +151,7 @@ class WeatherDetector:
             "wind_direction": sensor_data.get("wind_direction"),
             "visibility": self._estimate_visibility(condition, sensor_data),
             "condition": condition,
-            "forecast": self._generate_simple_forecast(condition, sensor_data),
+            "forecast": self._generate_enhanced_forecast(condition, sensor_data),
             "last_updated": datetime.now().isoformat(),
         }
 
@@ -633,42 +655,53 @@ class WeatherDetector:
             return None
         return round(speed_mph * 1.60934, 1)
 
-    def _generate_simple_forecast(
+    def _generate_enhanced_forecast(
         self, current_condition: str, sensor_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Generate an intelligent 5-day forecast based on current sensor data
-        and patterns."""
-        forecast = []
-        current_temp = sensor_data.get("outdoor_temp", 70)
-        current_pressure = sensor_data.get("pressure", 29.92)
-        current_humidity = sensor_data.get("humidity", 50)
-        current_wind_speed = sensor_data.get("wind_speed", 5)
+        """Generate an intelligent 5-day forecast using historical trends and patterns.
 
-        # Pressure trend analysis for weather prediction
-        pressure_hpa = self._convert_to_hpa(current_pressure) or 1013
+        Uses historical data, trend analysis, and meteorological patterns to create
+        more accurate forecasts than simple rule-based approaches.
+        """
+        forecast = []
+
+        # Get comprehensive trend analysis
+        pressure_analysis = self._analyze_pressure_trends()
+        temp_patterns = self._analyze_temperature_patterns()
+        humidity_trend = self._get_historical_trends("humidity", hours=24)
+        wind_trend = self._get_historical_trends("wind_speed", hours=24)
+
+        # Current baseline values
+        current_temp = sensor_data.get("outdoor_temp", 70)
+        current_humidity = sensor_data.get("humidity", 50)
+        current_wind = sensor_data.get("wind_speed", 5)
 
         for i in range(5):
             date = datetime.now() + timedelta(days=i + 1)
 
-            # Enhanced temperature forecast with seasonal and pressure influence
-            day_temp_variation = self._calculate_temp_trend(
-                i, current_temp, pressure_hpa
-            )
-            forecast_temp = current_temp + day_temp_variation
-
-            # Enhanced condition forecast based on pressure trends and patterns
-            forecast_condition = self._predict_condition(
-                i, current_condition, pressure_hpa, current_humidity, current_wind_speed
+            # Enhanced temperature forecasting using patterns and trends
+            forecast_temp = self._forecast_temperature_enhanced(
+                i, current_temp, temp_patterns, pressure_analysis
             )
 
-            # Calculate precipitation probability
-            precipitation = self._calculate_precipitation(
-                forecast_condition, pressure_hpa, current_humidity
+            # Enhanced condition forecasting using multiple data sources
+            forecast_condition = self._forecast_condition_enhanced(
+                i, current_condition, pressure_analysis, sensor_data
             )
 
-            # Wind speed forecast
-            wind_forecast = self._forecast_wind_speed(
-                current_wind_speed, forecast_condition, i
+            # Enhanced precipitation forecasting
+            precipitation = self._forecast_precipitation_enhanced(
+                i, forecast_condition, pressure_analysis, humidity_trend
+            )
+
+            # Enhanced wind forecasting
+            wind_forecast = self._forecast_wind_enhanced(
+                i, current_wind, forecast_condition, wind_trend, pressure_analysis
+            )
+
+            # Calculate humidity forecast
+            humidity_forecast = self._forecast_humidity(
+                i, current_humidity, humidity_trend, forecast_condition
             )
 
             forecast.append(
@@ -683,120 +716,430 @@ class WeatherDetector:
                     "condition": forecast_condition,
                     "precipitation": precipitation,
                     "wind_speed": wind_forecast,
-                    "humidity": max(
-                        30, min(90, current_humidity + (i * 2))
-                    ),  # Simple humidity trend
+                    "humidity": humidity_forecast,
                 }
             )
 
         return forecast
 
-    def _calculate_temp_trend(
-        self, day: int, current_temp: float, pressure_hpa: float
+    def _forecast_temperature_enhanced(
+        self,
+        day: int,
+        current_temp: float,
+        temp_patterns: Dict[str, Any],
+        pressure_analysis: Dict[str, Any],
     ) -> float:
-        """Calculate temperature trend based on pressure and time."""
-        # Base seasonal variation (simplified)
-        seasonal_variation = [0, -1, 1, -2, 1][day]
+        """Enhanced temperature forecasting using historical patterns
+        and pressure systems.
 
-        # Pressure influence on temperature
-        if pressure_hpa > 1020:  # High pressure - generally stable/clear
-            pressure_effect = 1 + (day * 0.5)  # Slight warming trend
-        elif pressure_hpa < 1000:  # Low pressure - storm systems
-            pressure_effect = -2 - (day * 0.3)  # Cooling trend
+        Args:
+            day: Day ahead to forecast (0-4)
+            current_temp: Current temperature in Fahrenheit
+            temp_patterns: Temperature pattern analysis
+            pressure_analysis: Pressure trend analysis
+
+        Returns:
+            float: Forecasted temperature in Fahrenheit
+        """
+        # Base temperature from current reading
+        forecast_temp = current_temp
+
+        # Apply diurnal and seasonal patterns
+        seasonal_adjustment = self._calculate_seasonal_temperature_adjustment(day)
+        forecast_temp += seasonal_adjustment
+
+        # Apply pressure system influence
+        pressure_system = pressure_analysis.get("pressure_system", "normal")
+        if pressure_system == "high_pressure":
+            # High pressure systems are generally warmer and more stable
+            pressure_adjustment = 2 - (day * 0.3)  # Warming effect diminishes over time
+        elif pressure_system == "low_pressure":
+            # Low pressure systems are generally cooler
+            pressure_adjustment = -3 + (day * 0.5)  # Cooling effect lessens over time
         else:
-            pressure_effect = 0
+            pressure_adjustment = 0
 
-        return seasonal_variation + pressure_effect
+        forecast_temp += pressure_adjustment
 
-    def _predict_condition(
+        # Apply historical trend influence
+        # (dampened for longer forecasts)
+        trend_influence = temp_patterns.get("trend", 0) * (
+            24 - day * 4
+        )  # Less influence for distant days
+        forecast_temp += min(max(trend_influence, -5), 5)  # Cap the trend influence
+
+        return forecast_temp
+
+    def _calculate_seasonal_temperature_adjustment(self, day: int) -> float:
+        """Calculate seasonal temperature variation for forecasting."""
+        # Simplified seasonal patterns (would be enhanced with actual seasonal data)
+        # This is a basic implementation - could be enhanced with
+        # astronomical calculations
+        base_variation = [0, -1, 1, -0.5, 0.5][day]  # Day-to-day variation
+
+        # Add some randomness based on typical weather patterns
+        # In reality, this would use historical seasonal data
+        return base_variation
+
+    def _forecast_condition_enhanced(
         self,
         day: int,
         current_condition: str,
-        pressure_hpa: float,
-        humidity: float,
-        wind_speed: float,
+        pressure_analysis: Dict[str, Any],
+        sensor_data: Dict[str, Any],
     ) -> str:
-        """Predict weather condition based on atmospheric patterns."""
+        """Enhanced condition forecasting using pressure trends and historical patterns.
 
-        # Special handling for fog - it's often localized and temporary
-        if current_condition == "foggy":
-            if day == 0:
-                return "foggy"  # Fog may persist for a day
-            elif day == 1:
-                # Fog often clears to cloudy or partly cloudy
-                return "cloudy" if humidity > 85 else "partly_cloudy"
-            else:
-                # After fog clears, normal weather patterns resume
-                if pressure_hpa > 1020:
-                    return "partly_cloudy"
-                elif pressure_hpa < 1000:
-                    return "cloudy"
-                else:
-                    return "partly_cloudy"
+        Args:
+            day: Day ahead to forecast (0-4)
+            current_condition: Current weather condition
+            pressure_analysis: Pressure trend analysis
+            sensor_data: Current sensor data
 
-        # Day 0-1: Current conditions persist with pressure influence
-        if day <= 1:
-            if pressure_hpa > 1025:  # Very high pressure
-                return "sunny" if day == 0 else "partly_cloudy"
-            elif pressure_hpa < 995:  # Very low pressure
-                return "stormy" if wind_speed > 15 else "rainy"
+        Returns:
+            str: Forecasted weather condition
+        """
+        pressure_system = pressure_analysis.get("pressure_system", "normal")
+        storm_probability = pressure_analysis.get("storm_probability", 0)
+
+        # High confidence predictions for near-term
+        if day == 0:
+            if storm_probability > 60:
+                return "stormy"
+            elif storm_probability > 30:
+                return "rainy"
+            elif pressure_system == "high_pressure":
+                return "sunny"
             else:
                 return current_condition
 
-        # Day 2-3: Transition based on pressure trends
-        elif day <= 3:
-            if pressure_hpa > 1020:
-                return ["sunny", "partly_cloudy"][day % 2]
-            elif pressure_hpa < 1000:
-                return ["rainy", "cloudy", "partly_cloudy"][day % 3]
+        # Medium-term predictions (1-2 days)
+        elif day <= 2:
+            if storm_probability > 40:
+                return "rainy" if storm_probability < 70 else "stormy"
+            elif pressure_system == "high_pressure":
+                return "partly_cloudy" if day == 1 else "sunny"
+            elif pressure_system == "low_pressure":
+                return "cloudy" if day == 1 else "rainy"
             else:
-                return ["partly_cloudy", "cloudy"][day % 2]
+                # Default to improving conditions
+                condition_progression = {
+                    "stormy": ["rainy", "cloudy", "partly_cloudy"],
+                    "rainy": ["cloudy", "partly_cloudy", "sunny"],
+                    "cloudy": ["partly_cloudy", "sunny", "sunny"],
+                    "partly_cloudy": ["sunny", "sunny", "partly_cloudy"],
+                    "sunny": ["sunny", "partly_cloudy", "sunny"],
+                    "foggy": ["cloudy", "partly_cloudy", "sunny"],
+                    "snowy": ["cloudy", "partly_cloudy", "sunny"],
+                }
+                progression = condition_progression.get(
+                    current_condition, ["partly_cloudy"]
+                )
+                return progression[min(day, len(progression) - 1)]
 
-        # Day 4-5: Longer term patterns (return to average conditions)
+        # Long-term predictions (3-4 days)
+        # - return to average conditions
         else:
-            if humidity > 80:
-                return "cloudy"
-            elif humidity < 40:
+            if pressure_system == "high_pressure":
                 return "sunny"
+            elif pressure_system == "low_pressure":
+                return "cloudy"
             else:
                 return "partly_cloudy"
 
-    def _calculate_precipitation(
-        self, condition: str, pressure_hpa: float, humidity: float
+    def _forecast_precipitation_enhanced(
+        self,
+        day: int,
+        condition: str,
+        pressure_analysis: Dict[str, Any],
+        humidity_trend: Dict[str, Any],
     ) -> float:
-        """Calculate precipitation probability based on conditions."""
-        if condition in ["rainy", "stormy"]:
-            # More conservative precipitation calculation
-            if condition == "rainy":
-                base_precip = 2.0  # Reduced from 5.0
-            else:  # stormy
-                base_precip = 5.0  # Reduced from 10.0
+        """Enhanced precipitation forecasting using multiple data sources.
 
-            # More realistic humidity and pressure factors
-            humidity_factor = max(1.0, (humidity - 60) / 40)  # Only boost above 60%
-            pressure_factor = max(1.0, (1013 - pressure_hpa) / 40)  # More conservative
-            return round(base_precip * humidity_factor * pressure_factor, 1)
-        elif condition == "snowy":
-            return 2.0  # Reduced from 3.0
-        elif condition == "cloudy" and humidity > 80:  # Raised threshold
-            return 0.5  # Reduced from 1.0
-        elif condition == "foggy":
-            # Fog rarely leads to significant precipitation
-            return 0.1 if humidity > 95 else 0.0
-        else:
+        Args:
+            day: Day ahead to forecast (0-4)
+            condition: Forecasted weather condition
+            pressure_analysis: Pressure trend analysis
+            humidity_trend: Historical humidity trends
+
+        Returns:
+            float: Precipitation amount in mm
+        """
+        base_precipitation = 0.0
+        storm_probability = pressure_analysis.get("storm_probability", 0)
+
+        # Base precipitation by condition
+        condition_precip = {
+            "stormy": 15.0,
+            "rainy": 5.0,
+            "snowy": 3.0,
+            "cloudy": 0.5,
+            "foggy": 0.1,
+        }
+        base_precipitation = condition_precip.get(condition, 0.0)
+
+        # Adjust by storm probability
+        if storm_probability > 70:
+            base_precipitation *= 1.5
+        elif storm_probability > 40:
+            base_precipitation *= 1.2
+
+        # Adjust by humidity trends
+        if humidity_trend and humidity_trend.get("average", 50) > 80:
+            base_precipitation *= 1.3
+
+        # Reduce precipitation for distant forecasts (less confidence)
+        confidence_factor = max(0.3, 1.0 - (day * 0.15))
+        base_precipitation *= confidence_factor
+
+        return round(base_precipitation, 1)
+
+    def _forecast_wind_enhanced(
+        self,
+        day: int,
+        current_wind: float,
+        condition: str,
+        wind_trend: Dict[str, Any],
+        pressure_analysis: Dict[str, Any],
+    ) -> float:
+        """Enhanced wind forecasting using trends and weather patterns.
+
+        Args:
+            day: Day ahead to forecast (0-4)
+            current_wind: Current wind speed in mph
+            condition: Forecasted weather condition
+            wind_trend: Historical wind trends
+            pressure_analysis: Pressure trend analysis
+
+        Returns:
+            float: Forecasted wind speed in km/h
+        """
+        # Convert current wind to km/h for consistency
+        current_wind_kmh = self._convert_to_kmh(current_wind) or 10
+
+        # Base wind by condition
+        condition_wind = {
+            "stormy": 30.0,  # Strong winds with storms
+            "rainy": 15.0,  # Moderate winds with rain
+            "cloudy": 10.0,  # Light winds
+            "partly_cloudy": 8.0,
+            "sunny": 5.0,  # Light winds on clear days
+            "foggy": 3.0,  # Very light winds with fog
+            "snowy": 12.0,  # Moderate winds with snow
+        }
+        forecast_wind = condition_wind.get(condition, current_wind_kmh)
+
+        # Apply pressure system influence
+        pressure_system = pressure_analysis.get("pressure_system", "normal")
+        if pressure_system == "low_pressure":
+            forecast_wind *= 1.3  # Stronger winds with low pressure
+        elif pressure_system == "high_pressure":
+            forecast_wind *= 0.8  # Lighter winds with high pressure
+
+        # Apply historical trend influence (dampened)
+        if wind_trend and wind_trend.get("trend"):
+            trend_influence = wind_trend["trend"] * 24 * 0.1  # 10% of 24-hour trend
+            forecast_wind += trend_influence
+
+        # Reduce wind for distant forecasts
+        distance_factor = max(0.5, 1.0 - (day * 0.1))
+        forecast_wind *= distance_factor
+
+        return round(max(1.0, forecast_wind), 1)
+
+    def _forecast_humidity(
+        self,
+        day: int,
+        current_humidity: float,
+        humidity_trend: Dict[str, Any],
+        condition: str,
+    ) -> int:
+        """Forecast humidity based on trends and weather conditions.
+
+        Args:
+            day: Day ahead to forecast (0-4)
+            current_humidity: Current humidity percentage
+            humidity_trend: Historical humidity trends
+            condition: Forecasted weather condition
+
+        Returns:
+            int: Forecasted humidity percentage
+        """
+        forecast_humidity = current_humidity
+
+        # Base humidity by condition
+        condition_humidity = {
+            "stormy": 85,
+            "rainy": 80,
+            "snowy": 75,
+            "cloudy": 70,
+            "partly_cloudy": 60,
+            "sunny": 50,
+            "foggy": 95,
+        }
+        target_humidity = condition_humidity.get(condition, current_humidity)
+
+        # Gradually move toward target humidity
+        humidity_change = (target_humidity - current_humidity) * (1 - day * 0.2)
+        forecast_humidity += humidity_change
+
+        # Apply historical trend influence
+        if humidity_trend and humidity_trend.get("trend"):
+            trend_influence = humidity_trend["trend"] * 24 * 0.05  # 5% of 24-hour trend
+            forecast_humidity += trend_influence
+
+        return max(10, min(100, int(round(forecast_humidity))))
+
+    def _store_historical_data(self, sensor_data: Dict[str, Any]) -> None:
+        """Store current sensor readings in historical buffer.
+
+        Args:
+            sensor_data: Current sensor readings to store
+        """
+        timestamp = datetime.now()
+
+        for sensor_key, value in sensor_data.items():
+            if sensor_key in self._sensor_history and value is not None:
+                self._sensor_history[sensor_key].append(
+                    {"timestamp": timestamp, "value": value}
+                )
+
+    def _get_historical_trends(
+        self, sensor_key: str, hours: int = 24
+    ) -> Dict[str, Any]:
+        """Calculate historical trends for a sensor over the specified time period.
+
+        Args:
+            sensor_key: The sensor key to analyze
+            hours: Number of hours to look back
+
+        Returns:
+            dict: Trend analysis including:
+                - current: Most recent value
+                - average: Average over the period
+                - trend: Rate of change per hour
+                - min/max: Min/max values
+                - volatility: Standard deviation
+        """
+        if sensor_key not in self._sensor_history:
+            return {}
+
+        # Get data from the last N hours
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        recent_data = [
+            entry
+            for entry in self._sensor_history[sensor_key]
+            if entry["timestamp"] > cutoff_time
+        ]
+
+        if len(recent_data) < 2:
+            return {}
+
+        values = [entry["value"] for entry in recent_data]
+        timestamps = [entry["timestamp"] for entry in recent_data]
+
+        # Calculate time differences in hours
+        time_diffs = [(t - timestamps[0]).total_seconds() / 3600 for t in timestamps]
+
+        try:
+            # Basic statistics
+            current = values[-1]
+            average = statistics.mean(values)
+            minimum = min(values)
+            maximum = max(values)
+            volatility = statistics.stdev(values) if len(values) > 1 else 0
+
+            # Trend calculation (linear regression slope)
+            trend = self._calculate_trend(time_diffs, values)
+
+            return {
+                "current": current,
+                "average": average,
+                "trend": trend,  # Change per hour
+                "min": minimum,
+                "max": maximum,
+                "volatility": volatility,
+                "sample_count": len(values),
+            }
+        except statistics.StatisticsError:
+            return {}
+
+    def _calculate_trend(self, x_values: List[float], y_values: List[float]) -> float:
+        """Calculate linear trend (slope) using simple linear regression.
+
+        Args:
+            x_values: Independent variable values (time)
+            y_values: Dependent variable values (sensor readings)
+
+        Returns:
+            float: Slope of the trend line (change per unit time)
+        """
+        if len(x_values) != len(y_values) or len(x_values) < 2:
             return 0.0
 
-    def _forecast_wind_speed(
-        self, current_wind: float, condition: str, day: int
-    ) -> float:
-        """Forecast wind speed based on conditions."""
-        base_wind = current_wind
+        n = len(x_values)
+        sum_x = sum(x_values)
+        sum_y = sum(y_values)
+        sum_xy = sum(x * y for x, y in zip(x_values, y_values))
+        sum_x2 = sum(x * x for x in x_values)
 
-        if condition == "stormy":
-            return round(base_wind * 1.5 + day, 1)
-        elif condition in ["rainy", "cloudy"]:
-            return round(base_wind * 1.1 + (day * 0.5), 1)
-        elif condition == "sunny":
-            return round(max(2.0, base_wind * 0.8), 1)
+        denominator = n * sum_x2 - sum_x * sum_x
+        if denominator == 0:
+            return 0.0
+
+        slope = (n * sum_xy - sum_x * sum_y) / denominator
+        return slope
+
+    def _analyze_pressure_trends(self) -> Dict[str, Any]:
+        """Analyze pressure trends for weather prediction.
+
+        Returns:
+            dict: Pressure trend analysis including:
+                - current_trend: Short-term pressure change
+                - long_term_trend: 24-hour pressure trend
+                - pressure_system: Type of pressure system
+                - storm_probability: Probability of storm development
+        """
+        # Get pressure trends over different time periods
+        short_trend = self._get_historical_trends("pressure", hours=3)  # 3-hour trend
+        long_trend = self._get_historical_trends("pressure", hours=24)  # 24-hour trend
+
+        if not short_trend or not long_trend:
+            return {"pressure_system": "unknown", "storm_probability": 0.0}
+
+        current_pressure = long_trend["current"]
+        short_term_change = short_trend["trend"] * 3  # 3-hour change
+        long_term_change = long_trend["trend"] * 24  # 24-hour change
+
+        # Classify pressure system
+        if current_pressure > 1020:
+            pressure_system = "high_pressure"
+        elif current_pressure < 1000:
+            pressure_system = "low_pressure"
         else:
-            return round(base_wind + (day * 0.2), 1)
+            pressure_system = "normal"
+
+        # Calculate storm probability based on pressure trends
+        storm_probability = 0.0
+
+        # Rapid pressure drop indicates approaching storm
+        if short_term_change < -2:  # Falling >2 hPa in 3 hours
+            storm_probability += 40
+
+        # Sustained pressure drop over 24 hours
+        if long_term_change < -5:  # Falling >5 hPa in 24 hours
+            storm_probability += 30
+
+        # Very low pressure indicates storm
+        if current_pressure < 990:
+            storm_probability += 30
+
+        # Cap storm probability
+        storm_probability = min(100.0, storm_probability)
+
+        return {
+            "current_trend": short_term_change,
+            "long_term_trend": long_term_change,
+            "pressure_system": pressure_system,
+            "storm_probability": storm_probability,
+        }
