@@ -2,55 +2,61 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configuration des Capteurs de Station Météo",
-        "description": "Configurez votre station météorologique en sélectionnant les entités de capteurs.",
+        "title": "Configuration de Micro Station Météo",
+        "description": "Connectez vos capteurs météorologiques pour créer une entité météo intelligente. Seul le capteur de température extérieure est requis - tous les autres sont optionnels et améliorent la précision de détection météorologique.\n\n{tip}\n\n{sensors_help}",
         "data": {
-          "outdoor_temp_sensor": "Capteur de Température Extérieure (Requis)",
-          "indoor_temp_sensor": "Capteur de Température Intérieure (Optionnel)",
-          "humidity_sensor": "Capteur d'Humidité (Optionnel)",
-          "pressure_sensor": "Capteur de Pression Atmosphérique (Optionnel)",
-          "wind_speed_sensor": "Capteur de Vitesse du Vent (Optionnel)",
-          "wind_direction_sensor": "Capteur de Direction du Vent (Optionnel)",
-          "wind_gust_sensor": "Capteur de Rafales de Vent (Optionnel)",
-          "rain_rate_sensor": "Capteur de Taux de Précipitation (Optionnel)",
-          "rain_state_sensor": "Capteur d'État de Pluie (Optionnel)",
-          "solar_radiation_sensor": "Capteur de Radiation Solaire (Optionnel)",
-          "solar_lux_sensor": "Capteur de Lux Solaire (Optionnel)",
-          "uv_index_sensor": "Capteur d'Indice UV (Optionnel)",
-          "update_interval": "Intervalle de mise à jour en minutes"
+          "outdoor_temp_sensor": "🌡️ Capteur Température Extérieure (Requis)",
+          "indoor_temp_sensor": "🏠 Capteur Température Intérieure (Optionnel) - Utilisé pour analyse différentielle température",
+          "humidity_sensor": "💧 Capteur Humidité (Optionnel) - Améliore détection brouillard et calculs confort",
+          "pressure_sensor": "📊 Capteur Pression Atmosphérique (Optionnel) - Active prédiction orages et prévisions météo",
+          "wind_speed_sensor": "💨 Capteur Vitesse Vent (Optionnel) - Requis pour détection conditions vent",
+          "wind_direction_sensor": "🧭 Capteur Direction Vent (Optionnel) - Fournit données direction vent",
+          "wind_gust_sensor": "🌪️ Capteur Rafales Vent (Optionnel) - Améliore détection orages et temps extrême",
+          "rain_rate_sensor": "🌧️ Capteur Intensité Pluie (Optionnel) - Mesure intensité précipitations",
+          "rain_state_sensor": "🌦️ Capteur État Pluie (Optionnel) - Détecte s'il pleut actuellement",
+          "solar_radiation_sensor": "☀️ Capteur Rayonnement Solaire (Optionnel) - Mesure intensité lumière solaire (W/m²)",
+          "solar_lux_sensor": "💡 Capteur Lux Solaire (Optionnel) - Mesure niveaux lumière pour détection jour/nuit",
+          "uv_index_sensor": "🛡️ Capteur Indice UV (Optionnel) - Indique intensité solaire et exposition UV",
+          "update_interval": "🔄 Intervalle Mise à Jour (minutes) - Fréquence actualisation données météo (1-60 minutes)"
         }
       }
     },
     "error": {
-      "missing_outdoor_temp": "Le capteur de température extérieure est requis.",
-      "unknown": "Une erreur inconnue s'est produite."
+      "missing_outdoor_temp": "❌ Le capteur de température extérieure est requis. Veuillez sélectionner un capteur de température qui mesure les conditions extérieures.",
+      "unknown": "❌ Une erreur inattendue s'est produite lors de la configuration. Veuillez vérifier votre sélection de capteurs et réessayer."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Options des Capteurs de Station Météo",
-        "description": "Mettez à jour la configuration des capteurs de votre station météorologique.",
+        "title": "Mettre à Jour Capteurs Station Météo",
+        "description": "Modifiez la configuration des capteurs de votre station météorologique. Les modifications prennent effet immédiatement.\n\n{current_sensors}\n\n{update_help}",
         "data": {
-          "outdoor_temp_sensor": "Capteur de Température Extérieure (Requis)",
-          "indoor_temp_sensor": "Capteur de Température Intérieure (Optionnel)",
-          "humidity_sensor": "Capteur d'Humidité (Optionnel)",
-          "pressure_sensor": "Capteur de Pression Atmosphérique (Optionnel)",
-          "wind_speed_sensor": "Capteur de Vitesse du Vent (Optionnel)",
-          "wind_direction_sensor": "Capteur de Direction du Vent (Optionnel)",
-          "wind_gust_sensor": "Capteur de Rafales de Vent (Optionnel)",
-          "rain_rate_sensor": "Capteur de Taux de Précipitation (Optionnel)",
-          "rain_state_sensor": "Capteur d'État de Pluie (Optionnel)",
-          "solar_radiation_sensor": "Capteur de Radiation Solaire (Optionnel)",
-          "solar_lux_sensor": "Capteur de Lux Solaire (Optionnel)",
-          "uv_index_sensor": "Capteur d'Indice UV (Optionnel)",
-          "update_interval": "Intervalle de mise à jour en minutes"
+          "outdoor_temp_sensor": "🌡️ Capteur Température Extérieure (Requis)",
+          "indoor_temp_sensor": "🏠 Capteur Température Intérieure (Optionnel) - Utilisé pour analyse différentielle température",
+          "humidity_sensor": "💧 Capteur Humidité (Optionnel) - Améliore détection brouillard et calculs confort",
+          "pressure_sensor": "📊 Capteur Pression Atmosphérique (Optionnel) - Active prédiction orages et prévisions météo",
+          "wind_speed_sensor": "💨 Capteur Vitesse Vent (Optionnel) - Requis pour détection conditions vent",
+          "wind_direction_sensor": "🧭 Capteur Direction Vent (Optionnel) - Fournit données direction vent",
+          "wind_gust_sensor": "🌪️ Capteur Rafales Vent (Optionnel) - Améliore détection orages et temps extrême",
+          "rain_rate_sensor": "🌧️ Capteur Intensité Pluie (Optionnel) - Mesure intensité précipitations",
+          "rain_state_sensor": "🌦️ Capteur État Pluie (Optionnel) - Détecte s'il pleut actuellement",
+          "solar_radiation_sensor": "☀️ Capteur Rayonnement Solaire (Optionnel) - Mesure intensité lumière solaire (W/m²)",
+          "solar_lux_sensor": "💡 Capteur Lux Solaire (Optionnel) - Mesure niveaux lumière pour détection jour/nuit",
+          "uv_index_sensor": "🛡️ Capteur Indice UV (Optionnel) - Indique intensité solaire et exposition UV",
+          "update_interval": "🔄 Intervalle Mise à Jour (minutes) - Fréquence actualisation données météo (1-60 minutes)"
         }
       }
     },
     "error": {
-      "missing_outdoor_temp": "Le capteur de température extérieure est requis.",
-      "unknown": "Une erreur inconnue s'est produite."
+      "missing_outdoor_temp": "❌ Le capteur de température extérieure est requis. Veuillez sélectionner un capteur de température qui mesure les conditions extérieures.",
+      "unknown": "❌ Une erreur inattendue s'est produite lors de la configuration. Veuillez vérifier votre sélection de capteurs et réessayer."
     }
+  },
+  "placeholders": {
+    "tip": "**Astuce:** Utilisez Outils de Développement → États pour trouver les ID de vos entités de capteurs.",
+    "sensors_help": "**Exigences des Capteurs:**\n• Les capteurs de température doivent avoir device_class='temperature'\n• Les capteurs de pression doivent utiliser la pression relative (barométrique)\n• Les capteurs de vent doivent être en km/h ou mph\n• Rayonnement solaire en W/m², lux en lx",
+    "current_sensors": "**Configuration Actuelle:** Vous pouvez mettre à jour toute assignation de capteurs ou ajuster la fréquence de mise à jour.",
+    "update_help": "**Comportement de Mise à Jour:** Les modifications prennent effet immédiatement. L'entité météo se mettra à jour selon le nouvel intervalle."
   }
 }

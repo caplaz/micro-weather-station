@@ -2,55 +2,55 @@
   "config": {
     "step": {
       "user": {
-        "title": "Weather Station Sensor Setup",
-        "description": "Configure your weather station by selecting sensor entities.",
+        "title": "Micro Weather Station Setup",
+        "description": "Connect your weather sensors to create an intelligent weather entity. Only the outdoor temperature sensor is required - all others are optional and enhance weather detection accuracy.\n\n**Tip:** Use Developer Tools → States to find your sensor entity IDs.",
         "data": {
-          "outdoor_temp_sensor": "Outdoor Temperature Sensor (Required)",
-          "indoor_temp_sensor": "Indoor Temperature Sensor (Optional)",
-          "humidity_sensor": "Humidity Sensor (Optional)",
-          "pressure_sensor": "Atmospheric Pressure Sensor (Optional)",
-          "wind_speed_sensor": "Wind Speed Sensor (Optional)",
-          "wind_direction_sensor": "Wind Direction Sensor (Optional)",
-          "wind_gust_sensor": "Wind Gust Sensor (Optional)",
-          "rain_rate_sensor": "Rain Rate Sensor (Optional)",
-          "rain_state_sensor": "Rain State Sensor (Optional)",
-          "solar_radiation_sensor": "Solar Radiation Sensor (Optional)",
-          "solar_lux_sensor": "Solar Lux Sensor (Optional)",
-          "uv_index_sensor": "UV Index Sensor (Optional)",
-          "update_interval": "Update interval in minutes"
+          "outdoor_temp_sensor": "🌡️ Outdoor Temperature Sensor (Required)",
+          "indoor_temp_sensor": "🏠 Indoor Temperature Sensor (Optional) - Used for temperature differential analysis",
+          "humidity_sensor": "💧 Humidity Sensor (Optional) - Improves fog detection and comfort calculations",
+          "pressure_sensor": "📊 Atmospheric Pressure Sensor (Optional) - Enables storm prediction and weather forecasting",
+          "wind_speed_sensor": "💨 Wind Speed Sensor (Optional) - Required for wind condition detection",
+          "wind_direction_sensor": "🧭 Wind Direction Sensor (Optional) - Provides wind bearing data",
+          "wind_gust_sensor": "🌪️ Wind Gust Sensor (Optional) - Enhances storm and severe weather detection",
+          "rain_rate_sensor": "🌧️ Rain Rate Sensor (Optional) - Measures precipitation intensity",
+          "rain_state_sensor": "🌦️ Rain State Sensor (Optional) - Detects if it's currently raining",
+          "solar_radiation_sensor": "☀️ Solar Radiation Sensor (Optional) - Measures sunlight intensity (W/m²)",
+          "solar_lux_sensor": "💡 Solar Lux Sensor (Optional) - Measures light levels for day/night detection",
+          "uv_index_sensor": "🛡️ UV Index Sensor (Optional) - Indicates sun intensity and UV exposure",
+          "update_interval": "🔄 Update Interval (minutes) - How often to refresh weather data (1-60 minutes)"
         }
       }
     },
     "error": {
-      "missing_outdoor_temp": "Outdoor temperature sensor is required.",
-      "unknown": "Unknown error occurred."
+      "missing_outdoor_temp": "❌ Outdoor temperature sensor is required. Please select a temperature sensor that measures outdoor conditions.",
+      "unknown": "❌ An unexpected error occurred during configuration. Please check your sensor selections and try again."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Weather Station Sensor Options",
-        "description": "Update your weather station sensor configuration.",
+        "title": "Update Weather Station Sensors",
+        "description": "Modify your weather station sensor configuration. Changes take effect immediately.\n\n**Current Setup:** You can update any sensor assignments or adjust the update frequency.",
         "data": {
-          "outdoor_temp_sensor": "Outdoor Temperature Sensor (Required)",
-          "indoor_temp_sensor": "Indoor Temperature Sensor (Optional)",
-          "humidity_sensor": "Humidity Sensor (Optional)",
-          "pressure_sensor": "Atmospheric Pressure Sensor (Optional)",
-          "wind_speed_sensor": "Wind Speed Sensor (Optional)",
-          "wind_direction_sensor": "Wind Direction Sensor (Optional)",
-          "wind_gust_sensor": "Wind Gust Sensor (Optional)",
-          "rain_rate_sensor": "Rain Rate Sensor (Optional)",
-          "rain_state_sensor": "Rain State Sensor (Optional)",
-          "solar_radiation_sensor": "Solar Radiation Sensor (Optional)",
-          "solar_lux_sensor": "Solar Lux Sensor (Optional)",
-          "uv_index_sensor": "UV Index Sensor (Optional)",
-          "update_interval": "Update interval in minutes"
+          "outdoor_temp_sensor": "🌡️ Outdoor Temperature Sensor (Required)",
+          "indoor_temp_sensor": "🏠 Indoor Temperature Sensor (Optional) - Used for temperature differential analysis",
+          "humidity_sensor": "💧 Humidity Sensor (Optional) - Improves fog detection and comfort calculations",
+          "pressure_sensor": "📊 Atmospheric Pressure Sensor (Optional) - Enables storm prediction and weather forecasting",
+          "wind_speed_sensor": "💨 Wind Speed Sensor (Optional) - Required for wind condition detection",
+          "wind_direction_sensor": "🧭 Wind Direction Sensor (Optional) - Provides wind bearing data",
+          "wind_gust_sensor": "🌪️ Wind Gust Sensor (Optional) - Enhances storm and severe weather detection",
+          "rain_rate_sensor": "🌧️ Rain Rate Sensor (Optional) - Measures precipitation intensity",
+          "rain_state_sensor": "🌦️ Rain State Sensor (Optional) - Detects if it's currently raining",
+          "solar_radiation_sensor": "☀️ Solar Radiation Sensor (Optional) - Measures sunlight intensity (W/m²)",
+          "solar_lux_sensor": "💡 Solar Lux Sensor (Optional) - Measures light levels for day/night detection",
+          "uv_index_sensor": "🛡️ UV Index Sensor (Optional) - Indicates sun intensity and UV exposure",
+          "update_interval": "🔄 Update Interval (minutes) - How often to refresh weather data (1-60 minutes)"
         }
       }
     },
     "error": {
-      "missing_outdoor_temp": "Outdoor temperature sensor is required.",
-      "unknown": "Unknown error occurred."
+      "missing_outdoor_temp": "❌ Outdoor temperature sensor is required. Please select a temperature sensor that measures outdoor conditions.",
+      "unknown": "❌ An unexpected error occurred during configuration. Please check your sensor selections and try again."
     }
   }
 }

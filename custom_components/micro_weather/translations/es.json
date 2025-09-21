@@ -2,55 +2,61 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configuración de Sensores de Estación Meteorológica",
-        "description": "Configure su estación meteorológica seleccionando las entidades de sensores.",
+        "title": "Configuración de Micro Estación Meteorológica",
+        "description": "Conecte sus sensores meteorológicos para crear una entidad meteorológica inteligente. Solo el sensor de temperatura exterior es requerido - todos los demás son opcionales y mejoran la precisión de detección meteorológica.\n\n{tip}\n\n{sensors_help}",
         "data": {
-          "outdoor_temp_sensor": "Sensor de Temperatura Exterior (Requerido)",
-          "indoor_temp_sensor": "Sensor de Temperatura Interior (Opcional)",
-          "humidity_sensor": "Sensor de Humedad (Opcional)",
-          "pressure_sensor": "Sensor de Presión Atmosférica (Opcional)",
-          "wind_speed_sensor": "Sensor de Velocidad del Viento (Opcional)",
-          "wind_direction_sensor": "Sensor de Dirección del Viento (Opcional)",
-          "wind_gust_sensor": "Sensor de Ráfagas de Viento (Opcional)",
-          "rain_rate_sensor": "Sensor de Intensidad de Lluvia (Opcional)",
-          "rain_state_sensor": "Sensor de Estado de Lluvia (Opcional)",
-          "solar_radiation_sensor": "Sensor de Radiación Solar (Opcional)",
-          "solar_lux_sensor": "Sensor de Lux Solar (Opcional)",
-          "uv_index_sensor": "Sensor de Índice UV (Opcional)",
-          "update_interval": "Intervalo de actualización en minutos"
+          "outdoor_temp_sensor": "🌡️ Sensor de Temperatura Exterior (Requerido)",
+          "indoor_temp_sensor": "🏠 Sensor de Temperatura Interior (Opcional) - Se usa para análisis de diferencia de temperatura",
+          "humidity_sensor": "💧 Sensor de Humedad (Opcional) - Mejora la detección de niebla y cálculos de confort",
+          "pressure_sensor": "📊 Sensor de Presión Atmosférica (Opcional) - Habilita predicción de tormentas y pronóstico del tiempo",
+          "wind_speed_sensor": "💨 Sensor de Velocidad del Viento (Opcional) - Requerido para detección de condiciones de viento",
+          "wind_direction_sensor": "🧭 Sensor de Dirección del Viento (Opcional) - Proporciona datos de dirección del viento",
+          "wind_gust_sensor": "🌪️ Sensor de Ráfagas de Viento (Opcional) - Mejora detección de tormentas y clima severo",
+          "rain_rate_sensor": "🌧️ Sensor de Intensidad de Lluvia (Opcional) - Mide intensidad de precipitación",
+          "rain_state_sensor": "🌦️ Sensor de Estado de Lluvia (Opcional) - Detecta si está lloviendo actualmente",
+          "solar_radiation_sensor": "☀️ Sensor de Radiación Solar (Opcional) - Mide intensidad de luz solar (W/m²)",
+          "solar_lux_sensor": "💡 Sensor de Lux Solar (Opcional) - Mide niveles de luz para detección día/noche",
+          "uv_index_sensor": "🛡️ Sensor de Índice UV (Opcional) - Indica intensidad solar y exposición UV",
+          "update_interval": "🔄 Intervalo de Actualización (minutos) - Con qué frecuencia refrescar datos meteorológicos (1-60 minutos)"
         }
       }
     },
     "error": {
-      "missing_outdoor_temp": "El sensor de temperatura exterior es requerido.",
-      "unknown": "Ha ocurrido un error desconocido."
+      "missing_outdoor_temp": "❌ El sensor de temperatura exterior es requerido. Por favor seleccione un sensor de temperatura que mida condiciones exteriores.",
+      "unknown": "❌ Ha ocurrido un error inesperado durante la configuración. Por favor verifique su selección de sensores e inténtelo nuevamente."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Opciones de Sensores de Estación Meteorológica",
-        "description": "Actualice la configuración de sensores de su estación meteorológica.",
+        "title": "Actualizar Sensores de Estación Meteorológica",
+        "description": "Modifique la configuración de sensores de su estación meteorológica. Los cambios tienen efecto inmediato.\n\n{current_sensors}\n\n{update_help}",
         "data": {
-          "outdoor_temp_sensor": "Sensor de Temperatura Exterior (Requerido)",
-          "indoor_temp_sensor": "Sensor de Temperatura Interior (Opcional)",
-          "humidity_sensor": "Sensor de Humedad (Opcional)",
-          "pressure_sensor": "Sensor de Presión Atmosférica (Opcional)",
-          "wind_speed_sensor": "Sensor de Velocidad del Viento (Opcional)",
-          "wind_direction_sensor": "Sensor de Dirección del Viento (Opcional)",
-          "wind_gust_sensor": "Sensor de Ráfagas de Viento (Opcional)",
-          "rain_rate_sensor": "Sensor de Intensidad de Lluvia (Opcional)",
-          "rain_state_sensor": "Sensor de Estado de Lluvia (Opcional)",
-          "solar_radiation_sensor": "Sensor de Radiación Solar (Opcional)",
-          "solar_lux_sensor": "Sensor de Lux Solar (Opcional)",
-          "uv_index_sensor": "Sensor de Índice UV (Opcional)",
-          "update_interval": "Intervalo de actualización en minutos"
+          "outdoor_temp_sensor": "🌡️ Sensor de Temperatura Exterior (Requerido)",
+          "indoor_temp_sensor": "🏠 Sensor de Temperatura Interior (Opcional) - Se usa para análisis de diferencia de temperatura",
+          "humidity_sensor": "💧 Sensor de Humedad (Opcional) - Mejora la detección de niebla y cálculos de confort",
+          "pressure_sensor": "📊 Sensor de Presión Atmosférica (Opcional) - Habilita predicción de tormentas y pronóstico del tiempo",
+          "wind_speed_sensor": "💨 Sensor de Velocidad del Viento (Opcional) - Requerido para detección de condiciones de viento",
+          "wind_direction_sensor": "🧭 Sensor de Dirección del Viento (Opcional) - Proporciona datos de dirección del viento",
+          "wind_gust_sensor": "🌪️ Sensor de Ráfagas de Viento (Opcional) - Mejora detección de tormentas y clima severo",
+          "rain_rate_sensor": "🌧️ Sensor de Intensidad de Lluvia (Opcional) - Mide intensidad de precipitación",
+          "rain_state_sensor": "🌦️ Sensor de Estado de Lluvia (Opcional) - Detecta si está lloviendo actualmente",
+          "solar_radiation_sensor": "☀️ Sensor de Radiación Solar (Opcional) - Mide intensidad de luz solar (W/m²)",
+          "solar_lux_sensor": "💡 Sensor de Lux Solar (Opcional) - Mide niveles de luz para detección día/noche",
+          "uv_index_sensor": "🛡️ Sensor de Índice UV (Opcional) - Indica intensidad solar y exposición UV",
+          "update_interval": "🔄 Intervalo de Actualización (minutos) - Con qué frecuencia refrescar datos meteorológicos (1-60 minutos)"
         }
       }
     },
     "error": {
-      "missing_outdoor_temp": "El sensor de temperatura exterior es requerido.",
-      "unknown": "Ha ocurrido un error desconocido."
+      "missing_outdoor_temp": "❌ El sensor de temperatura exterior es requerido. Por favor seleccione un sensor de temperatura que mida condiciones exteriores.",
+      "unknown": "❌ Ha ocurrido un error inesperado durante la configuración. Por favor verifique su selección de sensores e inténtelo nuevamente."
     }
+  },
+  "placeholders": {
+    "tip": "**Consejo:** Use Herramientas para Desarrolladores → Estados para encontrar los ID de entidad de sus sensores.",
+    "sensors_help": "**Requisitos de Sensores:**\n• Los sensores de temperatura deben tener device_class='temperature'\n• Los sensores de presión deben usar presión relativa (barométrica)\n• Los sensores de viento deben estar en km/h o mph\n• Radiación solar en W/m², lux en lx",
+    "current_sensors": "**Configuración Actual:** Puede actualizar cualquier asignación de sensores o ajustar la frecuencia de actualización.",
+    "update_help": "**Comportamiento de Actualización:** Los cambios surten efecto inmediatamente. La entidad meteorológica se actualizará según el nuevo intervalo."
   }
 }
