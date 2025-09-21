@@ -76,14 +76,14 @@ jobs:
           try:
               with open('custom_components/micro_weather/manifest.json') as f:
                   manifest = json.load(f)
-              
+
               required_fields = ['domain', 'name', 'version', 'documentation', 'issue_tracker', 'requirements', 'codeowners']
               missing_fields = [field for field in required_fields if field not in manifest]
-              
+
               if missing_fields:
                   print(f'Missing required manifest fields: {missing_fields}')
                   sys.exit(1)
-              
+
               print('Custom component validation passed')
           except Exception as e:
               print(f'Manifest validation failed: {e}')
@@ -105,16 +105,16 @@ jobs:
           try:
               from micro_weather import DOMAIN
               print(f'✅ Component import successful, domain: {DOMAIN}')
-              
+
               from micro_weather.config_flow import ConfigFlow
               print('✅ Config flow import successful')
-              
+
               from micro_weather.sensor import MicroWeatherSensor
               print('✅ Sensor import successful')
-              
+
               from micro_weather.weather import MicroWeatherEntity
               print('✅ Weather entity import successful')
-              
+
           except Exception as e:
               print(f'❌ Component import failed: {e}')
               sys.exit(1)

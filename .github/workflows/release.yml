@@ -49,7 +49,7 @@ jobs:
           if [ -f CHANGELOG.md ]; then
             # Get content between this version and next version header
             awk '/^## '"${{ steps.version.outputs.version }}"'/{flag=1; next} /^## /{flag=0} flag' CHANGELOG.md > current_changelog.md
-            
+
             if [ -s current_changelog.md ]; then
               echo "found_changelog=true" >> $GITHUB_OUTPUT
             else

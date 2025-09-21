@@ -27,7 +27,6 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.template import Template
 
 from .const import (
     CONF_DEWPOINT_SENSOR,
@@ -163,10 +162,12 @@ class WeatherDetector:
                     if sensor_key == "rain_state":
                         sensor_data[sensor_key] = state.state.lower()
                     else:
-                        sensor_data[sensor_key] = float(state.state)  # type: ignore[assignment]
+                        sensor_data[sensor_key] = float(
+                            state.state
+                        )  # type: ignore[assignment]
                 except (ValueError, TypeError):
                     _LOGGER.warning(
-                        f"Could not convert sensor {entity_id} value: {state.state}"
+                        "Could not convert sensor {entity_id} value: {state.state}"
                     )
 
         return sensor_data
@@ -223,7 +224,6 @@ class WeatherDetector:
         # Wind analysis (Beaufort scale adapted)
         wind_calm = wind_speed < 1  # 0-1 mph: Calm
         wind_light = 1 <= wind_speed < 8  # 1-7 mph: Light air to light breeze
-        wind_moderate = 8 <= wind_speed < 19  # 8-18 mph: Gentle to fresh breeze
         wind_strong = 19 <= wind_speed < 32  # 19-31 mph: Strong breeze to near gale
         wind_gale = wind_speed >= 32  # 32+ mph: Gale force
 
@@ -232,11 +232,23 @@ class WeatherDetector:
         is_very_gusty = gust_factor > 2.0 and wind_gust > 15
 
         _LOGGER.info(
-            f"Weather Analysis - Rain: {rain_rate:.2f} in/h ({rain_state}), "
-            f"Wind: {wind_speed:.1f} mph (gust: {wind_gust:.1f}, ratio: {gust_factor:.1f}), "
-            f"Pressure: {pressure:.2f} inHg, Solar: {solar_radiation:.0f} W/m² ({solar_lux:.0f} lx), "
-            f"Temp: {outdoor_temp:.1f}°F, Humidity: {humidity:.0f}%, "
-            f"Dewpoint: {dewpoint:.1f}°F (spread: {temp_dewpoint_spread:.1f}°F)"
+            "Weather Analysis - Rain: %.2f in/h (%s), "
+            "Wind: %.1f mph (gust: %.1f, ratio: %.1f), "
+            "Pressure: %.2f inHg, Solar: %d W/m² (%d lx), "
+            "Temp: %.1f°F, Humidity: %d%%, "
+            "Dewpoint: %.1f°F (spread: %.1f°F)",
+            rain_rate,
+            rain_state,
+            wind_speed,
+            wind_gust,
+            gust_factor,
+            pressure,
+            solar_radiation,
+            solar_lux,
+            outdoor_temp,
+            humidity,
+            dewpoint,
+            temp_dewpoint_spread,
         )
 
         # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
@@ -272,7 +284,8 @@ class WeatherDetector:
             else:
                 return "rainy"  # Light rain/drizzle
 
-        # PRIORITY 2: SEVERE WEATHER CONDITIONS (No precipitation but extreme conditions)
+        # PRIORITY 2: SEVERE WEATHER CONDITIONS
+        # (No precipitation but extreme conditions)
         if pressure_extremely_low and (wind_strong or is_very_gusty):
             return "stormy"  # Severe weather system approaching
 
@@ -426,7 +439,8 @@ class WeatherDetector:
             user feedback about incorrect fog detection.
         """
 
-        # Dense fog conditions (very restrictive - must be extremely close to saturation)
+        # Dense fog conditions
+        # (very restrictive - must be extremely close to saturation)
         if humidity >= 99 and spread <= 1 and wind_speed <= 2:
             return "foggy"
 
@@ -622,7 +636,8 @@ class WeatherDetector:
     def _generate_simple_forecast(
         self, current_condition: str, sensor_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Generate an intelligent 5-day forecast based on current sensor data and patterns."""
+        """Generate an intelligent 5-day forecast based on current sensor data
+        and patterns."""
         forecast = []
         current_temp = sensor_data.get("outdoor_temp", 70)
         current_pressure = sensor_data.get("pressure", 29.92)
@@ -631,8 +646,6 @@ class WeatherDetector:
 
         # Pressure trend analysis for weather prediction
         pressure_hpa = self._convert_to_hpa(current_pressure) or 1013
-        is_high_pressure = pressure_hpa > 1020
-        is_low_pressure = pressure_hpa < 1000
 
         for i in range(5):
             date = datetime.now() + timedelta(days=i + 1)

@@ -1,11 +1,9 @@
 """Test the configuration flow."""
 
-import pytest
-from unittest.mock import patch, Mock
-from homeassistant import config_entries, data_entry_flow
+from unittest.mock import patch
+
 from homeassistant.core import HomeAssistant
 
-from custom_components.micro_weather.const import DOMAIN
 from custom_components.micro_weather.config_flow import ConfigFlowHandler
 
 
@@ -46,7 +44,7 @@ class TestConfigFlow:
         with patch(
             "custom_components.micro_weather.async_setup_entry",
             return_value=True,
-        ) as mock_setup_entry:
+        ):
             result = await flow.async_step_user(
                 {
                     "outdoor_temp_sensor": "sensor.outdoor_temperature",

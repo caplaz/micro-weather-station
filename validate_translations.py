@@ -2,7 +2,6 @@
 """Translation validation script for micro weather station integration."""
 
 import json
-import os
 from pathlib import Path
 
 
@@ -50,7 +49,7 @@ def validate_translations():
             print(f"  • {error}")
         return False
     else:
-        print(f"\n✅ All translations valid!")
+        print("\n✅ All translations valid!")
         return True
 
 

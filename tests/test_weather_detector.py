@@ -1,8 +1,10 @@
 """Test the weather detector functionality."""
 
-import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
+
 from homeassistant.core import HomeAssistant
+import pytest
+
 from custom_components.micro_weather.weather_detector import WeatherDetector
 
 

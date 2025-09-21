@@ -404,7 +404,7 @@ automation:
         data:
           title: "Weather Update Test"
           message: >
-            Weather condition changed from {{ trigger.from_state.state }} 
+            Weather condition changed from {{ trigger.from_state.state }}
             to {{ trigger.to_state.state }} at {{ now().strftime('%H:%M') }}
 ```
 

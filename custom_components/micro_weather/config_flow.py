@@ -5,7 +5,6 @@ from typing import Any
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 import voluptuous as vol

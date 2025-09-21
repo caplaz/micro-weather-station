@@ -1,7 +1,6 @@
 """Sensor entities for Micro Weather Station."""
 
 import logging
-from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,

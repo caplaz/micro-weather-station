@@ -1,7 +1,6 @@
 """Weather entity for Micro Weather Station."""
 
 import logging
-from typing import Any
 
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLOUDY,
@@ -10,7 +9,6 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_RAINY,
     ATTR_CONDITION_SNOWY,
-    ATTR_CONDITION_SNOWY_RAINY,
     ATTR_CONDITION_SUNNY,
     Forecast,
     WeatherEntity,

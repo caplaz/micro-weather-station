@@ -1,14 +1,15 @@
 """Test configuration validation logic for Micro Weather Station."""
 
-import pytest
 from typing import Any, Dict
 
+import pytest
+
 from custom_components.micro_weather.const import (
-    CONF_OUTDOOR_TEMP_SENSOR,
-    CONF_HUMIDITY_SENSOR,
-    CONF_UPDATE_INTERVAL,
     CONF_DEWPOINT_SENSOR,
+    CONF_HUMIDITY_SENSOR,
+    CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
+    CONF_UPDATE_INTERVAL,
     CONF_WIND_SPEED_SENSOR,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
@@ -243,7 +244,6 @@ class TestComponentStructure:
         """Test that config flow can be imported (basic structure test)."""
         # This test is more limited due to Home Assistant dependencies
         # but we can at least check the module exists
-        import sys
         import os
 
         config_flow_path = os.path.join(
@@ -293,6 +293,7 @@ class TestIntegrationMetadata:
         """Test that version is consistent between manifest and version.py."""
         import json
         import os
+
         from custom_components.micro_weather.version import __version__
 
         manifest_path = os.path.join(
@@ -309,6 +310,7 @@ class TestIntegrationMetadata:
         """Test that domain is consistent across files."""
         import json
         import os
+
         from custom_components.micro_weather.const import DOMAIN
 
         manifest_path = os.path.join(

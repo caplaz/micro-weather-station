@@ -60,7 +60,7 @@ jobs:
               state: 'open'
             });
 
-            const existingIssue = issues.find(issue => 
+            const existingIssue = issues.find(issue =>
               issue.title.includes('Dependency Update')
             );
 
@@ -70,17 +70,17 @@ jobs:
                 repo: context.repo.repo,
                 title: 'Dependency Update Available',
                 body: `## Dependency Updates Available
-                
+
                 ### Home Assistant
                 - **Current**: ${{ steps.ha_check.outputs.current_ha }}
                 - **Latest**: ${{ steps.ha_check.outputs.latest_ha }}
-                
+
                 ### Actions Required
                 - [ ] Test compatibility with latest Home Assistant version
                 - [ ] Update manifest.json if compatible
                 - [ ] Update documentation if needed
                 - [ ] Create new release if necessary
-                
+
                 This issue was automatically created by the dependency update workflow.`,
                 labels: ['dependencies', 'enhancement', 'automated']
               });
