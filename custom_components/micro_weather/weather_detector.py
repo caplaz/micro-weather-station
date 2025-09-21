@@ -313,27 +313,33 @@ class WeatherDetector:
         - Small temperature-dewpoint spread (<4°F)
         - Light winds (<7 mph) for radiation fog
         - Specific conditions for other fog types
+
+        Made more conservative to reduce false positives.
         """
 
-        # Radiation fog (most common - clear nights, light winds)
+        # Dense fog conditions (very restrictive - must be extremely close to saturation)
+        if humidity >= 99 and spread <= 1 and wind_speed <= 2:
+            return "foggy"
+
+        # Radiation fog (more restrictive than before)
         if (
-            humidity >= 95
-            and spread <= 3
-            and wind_speed <= 5
-            and (not is_daytime or solar_rad < 10)
+            humidity >= 98  # Raised from 95 to 98
+            and spread <= 2  # Reduced from 3 to 2
+            and wind_speed <= 3  # Reduced from 5 to 3
+            and (not is_daytime or solar_rad < 5)  # More restrictive solar condition
         ):
             return "foggy"
 
-        # Dense fog conditions
-        if humidity >= 98 and spread <= 2 and wind_speed <= 3:
+        # Advection fog (moist air over cooler surface) - kept similar
+        if (
+            humidity >= 95 and spread <= 3 and 3 <= wind_speed <= 12
+        ):  # Raised humidity threshold
             return "foggy"
 
-        # Advection fog (moist air over cooler surface)
-        if humidity >= 92 and spread <= 4 and 3 <= wind_speed <= 12:
-            return "foggy"
-
-        # Evaporation fog (after rain, warm ground)
-        if humidity >= 90 and spread <= 5 and wind_speed <= 8 and temp > 40:
+        # Evaporation fog (after rain, warm ground) - more restrictive
+        if (
+            humidity >= 95 and spread <= 3 and wind_speed <= 6 and temp > 40
+        ):  # Raised thresholds
             # Check if conditions suggest recent precipitation
             return "foggy"
 
