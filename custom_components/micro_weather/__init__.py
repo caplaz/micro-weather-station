@@ -30,7 +30,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    # Set up options update listener for immediate refresh
+    entry.async_on_unload(entry.add_update_listener(async_update_options))
+
     return True
+
+
+async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Update options and force immediate refresh."""
+    _LOGGER.info("Micro Weather Station config updated, refreshing data immediately")
+
+    # Get the coordinator and force an immediate refresh
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    await coordinator.async_request_refresh()
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

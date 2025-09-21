@@ -590,6 +590,22 @@ class WeatherDetector:
     ) -> str:
         """Predict weather condition based on atmospheric patterns."""
 
+        # Special handling for fog - it's often localized and temporary
+        if current_condition == "foggy":
+            if day == 0:
+                return "foggy"  # Fog may persist for a day
+            elif day == 1:
+                # Fog often clears to cloudy or partly cloudy
+                return "cloudy" if humidity > 85 else "partly_cloudy"
+            else:
+                # After fog clears, normal weather patterns resume
+                if pressure_hpa > 1020:
+                    return "partly_cloudy"
+                elif pressure_hpa < 1000:
+                    return "cloudy"
+                else:
+                    return "partly_cloudy"
+
         # Day 0-1: Current conditions persist with pressure influence
         if day <= 1:
             if pressure_hpa > 1025:  # Very high pressure
@@ -622,15 +638,23 @@ class WeatherDetector:
     ) -> float:
         """Calculate precipitation probability based on conditions."""
         if condition in ["rainy", "stormy"]:
-            base_precip = 5.0 if condition == "rainy" else 10.0
-            # High humidity and low pressure increase precipitation
-            humidity_factor = max(1.0, humidity / 60)
-            pressure_factor = max(1.0, (1020 - pressure_hpa) / 20)
+            # More conservative precipitation calculation
+            if condition == "rainy":
+                base_precip = 2.0  # Reduced from 5.0
+            else:  # stormy
+                base_precip = 5.0  # Reduced from 10.0
+
+            # More realistic humidity and pressure factors
+            humidity_factor = max(1.0, (humidity - 60) / 40)  # Only boost above 60%
+            pressure_factor = max(1.0, (1013 - pressure_hpa) / 40)  # More conservative
             return round(base_precip * humidity_factor * pressure_factor, 1)
         elif condition == "snowy":
-            return 3.0
-        elif condition == "cloudy" and humidity > 75:
-            return 1.0  # Light chance of rain
+            return 2.0  # Reduced from 3.0
+        elif condition == "cloudy" and humidity > 80:  # Raised threshold
+            return 0.5  # Reduced from 1.0
+        elif condition == "foggy":
+            # Fog rarely leads to significant precipitation
+            return 0.1 if humidity > 95 else 0.0
         else:
             return 0.0
 
