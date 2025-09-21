@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 class WeatherDetector:
     """Detect weather conditions from real sensor data."""
 
-    def __init__(self, hass: HomeAssistant, options: Dict[str, Any]) -> None:
+    def __init__(self, hass: HomeAssistant, options: Mapping[str, Any]) -> None:
         """Initialize the weather detector."""
         self.hass = hass
         self.options = options
@@ -93,7 +93,7 @@ class WeatherDetector:
                     if sensor_key == "rain_state":
                         sensor_data[sensor_key] = state.state.lower()
                     else:
-                        sensor_data[sensor_key] = float(state.state)
+                        sensor_data[sensor_key] = float(state.state)  # type: ignore[assignment]
                 except (ValueError, TypeError):
                     _LOGGER.warning(
                         f"Could not convert sensor {entity_id} value: {state.state}"

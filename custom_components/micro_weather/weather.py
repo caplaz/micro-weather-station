@@ -12,8 +12,8 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_SNOWY,
     ATTR_CONDITION_SNOWY_RAINY,
     ATTR_CONDITION_SUNNY,
+    Forecast,
     WeatherEntity,
-    WeatherEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -59,9 +59,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
 
     _attr_has_entity_name = True
     _attr_name = None
-    _attr_supported_features = (
-        WeatherEntityFeature.FORECAST_DAILY | WeatherEntityFeature.FORECAST_HOURLY
-    )
+    _attr_supported_features = 3  # FORECAST_DAILY | FORECAST_HOURLY
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_pressure_unit = UnitOfPressure.HPA
     _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
@@ -85,7 +83,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         """Return the current condition."""
         if self.coordinator.data:
             condition = self.coordinator.data.get("condition")
-            return CONDITION_MAP.get(condition, condition)
+            return CONDITION_MAP.get(condition, condition)  # type: ignore[arg-type]
         return None
 
     @property
@@ -130,7 +128,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             return self.coordinator.data.get("visibility")
         return None
 
-    async def async_forecast_daily(self) -> list[dict[str, Any]] | None:
+    async def async_forecast_daily(self) -> list[Forecast] | None:
         """Return the daily forecast."""
         if self.coordinator.data and "forecast" in self.coordinator.data:
             forecast_data = []
@@ -148,10 +146,10 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         "humidity": day_data.get("humidity", 50),
                     }
                 )
-            return forecast_data
+            return forecast_data  # type: ignore[return-value]
         return None
 
-    async def async_forecast_hourly(self) -> list[dict[str, Any]] | None:
+    async def async_forecast_hourly(self) -> list[Forecast] | None:
         """Return the hourly forecast."""
         if not self.coordinator.data:
             return None
@@ -195,4 +193,4 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 }
             )
 
-        return hourly_data
+        return hourly_data  # type: ignore[return-value]
