@@ -86,6 +86,7 @@ class WeatherDetector:
             "humidity": deque(maxlen=self._history_maxlen),
             "pressure": deque(maxlen=self._history_maxlen),
             "wind_speed": deque(maxlen=self._history_maxlen),
+            "wind_direction": deque(maxlen=self._history_maxlen),
             "solar_radiation": deque(maxlen=self._history_maxlen),
             "rain_rate": deque(maxlen=self._history_maxlen),
         }
@@ -788,7 +789,8 @@ class WeatherDetector:
         pressure_analysis: Dict[str, Any],
         sensor_data: Dict[str, Any],
     ) -> str:
-        """Enhanced condition forecasting using pressure trends and historical patterns.
+        """Enhanced condition forecasting using pressure trends, historical patterns,
+        and wind direction analysis.
 
         Args:
             day: Day ahead to forecast (0-4)
@@ -802,14 +804,23 @@ class WeatherDetector:
         pressure_system = pressure_analysis.get("pressure_system", "normal")
         storm_probability = pressure_analysis.get("storm_probability", 0)
 
+        # Get wind direction analysis for enhanced prediction
+        wind_direction_analysis = self._analyze_wind_direction_trends()
+        direction_stability = wind_direction_analysis.get("direction_stability", 0.5)
+        significant_shift = wind_direction_analysis.get("significant_shift", False)
+
         # High confidence predictions for near-term
         if day == 0:
             if storm_probability > 60:
                 return "stormy"
             elif storm_probability > 30:
                 return "rainy"
-            elif pressure_system == "high_pressure":
+            elif pressure_system == "high_pressure" and direction_stability > 0.7:
+                # Stable high pressure with consistent winds = clear weather
                 return "sunny"
+            elif significant_shift and storm_probability > 20:
+                # Wind direction change with some storm probability = approaching change
+                return "cloudy"
             else:
                 return current_condition
 
@@ -818,31 +829,44 @@ class WeatherDetector:
             if storm_probability > 40:
                 return "rainy" if storm_probability < 70 else "stormy"
             elif pressure_system == "high_pressure":
-                return "partly_cloudy" if day == 1 else "sunny"
+                if direction_stability > 0.8:
+                    # Very stable winds with high pressure = excellent conditions
+                    return "sunny" if day == 1 else "sunny"
+                else:
+                    return "partly_cloudy" if day == 1 else "sunny"
             elif pressure_system == "low_pressure":
-                return "cloudy" if day == 1 else "rainy"
+                if significant_shift:
+                    # Wind shifting with low pressure = unsettled weather
+                    return "rainy" if day == 1 else "cloudy"
+                else:
+                    return "cloudy" if day == 1 else "rainy"
             else:
-                # Default to improving conditions
-                condition_progression = {
-                    "stormy": ["rainy", "cloudy", "partly_cloudy"],
-                    "rainy": ["cloudy", "partly_cloudy", "sunny"],
-                    "cloudy": ["partly_cloudy", "sunny", "sunny"],
-                    "partly_cloudy": ["sunny", "sunny", "partly_cloudy"],
-                    "sunny": ["sunny", "partly_cloudy", "sunny"],
-                    "foggy": ["cloudy", "partly_cloudy", "sunny"],
-                    "snowy": ["cloudy", "partly_cloudy", "sunny"],
-                }
-                progression = condition_progression.get(
-                    current_condition, ["partly_cloudy"]
-                )
-                return progression[min(day, len(progression) - 1)]
+                # Default to improving conditions, but consider wind stability
+                if direction_stability < 0.3:
+                    # Unstable winds = variable conditions
+                    return "partly_cloudy"
+                else:
+                    # Default progression
+                    condition_progression = {
+                        "stormy": ["rainy", "cloudy", "partly_cloudy"],
+                        "rainy": ["cloudy", "partly_cloudy", "sunny"],
+                        "cloudy": ["partly_cloudy", "sunny", "sunny"],
+                        "partly_cloudy": ["sunny", "sunny", "partly_cloudy"],
+                        "sunny": ["sunny", "partly_cloudy", "sunny"],
+                        "foggy": ["cloudy", "partly_cloudy", "sunny"],
+                        "snowy": ["cloudy", "partly_cloudy", "sunny"],
+                    }
+                    progression = condition_progression.get(
+                        current_condition, ["partly_cloudy"]
+                    )
+                    return progression[min(day, len(progression) - 1)]
 
         # Long-term predictions (3-4 days)
         # - return to average conditions
         else:
-            if pressure_system == "high_pressure":
+            if pressure_system == "high_pressure" and direction_stability > 0.6:
                 return "sunny"
-            elif pressure_system == "low_pressure":
+            elif pressure_system == "low_pressure" or significant_shift:
                 return "cloudy"
             else:
                 return "partly_cloudy"
@@ -1134,6 +1158,29 @@ class WeatherDetector:
         if current_pressure < 990:
             storm_probability += 30
 
+        # Incorporate wind direction analysis for enhanced storm prediction
+        wind_direction_analysis = self._analyze_wind_direction_trends()
+        direction_stability = wind_direction_analysis.get("direction_stability", 0.5)
+        significant_shift = wind_direction_analysis.get("significant_shift", False)
+        direction_change_rate = wind_direction_analysis.get(
+            "direction_change_rate", 0.0
+        )
+
+        # Wind direction changes can indicate approaching weather systems
+        if significant_shift:
+            # Major wind direction shift often precedes weather changes
+            storm_probability += 15
+
+        # Rapid wind direction changes with pressure drops = strong storm signal
+        if direction_change_rate > 30 and (
+            short_term_change < -1 or long_term_change < -3
+        ):
+            storm_probability += 20
+
+        # Unstable winds with low pressure = increased storm probability
+        if direction_stability < 0.3 and pressure_system == "low_pressure":
+            storm_probability += 10
+
         # Cap storm probability
         storm_probability = min(100.0, storm_probability)
 
@@ -1143,3 +1190,178 @@ class WeatherDetector:
             "pressure_system": pressure_system,
             "storm_probability": storm_probability,
         }
+
+    def _analyze_wind_direction_trends(self) -> Dict[str, Any]:
+        """Analyze wind direction trends for weather prediction.
+
+        Wind direction analysis is complex due to circular nature (0-360°).
+        This method handles direction changes that may indicate approaching
+        weather systems or changing weather patterns.
+
+        Returns:
+            dict: Wind direction trend analysis including:
+                - average_direction: Mean wind direction in degrees
+                - direction_stability: How consistent direction has been (0-1)
+                - direction_change_rate: Rate of direction change in °/hour
+                - significant_shift: Boolean indicating major direction change
+                - prevailing_direction: Most common direction sector
+        """
+        # Get wind direction trends over different time periods
+        short_trend = self._get_historical_trends(
+            "wind_direction", hours=6
+        )  # 6-hour trend
+        long_trend = self._get_historical_trends(
+            "wind_direction", hours=24
+        )  # 24-hour trend
+
+        if not short_trend or not long_trend:
+            return {
+                "average_direction": None,
+                "direction_stability": 0.0,
+                "direction_change_rate": 0.0,
+                "significant_shift": False,
+                "prevailing_direction": "unknown",
+            }
+
+        # Get recent wind direction data for detailed analysis
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        recent_data = [
+            entry
+            for entry in self._sensor_history["wind_direction"]
+            if entry["timestamp"] > cutoff_time
+        ]
+
+        if len(recent_data) < 3:
+            return {
+                "average_direction": long_trend["current"],
+                "direction_stability": 0.0,
+                "direction_change_rate": 0.0,
+                "significant_shift": False,
+                "prevailing_direction": "unknown",
+            }
+
+        directions = [entry["value"] for entry in recent_data]
+        timestamps = [entry["timestamp"] for entry in recent_data]
+
+        # Calculate average direction (circular mean)
+        avg_direction = self._calculate_circular_mean(directions)
+
+        # Calculate direction stability (lower volatility = more stable)
+        stability = max(0.0, 1.0 - (long_trend.get("volatility", 0) / 180.0))
+
+        # Calculate direction change rate
+        if len(directions) >= 2:
+            # Calculate angular differences (handling wraparound)
+            direction_changes = []
+            for i in range(1, len(directions)):
+                change = self._calculate_angular_difference(
+                    directions[i - 1], directions[i]
+                )
+                direction_changes.append(change)
+
+            # Average change per hour
+            total_time_hours = (timestamps[-1] - timestamps[0]).total_seconds() / 3600
+            if total_time_hours > 0:
+                avg_change_per_hour = (
+                    sum(abs(c) for c in direction_changes) / total_time_hours
+                )
+            else:
+                avg_change_per_hour = 0.0
+        else:
+            avg_change_per_hour = 0.0
+
+        # Detect significant direction shift (rapid change > 45° in 6 hours)
+        significant_shift = False
+        if len(directions) >= 2:
+            recent_change = self._calculate_angular_difference(
+                directions[0], directions[-1]
+            )
+            if abs(recent_change) > 45:  # More than 45° change in 24 hours
+                significant_shift = True
+
+        # Determine prevailing direction (most common 90° sector)
+        prevailing_direction = self._calculate_prevailing_direction(directions)
+
+        return {
+            "average_direction": avg_direction,
+            "direction_stability": stability,
+            "direction_change_rate": avg_change_per_hour,
+            "significant_shift": significant_shift,
+            "prevailing_direction": prevailing_direction,
+        }
+
+    def _calculate_circular_mean(self, directions: List[float]) -> float:
+        """Calculate the circular mean of wind directions.
+
+        Args:
+            directions: List of wind directions in degrees (0-360)
+
+        Returns:
+            float: Circular mean direction in degrees
+        """
+        if not directions:
+            return 0.0
+
+        # Convert to radians
+        radians = [math.radians(d) for d in directions]
+
+        # Calculate circular mean
+        sin_sum = sum(math.sin(r) for r in radians)
+        cos_sum = sum(math.cos(r) for r in radians)
+
+        mean_radians = math.atan2(sin_sum, cos_sum)
+
+        # Convert back to degrees (0-360)
+        mean_degrees = math.degrees(mean_radians) % 360
+
+        return mean_degrees
+
+    def _calculate_angular_difference(self, dir1: float, dir2: float) -> float:
+        """Calculate the smallest angular difference between two directions.
+
+        Args:
+            dir1: First direction in degrees
+            dir2: Second direction in degrees
+
+        Returns:
+            float: Angular difference in degrees (-180 to +180)
+        """
+        diff = (dir2 - dir1) % 360
+        if diff > 180:
+            diff -= 360
+        return diff
+
+    def _calculate_prevailing_direction(self, directions: List[float]) -> str:
+        """Determine the prevailing wind direction sector.
+
+        Args:
+            directions: List of wind directions in degrees
+
+        Returns:
+            str: Prevailing direction as cardinal direction
+        """
+        if not directions:
+            return "unknown"
+
+        # Count directions in each 90° sector
+        sectors = {
+            "north": 0,  # 315-45°
+            "east": 0,  # 45-135°
+            "south": 0,  # 135-225°
+            "west": 0,  # 225-315°
+        }
+
+        for direction in directions:
+            normalized = direction % 360
+            if 315 <= normalized or normalized < 45:
+                sectors["north"] += 1
+            elif 45 <= normalized < 135:
+                sectors["east"] += 1
+            elif 135 <= normalized < 225:
+                sectors["south"] += 1
+            else:  # 225 <= normalized < 315
+                sectors["west"] += 1
+
+        # Return the sector with the most observations
+        prevailing = max(sectors, key=sectors.get)
+        return prevailing
