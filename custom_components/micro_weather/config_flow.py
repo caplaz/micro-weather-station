@@ -11,8 +11,8 @@ from homeassistant.helpers import selector
 import voluptuous as vol
 
 from .const import (
+    CONF_DEWPOINT_SENSOR,
     CONF_HUMIDITY_SENSOR,
-    CONF_INDOOR_TEMP_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
     CONF_RAIN_RATE_SENSOR,
@@ -53,8 +53,8 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         CONF_OUTDOOR_TEMP_SENSOR: user_input.get(
                             CONF_OUTDOOR_TEMP_SENSOR
                         ),
-                        CONF_INDOOR_TEMP_SENSOR: user_input.get(
-                            CONF_INDOOR_TEMP_SENSOR
+                        CONF_DEWPOINT_SENSOR: user_input.get(
+                            CONF_DEWPOINT_SENSOR
                         ),
                         CONF_HUMIDITY_SENSOR: user_input.get(CONF_HUMIDITY_SENSOR),
                         CONF_PRESSURE_SENSOR: user_input.get(CONF_PRESSURE_SENSOR),
@@ -93,7 +93,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         domain="sensor", device_class="temperature"
                     )
                 ),
-                vol.Optional(CONF_INDOOR_TEMP_SENSOR): selector.EntitySelector(
+                vol.Optional(CONF_DEWPOINT_SENSOR): selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain="sensor", device_class="temperature"
                     )
@@ -182,8 +182,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_OUTDOOR_TEMP_SENSOR: user_input.get(
                             CONF_OUTDOOR_TEMP_SENSOR
                         ),
-                        CONF_INDOOR_TEMP_SENSOR: user_input.get(
-                            CONF_INDOOR_TEMP_SENSOR
+                        CONF_DEWPOINT_SENSOR: user_input.get(
+                            CONF_DEWPOINT_SENSOR
                         ),
                         CONF_HUMIDITY_SENSOR: user_input.get(CONF_HUMIDITY_SENSOR),
                         CONF_PRESSURE_SENSOR: user_input.get(CONF_PRESSURE_SENSOR),
@@ -224,8 +224,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     )
                 ),
                 vol.Optional(
-                    CONF_INDOOR_TEMP_SENSOR,
-                    default=current_options.get(CONF_INDOOR_TEMP_SENSOR),
+                    CONF_DEWPOINT_SENSOR,
+                    default=current_options.get(CONF_DEWPOINT_SENSOR),
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain="sensor", device_class="temperature"

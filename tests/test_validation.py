@@ -7,7 +7,7 @@ from custom_components.micro_weather.const import (
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_HUMIDITY_SENSOR,
     CONF_UPDATE_INTERVAL,
-    CONF_INDOOR_TEMP_SENSOR,
+    CONF_DEWPOINT_SENSOR,
     CONF_PRESSURE_SENSOR,
     CONF_WIND_SPEED_SENSOR,
     DEFAULT_UPDATE_INTERVAL,
@@ -106,7 +106,7 @@ class TestConfigValidation:
         """Test validation with all optional sensors provided."""
         config = {
             CONF_OUTDOOR_TEMP_SENSOR: "sensor.outdoor_temperature",
-            CONF_INDOOR_TEMP_SENSOR: "sensor.indoor_temperature",
+            CONF_DEWPOINT_SENSOR: "sensor.dewpoint",
             CONF_HUMIDITY_SENSOR: "sensor.humidity",
             CONF_PRESSURE_SENSOR: "sensor.pressure",
             CONF_WIND_SPEED_SENSOR: "sensor.wind_speed",

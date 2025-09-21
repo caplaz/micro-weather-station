@@ -187,19 +187,19 @@ The configuration flow will guide you through selecting your sensors:
 
 Configure additional sensors for enhanced weather detection:
 
-| Configuration Field | Example Entity ID           | Purpose                             |
-| ------------------- | --------------------------- | ----------------------------------- |
-| Indoor Temperature  | `sensor.indoor_temperature` | Temperature differential analysis   |
-| Humidity            | `sensor.humidity`           | Humidity readings and fog detection |
-| Pressure            | `sensor.pressure`           | Storm prediction and forecasting    |
-| Wind Speed          | `sensor.wind_speed`         | Wind condition detection            |
-| Wind Direction      | `sensor.wind_direction`     | Wind data and storm analysis        |
-| Wind Gust           | `sensor.wind_gust`          | Storm and severe weather detection  |
-| Rain Rate           | `sensor.rain_rate`          | Precipitation rate measurement      |
-| Rain State          | `sensor.rain_detector`      | Precipitation state detection       |
-| Solar Radiation     | `sensor.solar_radiation`    | Cloud cover and solar analysis      |
-| Solar Lux           | `sensor.light_sensor`       | Day/night and cloud detection       |
-| UV Index            | `sensor.uv_index`           | Clear sky and sun intensity         |
+| Configuration Field | Example Entity ID        | Purpose                             |
+| ------------------- | ------------------------ | ----------------------------------- |
+| Dewpoint            | `sensor.dewpoint`        | Direct dewpoint measurement         |
+| Humidity            | `sensor.humidity`        | Humidity readings and fog detection |
+| Pressure            | `sensor.pressure`        | Storm prediction and forecasting    |
+| Wind Speed          | `sensor.wind_speed`      | Wind condition detection            |
+| Wind Direction      | `sensor.wind_direction`  | Wind data and storm analysis        |
+| Wind Gust           | `sensor.wind_gust`       | Storm and severe weather detection  |
+| Rain Rate           | `sensor.rain_rate`       | Precipitation rate measurement      |
+| Rain State          | `sensor.rain_detector`   | Precipitation state detection       |
+| Solar Radiation     | `sensor.solar_radiation` | Cloud cover and solar analysis      |
+| Solar Lux           | `sensor.light_sensor`    | Day/night and cloud detection       |
+| UV Index            | `sensor.uv_index`        | Clear sky and sun intensity         |
 
 ### Step 3: Testing Your Configuration
 
@@ -305,37 +305,39 @@ automation:
 
 ### Optional Sensors
 
-| Sensor Type        | Description                   | Used For                          |
-| ------------------ | ----------------------------- | --------------------------------- |
-| Indoor Temperature | Indoor temperature sensor     | Temperature differential analysis |
-| Humidity           | Humidity percentage sensor    | Humidity readings                 |
-| Pressure           | Atmospheric pressure sensor   | Storm detection                   |
-| Wind Speed         | Wind speed sensor             | Wind conditions                   |
-| Wind Direction     | Wind direction sensor         | Wind data                         |
-| Wind Gust          | Wind gust sensor              | Storm detection                   |
-| Rain Rate          | Precipitation rate sensor     | Precipitation detection           |
-| Rain State         | Rain state sensor (dry/wet)   | Precipitation detection           |
-| Solar Radiation    | Solar radiation sensor (W/m²) | Cloud cover detection             |
-| Solar Lux          | Light level sensor (lx)       | Day/night and cloud detection     |
-| UV Index           | UV index sensor               | Clear sky detection               |
+| Sensor Type     | Description                   | Used For                                          |
+| --------------- | ----------------------------- | ------------------------------------------------- |
+| Dewpoint        | Dewpoint temperature sensor   | Direct dewpoint measurement for improved accuracy |
+| Humidity        | Humidity percentage sensor    | Humidity readings and fog detection               |
+| Pressure        | Atmospheric pressure sensor   | Storm detection and weather forecasting           |
+| Wind Speed      | Wind speed sensor             | Wind conditions and storm detection               |
+| Wind Direction  | Wind direction sensor         | Wind data and storm tracking                      |
+| Wind Gust       | Wind gust sensor              | Severe weather and storm detection                |
+| Rain Rate       | Precipitation rate sensor     | Precipitation intensity measurement               |
+| Rain State      | Rain state sensor (dry/wet)   | Boolean precipitation detection                   |
+| Solar Radiation | Solar radiation sensor (W/m²) | Cloud cover detection and solar analysis          |
+| Solar Lux       | Light level sensor (lx)       | Day/night and cloud detection (backup)            |
+| UV Index        | UV index sensor               | Clear sky detection and solar intensity           |
 
 ### Example Sensor Configuration
 
 ```yaml
 # Example sensor mappings for weather station:
-Outdoor Temperature: sensor.outdoor_temperature
-Indoor Temperature: sensor.indoor_temperature
-Humidity: sensor.indoor_humidity
-Pressure: sensor.relative_pressure
-Wind Speed: sensor.wind_speed
-Wind Direction: sensor.wind_direction
-Wind Gust: sensor.wind_gust
-Rain Rate: sensor.rain_rate_piezo
-Rain State: sensor.rain_state_piezo
-Solar Radiation: sensor.solar_radiation
-Solar Lux: sensor.solar_lux
-UV Index: sensor.uv_index
+Outdoor Temperature: sensor.outdoor_temperature # Required - base temperature readings
+Dewpoint: sensor.dewpoint # Optional - direct dewpoint measurement
+Humidity: sensor.indoor_humidity # Optional - fog detection, comfort calculations
+Pressure: sensor.relative_pressure # Optional - storm prediction, forecasting
+Wind Speed: sensor.wind_speed # Optional - wind conditions, storm detection
+Wind Direction: sensor.wind_direction # Optional - wind patterns, storm tracking
+Wind Gust: sensor.wind_gust # Optional - severe weather detection
+Rain Rate: sensor.rain_rate_piezo # Optional - precipitation intensity
+Rain State: sensor.rain_state_piezo # Optional - boolean precipitation detection
+Solar Radiation: sensor.solar_radiation # Optional - cloud cover analysis
+Solar Lux: sensor.solar_lux # Optional - day/night detection backup
+UV Index: sensor.uv_index # Optional - clear sky confirmation
 ```
+
+**Note**: Indoor temperature sensor has been removed. This integration focuses on outdoor weather conditions using only outdoor environmental sensors.
 
 ## Entities Created
 
@@ -343,30 +345,39 @@ UV Index: sensor.uv_index
 
 - `weather.micro_weather_station` - Main weather entity with current conditions and forecast
 
-### Sensor Entities
+This integration creates only the weather entity to avoid duplicating your existing sensor entities. All weather data is displayed through the main weather entity, which references your configured sensors directly.
 
-- `sensor.micro_weather_station_temperature` - Current temperature (°C)
-- `sensor.micro_weather_station_humidity` - Current humidity (%)
-- `sensor.micro_weather_station_pressure` - Current pressure (hPa)
-- `sensor.micro_weather_station_wind_speed` - Current wind speed (km/h)
-- `sensor.micro_weather_station_wind_direction` - Current wind direction (°)
-- `sensor.micro_weather_station_visibility` - Current visibility (km)
+## Enhanced Dewpoint Support
+
+The integration now supports direct dewpoint sensors for improved accuracy:
+
+- **Direct Dewpoint**: If you have a dewpoint sensor, it will be used directly for maximum accuracy
+- **Calculated Dewpoint**: If no dewpoint sensor is available, it will be calculated from temperature and humidity using the Magnus formula
+- **Improved Fog Detection**: Better fog detection using conservative humidity thresholds (>98%) combined with dewpoint analysis and solar radiation data
+- **Fallback Mechanism**: Seamlessly falls back to calculated dewpoint when direct sensor unavailable
 
 ## Weather Detection Logic
 
 The integration intelligently detects weather conditions using your real sensor data with the following priority system:
 
-| Condition        | Detection Criteria                    | Priority    |
-| ---------------- | ------------------------------------- | ----------- |
-| ⛈️ Stormy        | Rain + High Wind (>25 km/h)           | 1 (Highest) |
-| 🌧️ Rainy         | Active precipitation detected         | 2           |
-| ❄️ Snowy         | Rain + Low temperature (<2°C)         | 3           |
-| �️ Foggy         | Low solar radiation + High humidity   | 4           |
-| ☀️ Sunny         | High solar radiation (>400 W/m²)      | 5           |
-| ⛅ Partly Cloudy | Medium solar radiation (100-400 W/m²) | 6           |
-| ☁️ Cloudy        | Low solar radiation (<100 W/m²)       | 7 (Default) |
+| Condition        | Detection Criteria                                   | Priority    |
+| ---------------- | ---------------------------------------------------- | ----------- |
+| ⛈️ Stormy        | Rain + High Wind (>25 km/h)                          | 1 (Highest) |
+| 🌧️ Rainy         | Active precipitation detected                        | 2           |
+| ❄️ Snowy         | Rain + Low temperature (<2°C)                        | 3           |
+| 🌫️ Foggy         | High humidity (>98%) + Dewpoint analysis + Low solar | 4           |
+| ☀️ Sunny         | High solar radiation (>400 W/m²) or High UV index    | 5           |
+| ⛅ Partly Cloudy | Medium solar radiation (100-400 W/m²)                | 6           |
+| ☁️ Cloudy        | Low solar radiation (<100 W/m²) or Default condition | 7 (Default) |
 
-The algorithm analyzes your sensor readings in real-time to provide accurate weather condition detection.
+The algorithm analyzes your sensor readings in real-time to provide accurate weather condition detection:
+
+**Enhanced Detection Features:**
+
+- **Dewpoint Integration**: Uses direct dewpoint sensors when available, calculates from temperature/humidity as fallback
+- **Scientific Fog Detection**: Combines humidity thresholds with dewpoint analysis and solar radiation for accurate fog detection
+- **Multi-sensor Validation**: Cross-references multiple sensors for improved accuracy
+- **Intelligent Fallbacks**: Seamlessly switches between sensor types when data unavailable
 
 ## Intelligent Forecasting
 

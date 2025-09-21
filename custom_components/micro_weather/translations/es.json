@@ -3,21 +3,36 @@
     "step": {
       "user": {
         "title": "Configuración de Micro Estación Meteorológica",
-        "description": "Conecte sus sensores meteorológicos para crear una entidad meteorológica inteligente. Solo el sensor de temperatura exterior es requerido - todos los demás son opcionales y mejoran la precisión de detección meteorológica.\n\n{tip}\n\n{sensors_help}",
+        "description": "Conecte sus sensores meteorológicos para crear una entidad meteorológica inteligente.\n\n**Requerido:** Solo la temperatura exterior es requerida.\n\n**Cómo se usa cada sensor:**\n\n🌡️ **Sensor de Punto de Rocío** (opcional)\n• Medición directa del punto de rocío para máxima precisión\n• Usado en algoritmo de detección de niebla (>98% humedad + punto de rocío)\n• Mejora cálculos de índice de confort\n• Respaldo: Calculado desde temperatura + humedad si no está disponible\n\n💧 **Sensor de Humedad** (opcional)\n• Esencial para detección de niebla (se activa con >98% humedad)\n• Usado en cálculos de índice de confort e índice de calor\n• Ayuda a determinar probabilidad de precipitación\n• Combinado con radiación solar para análisis de cobertura nubosa\n\n📊 **Sensor de Presión** (opcional)\n• Componente central para pronóstico del tiempo (5 días y por hora)\n• Detección de tormentas (caídas rápidas de presión indican tormentas)\n• Análisis de tendencias para predicción de patrones meteorológicos\n• Usado para calcular estabilidad del tiempo y probabilidad de cambio\n\n💨 **Sensor de Velocidad del Viento** (opcional)\n• Determina condiciones de viento en estado meteorológico\n• Detección de tormentas (>25 km/h + lluvia = condiciones tormentosas)\n• Cálculos de sensación térmica por viento\n• Alertas de clima severo y pronósticos relacionados con viento\n\n🧭 **Sensor de Dirección del Viento** (opcional)\n• Proporciona datos de dirección del viento para reportes meteorológicos detallados\n• Usado en seguimiento de tormentas y análisis de patrones meteorológicos\n• Mejora precisión de pronóstico con datos direccionales del viento\n\n🌪️ **Sensor de Ráfagas de Viento** (opcional)\n• Detección de clima severo y medición de intensidad de tormentas\n• Alertas de seguridad para condiciones de viento peligrosas\n• Clasificación mejorada de tormentas (ráfagas vs vientos constantes)\n\n🌧️ **Sensor de Intensidad de Lluvia** (opcional)\n• Medición directa de intensidad de precipitación\n• Activa condiciones meteorológicas lluviosas/tormentosas\n• Usado para pronóstico de precipitación\n• Anula otras condiciones cuando se detecta lluvia\n\n🌦️ **Sensor de Estado de Lluvia** (opcional)\n• Detección booleana de lluvia (estados seco/húmedo)\n• Anulación inmediata de condición meteorológica cuando está húmedo\n• Detección de precipitación de respaldo si sensor de intensidad no disponible\n\n☀️ **Sensor de Radiación Solar** (opcional)\n• Detección primaria de cobertura nubosa (>400 W/m² = soleado, <100 = nublado)\n• Clasificación día/noche e intensidad solar\n• Usado en detección de niebla (radiación baja + humedad alta)\n• Anula otras condiciones para detección de cielo despejado\n\n💡 **Sensor de Lux Solar** (opcional)\n• Detección día/noche basada en luz\n• Detección de cobertura nubosa de respaldo si sensor de radiación no disponible\n• Cálculos de visibilidad y detección de crepúsculo\n\n🛡️ **Sensor de Índice UV** (opcional)\n• Confirmación de cielo despejado (UV alto = definitivamente soleado)\n• Medición de intensidad solar para recomendaciones de seguridad\n• Precisión mejorada de detección de tiempo soleado\n\n**Consejos de Configuración:**\n• Use Herramientas de Desarrollador → Estados para encontrar IDs de entidad de sensores\n• Los sensores de temperatura deben tener device_class='temperature'\n• Los sensores de presión deben usar presión relativa/barométrica\n• Intervalo de actualización: 1-60 minutos (qué tan seguido refrescar datos meteorológicos)\n• ¡Más sensores = detección meteorológica más precisa!",
         "data": {
-          "outdoor_temp_sensor": "🌡️ Sensor de Temperatura Exterior (Requerido)",
-          "indoor_temp_sensor": "🏠 Sensor de Temperatura Interior (Opcional) - Se usa para análisis de diferencia de temperatura",
-          "humidity_sensor": "💧 Sensor de Humedad (Opcional) - Mejora la detección de niebla y cálculos de confort",
-          "pressure_sensor": "📊 Sensor de Presión Atmosférica (Opcional) - Habilita predicción de tormentas y pronóstico del tiempo",
-          "wind_speed_sensor": "💨 Sensor de Velocidad del Viento (Opcional) - Requerido para detección de condiciones de viento",
-          "wind_direction_sensor": "🧭 Sensor de Dirección del Viento (Opcional) - Proporciona datos de dirección del viento",
-          "wind_gust_sensor": "🌪️ Sensor de Ráfagas de Viento (Opcional) - Mejora detección de tormentas y clima severo",
-          "rain_rate_sensor": "🌧️ Sensor de Intensidad de Lluvia (Opcional) - Mide intensidad de precipitación",
-          "rain_state_sensor": "🌦️ Sensor de Estado de Lluvia (Opcional) - Detecta si está lloviendo actualmente",
-          "solar_radiation_sensor": "☀️ Sensor de Radiación Solar (Opcional) - Mide intensidad de luz solar (W/m²)",
-          "solar_lux_sensor": "💡 Sensor de Lux Solar (Opcional) - Mide niveles de luz para detección día/noche",
-          "uv_index_sensor": "🛡️ Sensor de Índice UV (Opcional) - Indica intensidad solar y exposición UV",
-          "update_interval": "🔄 Intervalo de Actualización (minutos) - Con qué frecuencia refrescar datos meteorológicos (1-60 minutos)"
+          "outdoor_temp_sensor": "Sensor de Temperatura Exterior",
+          "dewpoint_sensor": "Sensor de Punto de Rocío",
+          "humidity_sensor": "Sensor de Humedad",
+          "pressure_sensor": "Sensor de Presión Atmosférica",
+          "wind_speed_sensor": "Sensor de Velocidad del Viento",
+          "wind_direction_sensor": "Sensor de Dirección del Viento",
+          "wind_gust_sensor": "Sensor de Ráfagas de Viento",
+          "rain_rate_sensor": "Sensor de Intensidad de Lluvia",
+          "rain_state_sensor": "Sensor de Estado de Lluvia",
+          "solar_radiation_sensor": "Sensor de Radiación Solar",
+          "solar_lux_sensor": "Sensor de Lux Solar",
+          "uv_index_sensor": "Sensor de Índice UV",
+          "update_interval": "Intervalo de Actualización (minutos)"
+        },
+        "data_description": {
+          "outdoor_temp_sensor": "Sensor requerido para detección meteorológica básica. Proporciona lecturas de temperatura usadas en todos los cálculos meteorológicos y detección de condiciones.",
+          "dewpoint_sensor": "Sensor opcional que proporciona medición directa del punto de rocío para máxima precisión. Usado en detección de niebla (>98% humedad + punto de rocío) y cálculos de confort. Respaldo a punto de rocío calculado si no se proporciona.",
+          "humidity_sensor": "Sensor opcional esencial para detección de niebla (se activa con >98% humedad). Usado en cálculos de índice de confort, índice de calor y determinación de probabilidad de precipitación.",
+          "pressure_sensor": "Sensor opcional que habilita pronóstico del tiempo (5 días y por hora). Detecta tormentas a través de caídas rápidas de presión y proporciona análisis de tendencias para predicción de patrones meteorológicos.",
+          "wind_speed_sensor": "Sensor opcional para detección de condiciones de viento. Detección de tormentas (>25 km/h + lluvia = tormentoso), cálculos de sensación térmica por viento y alertas de clima severo.",
+          "wind_direction_sensor": "Sensor opcional que proporciona datos de dirección del viento para reportes meteorológicos detallados. Usado en seguimiento de tormentas y mejora precisión de pronóstico con datos direccionales del viento.",
+          "wind_gust_sensor": "Sensor opcional para detección de clima severo y medición de intensidad de tormentas. Proporciona alertas de seguridad para condiciones de viento peligrosas y clasificación mejorada de tormentas.",
+          "rain_rate_sensor": "Sensor opcional para medición directa de intensidad de precipitación. Activa condiciones meteorológicas lluviosas/tormentosas y anula otras condiciones cuando se detecta lluvia.",
+          "rain_state_sensor": "Sensor opcional para detección booleana de lluvia (estados seco/húmedo). Proporciona anulación inmediata de condición meteorológica cuando está húmedo y detección de precipitación de respaldo.",
+          "solar_radiation_sensor": "Sensor opcional para detección primaria de cobertura nubosa (>400 W/m² = soleado, <100 = nublado). Usado en detección de niebla y anula otras condiciones para detección de cielo despejado.",
+          "solar_lux_sensor": "Sensor opcional para detección día/noche basada en luz. Detección de cobertura nubosa de respaldo y cálculos de visibilidad cuando sensor de radiación solar no disponible.",
+          "uv_index_sensor": "Sensor opcional para confirmación de cielo despejado (UV alto = definitivamente soleado). Proporciona medición de intensidad solar para recomendaciones de seguridad y precisión mejorada de detección de tiempo soleado.",
+          "update_interval": "Qué tan seguido se refrescan los datos meteorológicos y se consultan los sensores. Rango: 1-60 minutos. Valores más bajos proporcionan actualizaciones más responsivas pero pueden aumentar la carga del sistema."
         }
       }
     },
@@ -30,21 +45,36 @@
     "step": {
       "init": {
         "title": "Actualizar Sensores de Estación Meteorológica",
-        "description": "Modifique la configuración de sensores de su estación meteorológica. Los cambios tienen efecto inmediato.\n\n{current_sensors}\n\n{update_help}",
+        "description": "Modifique la configuración de sensores de su estación meteorológica.\n\n**Los cambios surten efecto inmediatamente.** La entidad meteorológica se actualizará según el nuevo intervalo y configuración de sensores.",
         "data": {
-          "outdoor_temp_sensor": "🌡️ Sensor de Temperatura Exterior (Requerido)",
-          "indoor_temp_sensor": "🏠 Sensor de Temperatura Interior (Opcional) - Se usa para análisis de diferencia de temperatura",
-          "humidity_sensor": "💧 Sensor de Humedad (Opcional) - Mejora la detección de niebla y cálculos de confort",
-          "pressure_sensor": "📊 Sensor de Presión Atmosférica (Opcional) - Habilita predicción de tormentas y pronóstico del tiempo",
-          "wind_speed_sensor": "💨 Sensor de Velocidad del Viento (Opcional) - Requerido para detección de condiciones de viento",
-          "wind_direction_sensor": "🧭 Sensor de Dirección del Viento (Opcional) - Proporciona datos de dirección del viento",
-          "wind_gust_sensor": "🌪️ Sensor de Ráfagas de Viento (Opcional) - Mejora detección de tormentas y clima severo",
-          "rain_rate_sensor": "🌧️ Sensor de Intensidad de Lluvia (Opcional) - Mide intensidad de precipitación",
-          "rain_state_sensor": "🌦️ Sensor de Estado de Lluvia (Opcional) - Detecta si está lloviendo actualmente",
-          "solar_radiation_sensor": "☀️ Sensor de Radiación Solar (Opcional) - Mide intensidad de luz solar (W/m²)",
-          "solar_lux_sensor": "💡 Sensor de Lux Solar (Opcional) - Mide niveles de luz para detección día/noche",
-          "uv_index_sensor": "🛡️ Sensor de Índice UV (Opcional) - Indica intensidad solar y exposición UV",
-          "update_interval": "🔄 Intervalo de Actualización (minutos) - Con qué frecuencia refrescar datos meteorológicos (1-60 minutos)"
+          "outdoor_temp_sensor": "Sensor de Temperatura Exterior",
+          "dewpoint_sensor": "Sensor de Punto de Rocío",
+          "humidity_sensor": "Sensor de Humedad",
+          "pressure_sensor": "Sensor de Presión Atmosférica",
+          "wind_speed_sensor": "Sensor de Velocidad del Viento",
+          "wind_direction_sensor": "Sensor de Dirección del Viento",
+          "wind_gust_sensor": "Sensor de Ráfagas de Viento",
+          "rain_rate_sensor": "Sensor de Intensidad de Lluvia",
+          "rain_state_sensor": "Sensor de Estado de Lluvia",
+          "solar_radiation_sensor": "Sensor de Radiación Solar",
+          "solar_lux_sensor": "Sensor de Lux Solar",
+          "uv_index_sensor": "Sensor de Índice UV",
+          "update_interval": "Intervalo de Actualización (minutos)"
+        },
+        "data_description": {
+          "outdoor_temp_sensor": "Sensor requerido para detección meteorológica básica. Proporciona lecturas de temperatura usadas en todos los cálculos meteorológicos y detección de condiciones.",
+          "dewpoint_sensor": "Sensor opcional que proporciona medición directa del punto de rocío para máxima precisión. Usado en detección de niebla (>98% humedad + punto de rocío) y cálculos de confort. Respaldo a punto de rocío calculado si no se proporciona.",
+          "humidity_sensor": "Sensor opcional esencial para detección de niebla (se activa con >98% humedad). Usado en cálculos de índice de confort, índice de calor y determinación de probabilidad de precipitación.",
+          "pressure_sensor": "Sensor opcional que habilita pronóstico del tiempo (5 días y por hora). Detecta tormentas a través de caídas rápidas de presión y proporciona análisis de tendencias para predicción de patrones meteorológicos.",
+          "wind_speed_sensor": "Sensor opcional para detección de condiciones de viento. Detección de tormentas (>25 km/h + lluvia = tormentoso), cálculos de sensación térmica por viento y alertas de clima severo.",
+          "wind_direction_sensor": "Sensor opcional que proporciona datos de dirección del viento para reportes meteorológicos detallados. Usado en seguimiento de tormentas y mejora precisión de pronóstico con datos direccionales del viento.",
+          "wind_gust_sensor": "Sensor opcional para detección de clima severo y medición de intensidad de tormentas. Proporciona alertas de seguridad para condiciones de viento peligrosas y clasificación mejorada de tormentas.",
+          "rain_rate_sensor": "Sensor opcional para medición directa de intensidad de precipitación. Activa condiciones meteorológicas lluviosas/tormentosas y anula otras condiciones cuando se detecta lluvia.",
+          "rain_state_sensor": "Sensor opcional para detección booleana de lluvia (estados seco/húmedo). Proporciona anulación inmediata de condición meteorológica cuando está húmedo y detección de precipitación de respaldo.",
+          "solar_radiation_sensor": "Sensor opcional para detección primaria de cobertura nubosa (>400 W/m² = soleado, <100 = nublado). Usado en detección de niebla y anula otras condiciones para detección de cielo despejado.",
+          "solar_lux_sensor": "Sensor opcional para detección día/noche basada en luz. Detección de cobertura nubosa de respaldo y cálculos de visibilidad cuando sensor de radiación solar no disponible.",
+          "uv_index_sensor": "Sensor opcional para confirmación de cielo despejado (UV alto = definitivamente soleado). Proporciona medición de intensidad solar para recomendaciones de seguridad y precisión mejorada de detección de tiempo soleado.",
+          "update_interval": "Qué tan seguido se refrescan los datos meteorológicos y se consultan los sensores. Rango: 1-60 minutos. Valores más bajos proporcionan actualizaciones más responsivas pero pueden aumentar la carga del sistema."
         }
       }
     },
@@ -52,11 +82,5 @@
       "missing_outdoor_temp": "❌ El sensor de temperatura exterior es requerido. Por favor seleccione un sensor de temperatura que mida condiciones exteriores.",
       "unknown": "❌ Ha ocurrido un error inesperado durante la configuración. Por favor verifique su selección de sensores e inténtelo nuevamente."
     }
-  },
-  "placeholders": {
-    "tip": "**Consejo:** Use Herramientas para Desarrolladores → Estados para encontrar los ID de entidad de sus sensores.",
-    "sensors_help": "**Requisitos de Sensores:**\n• Los sensores de temperatura deben tener device_class='temperature'\n• Los sensores de presión deben usar presión relativa (barométrica)\n• Los sensores de viento deben estar en km/h o mph\n• Radiación solar en W/m², lux en lx",
-    "current_sensors": "**Configuración Actual:** Puede actualizar cualquier asignación de sensores o ajustar la frecuencia de actualización.",
-    "update_help": "**Comportamiento de Actualización:** Los cambios surten efecto inmediatamente. La entidad meteorológica se actualizará según el nuevo intervalo."
   }
 }

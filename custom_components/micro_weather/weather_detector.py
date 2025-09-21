@@ -1,4 +1,24 @@
-"""Weather condition detector using real sensor data."""
+"""Weather condition detector using real sensor data.
+
+This module implements advanced meteorological analysis algorithms to determine
+accurate weather conditions based on real sensor readings. It analyzes:
+
+- Precipitation patterns (rain rate, state detection)
+- Atmospheric pressure systems and trends
+- Solar radiation for cloud cover assessment
+- Wind patterns for storm identification
+- Temperature and humidity for fog detection
+- Dewpoint analysis for precipitation potential
+
+The detector uses scientific weather analysis principles to provide more accurate
+local weather conditions than external weather services.
+
+Classes:
+    WeatherDetector: Main weather analysis engine
+
+Author: caplaz
+License: MIT
+"""
 
 from datetime import datetime, timedelta
 import logging
@@ -10,8 +30,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.template import Template
 
 from .const import (
+    CONF_DEWPOINT_SENSOR,
     CONF_HUMIDITY_SENSOR,
-    CONF_INDOOR_TEMP_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
     CONF_RAIN_RATE_SENSOR,
@@ -28,20 +48,41 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class WeatherDetector:
-    """Detect weather conditions from real sensor data."""
+    """Detect weather conditions from real sensor data.
+    
+    This class analyzes real-time sensor data to determine accurate weather
+    conditions using meteorological principles. It supports multiple sensor
+    types and implements intelligent algorithms for:
+    
+    - Storm detection (precipitation + wind analysis)
+    - Fog detection (humidity + dewpoint + solar radiation)
+    - Cloud cover assessment (solar radiation patterns)
+    - Snow detection (temperature-based precipitation type)
+    - Weather forecasting (pressure trends)
+    
+    Attributes:
+        hass: Home Assistant instance for accessing sensor states
+        options: Configuration options with sensor entity mappings
+        sensors: Dictionary mapping sensor types to entity IDs
+    """
 
     def __init__(self, hass: HomeAssistant, options: Mapping[str, Any]) -> None:
-        """Initialize the weather detector."""
+        """Initialize the weather detector.
+        
+        Args:
+            hass: Home Assistant instance for accessing entity states
+            options: Configuration mapping sensor types to entity IDs
+        """
         self.hass = hass
         self.options = options
         self._last_condition = "partly_cloudy"
         self._condition_start_time = datetime.now()
 
-        # Sensor entity IDs
+        # Sensor entity IDs mapping
         self.sensors = {
             "outdoor_temp": options.get(CONF_OUTDOOR_TEMP_SENSOR),
-            "indoor_temp": options.get(CONF_INDOOR_TEMP_SENSOR),
             "humidity": options.get(CONF_HUMIDITY_SENSOR),
+            "dewpoint": options.get(CONF_DEWPOINT_SENSOR),
             "pressure": options.get(CONF_PRESSURE_SENSOR),
             "wind_speed": options.get(CONF_WIND_SPEED_SENSOR),
             "wind_direction": options.get(CONF_WIND_DIRECTION_SENSOR),
@@ -54,7 +95,26 @@ class WeatherDetector:
         }
 
     def get_weather_data(self) -> Dict[str, Any]:
-        """Get current weather data from sensors."""
+        """Get current weather data from sensors.
+        
+        Orchestrates the complete weather analysis process:
+        1. Reads current sensor values
+        2. Determines weather condition using meteorological algorithms
+        3. Converts units to standard formats
+        4. Generates forecast data
+        
+        Returns:
+            dict: Complete weather data including:
+                - temperature: Current temperature in Celsius
+                - humidity: Relative humidity percentage
+                - pressure: Atmospheric pressure in hPa
+                - wind_speed: Wind speed in km/h
+                - wind_direction: Wind direction in degrees
+                - visibility: Estimated visibility in km
+                - condition: Current weather condition string
+                - forecast: Weather forecast data
+                - last_updated: ISO timestamp of last update
+        """
         # Get sensor values
         sensor_data = self._get_sensor_values()
 
@@ -80,7 +140,16 @@ class WeatherDetector:
         return weather_data
 
     def _get_sensor_values(self) -> Dict[str, Any]:
-        """Get current values from all configured sensors."""
+        """Get current values from all configured sensors.
+        
+        Reads the current state of all configured sensor entities and converts
+        them to appropriate data types. Handles errors gracefully by logging
+        warnings for invalid sensor states.
+        
+        Returns:
+            dict: Sensor data with keys matching sensor types and values as
+                  floats (for numeric sensors) or strings (for state sensors)
+        """
         sensor_data = {}
 
         for sensor_key, entity_id in self.sensors.items():
@@ -90,7 +159,7 @@ class WeatherDetector:
             state = self.hass.states.get(entity_id)
             if state and state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
                 try:
-                    # Handle string sensors
+                    # Handle string sensors (rain state detection)
                     if sensor_key == "rain_state":
                         sensor_data[sensor_key] = state.state.lower()
                     else:
@@ -126,10 +195,14 @@ class WeatherDetector:
         outdoor_temp = sensor_data.get("outdoor_temp", 70.0)
         humidity = sensor_data.get("humidity", 50.0)
         pressure = sensor_data.get("pressure", 29.92)
-        indoor_temp = sensor_data.get("indoor_temp", outdoor_temp)
 
         # Calculate derived meteorological parameters
-        dewpoint = self._calculate_dewpoint(outdoor_temp, humidity)
+        # Use dewpoint sensor if available, otherwise calculate from temp/humidity
+        dewpoint_raw = sensor_data.get("dewpoint")
+        if dewpoint_raw is not None:
+            dewpoint = float(dewpoint_raw)
+        else:
+            dewpoint = self._calculate_dewpoint(outdoor_temp, humidity)
         temp_dewpoint_spread = outdoor_temp - dewpoint
         is_freezing = outdoor_temp <= 32.0
 
@@ -266,18 +339,33 @@ class WeatherDetector:
         return "partly_cloudy"
 
     def _calculate_dewpoint(self, temp_f: float, humidity: float) -> float:
-        """Calculate dewpoint using Magnus formula (meteorologically accurate)."""
+        """Calculate dewpoint using Magnus formula (meteorologically accurate).
+        
+        The dewpoint is the temperature at which air becomes saturated with
+        water vapor. This implementation uses the Magnus-Tetens formula,
+        which is accurate for typical atmospheric conditions.
+        
+        Args:
+            temp_f: Temperature in Fahrenheit
+            humidity: Relative humidity as percentage (0-100)
+            
+        Returns:
+            float: Dewpoint temperature in Fahrenheit
+            
+        Note:
+            Falls back to approximation for very dry conditions (humidity <= 0)
+        """
         if humidity <= 0:
             return temp_f - 50  # Approximate for very dry conditions
 
         # Convert to Celsius for calculation
         temp_c = (temp_f - 32) * 5 / 9
 
-        # Magnus formula constants
+        # Magnus formula constants (Tetens 1930, Murray 1967)
         a = 17.27
         b = 237.7
 
-        # Calculate dewpoint in Celsius
+        # Calculate dewpoint in Celsius using Magnus-Tetens approximation
         gamma = (a * temp_c) / (b + temp_c) + math.log(humidity / 100.0)
         dewpoint_c = (b * gamma) / (a - gamma)
 
@@ -305,27 +393,48 @@ class WeatherDetector:
         solar_rad: float,
         is_daytime: bool,
     ) -> str:
-        """
-        Advanced fog analysis using meteorological principles.
-
-        Fog formation requires:
-        - High humidity (>90%)
-        - Small temperature-dewpoint spread (<4°F)
-        - Light winds (<7 mph) for radiation fog
-        - Specific conditions for other fog types
-
-        Made more conservative to reduce false positives.
+        """Advanced fog analysis using meteorological principles.
+        
+        Analyzes atmospheric conditions to determine fog likelihood using
+        scientific criteria for fog formation. The algorithm considers:
+        
+        - Humidity levels (fog requires near-saturation)
+        - Temperature-dewpoint spread (closer = higher fog probability)
+        - Wind speed (light winds favor fog formation)
+        - Solar radiation (low radiation indicates existing fog)
+        - Time of day (radiation fog typically forms at night/early morning)
+        
+        Fog Types Detected:
+        - Dense fog: Extremely high humidity (99%+) with minimal spread
+        - Radiation fog: High humidity (98%+) with light winds at night
+        - Advection fog: Moist air moving over cooler surface
+        
+        Args:
+            temp: Current temperature in Fahrenheit
+            humidity: Relative humidity percentage
+            dewpoint: Dewpoint temperature in Fahrenheit
+            spread: Temperature minus dewpoint in Fahrenheit
+            wind_speed: Wind speed in mph
+            solar_rad: Solar radiation in W/m²
+            is_daytime: Boolean indicating if it's currently daytime
+            
+        Returns:
+            str: "foggy" if fog conditions are met, "clear" otherwise
+            
+        Note:
+            Uses conservative thresholds to reduce false positives after
+            user feedback about incorrect fog detection.
         """
 
         # Dense fog conditions (very restrictive - must be extremely close to saturation)
         if humidity >= 99 and spread <= 1 and wind_speed <= 2:
             return "foggy"
 
-        # Radiation fog (more restrictive than before)
+        # Radiation fog (more restrictive than before to reduce false positives)
         if (
-            humidity >= 98  # Raised from 95 to 98
-            and spread <= 2  # Reduced from 3 to 2
-            and wind_speed <= 3  # Reduced from 5 to 3
+            humidity >= 98  # Raised from 95 to 98 - requires near saturation
+            and spread <= 2  # Reduced from 3 to 2 - closer to dewpoint required
+            and wind_speed <= 3  # Reduced from 5 to 3 - lighter winds required
             and (not is_daytime or solar_rad < 5)  # More restrictive solar condition
         ):
             return "foggy"

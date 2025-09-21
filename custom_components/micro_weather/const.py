@@ -12,8 +12,8 @@ CONF_WEATHER_PATTERNS = "weather_patterns"
 
 # Sensor entity configuration
 CONF_OUTDOOR_TEMP_SENSOR = "outdoor_temp_sensor"
-CONF_INDOOR_TEMP_SENSOR = "indoor_temp_sensor"
 CONF_HUMIDITY_SENSOR = "humidity_sensor"
+CONF_DEWPOINT_SENSOR = "dewpoint_sensor"
 CONF_PRESSURE_SENSOR = "pressure_sensor"
 CONF_WIND_SPEED_SENSOR = "wind_speed_sensor"
 CONF_WIND_DIRECTION_SENSOR = "wind_direction_sensor"
