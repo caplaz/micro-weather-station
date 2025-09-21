@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install dependencies
         run: |
@@ -94,7 +94,7 @@ jobs:
         run: |
           # Set up Python environment
           python -m pip install --upgrade pip
-          pip install homeassistant==2025.9.0
+          pip install homeassistant==2025.9.4
 
           # Test that the component can be imported
           export PYTHONPATH="${PWD}:${PYTHONPATH}"
@@ -125,8 +125,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
-        home-assistant-version: ["2025.9.0"]
+        python-version: ["3.13"]
+        home-assistant-version: ["2025.9.4"]
 
     steps:
       - uses: actions/checkout@v4
@@ -164,7 +164,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install bandit
         run: pip install bandit
