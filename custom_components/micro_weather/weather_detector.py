@@ -105,10 +105,10 @@ class WeatherDetector:
     def _determine_weather_condition(self, sensor_data: Dict[str, Any]) -> str:
         """
         Advanced meteorological weather condition detection.
-        
+
         Uses scientific weather analysis principles:
         - Precipitation analysis (intensity, type, persistence)
-        - Atmospheric pressure systems 
+        - Atmospheric pressure systems
         - Solar radiation for cloud cover assessment
         - Wind patterns for storm identification
         - Temperature/humidity for fog and frost conditions
@@ -132,26 +132,28 @@ class WeatherDetector:
         dewpoint = self._calculate_dewpoint(outdoor_temp, humidity)
         temp_dewpoint_spread = outdoor_temp - dewpoint
         is_freezing = outdoor_temp <= 32.0
-        
+
         # Advanced daytime detection (solar elevation proxy)
         is_daytime = solar_radiation > 5 or solar_lux > 50 or uv_index > 0.1
-        is_twilight = (solar_lux > 10 and solar_lux < 100) or (solar_radiation > 1 and solar_radiation < 50)
-        
+        is_twilight = (solar_lux > 10 and solar_lux < 100) or (
+            solar_radiation > 1 and solar_radiation < 50
+        )
+
         # Pressure analysis (meteorologically accurate thresholds)
         pressure_very_high = pressure > 30.20  # High pressure system
-        pressure_high = pressure > 30.00       # Above normal
+        pressure_high = pressure > 30.00  # Above normal
         pressure_normal = 29.80 <= pressure <= 30.20  # Normal range
-        pressure_low = pressure < 29.80        # Low pressure system
-        pressure_very_low = pressure < 29.50   # Storm system
+        pressure_low = pressure < 29.80  # Low pressure system
+        pressure_very_low = pressure < 29.50  # Storm system
         pressure_extremely_low = pressure < 29.20  # Severe storm
-        
+
         # Wind analysis (Beaufort scale adapted)
-        wind_calm = wind_speed < 1           # 0-1 mph: Calm
-        wind_light = 1 <= wind_speed < 8     # 1-7 mph: Light air to light breeze
-        wind_moderate = 8 <= wind_speed < 19 # 8-18 mph: Gentle to fresh breeze
+        wind_calm = wind_speed < 1  # 0-1 mph: Calm
+        wind_light = 1 <= wind_speed < 8  # 1-7 mph: Light air to light breeze
+        wind_moderate = 8 <= wind_speed < 19  # 8-18 mph: Gentle to fresh breeze
         wind_strong = 19 <= wind_speed < 32  # 19-31 mph: Strong breeze to near gale
-        wind_gale = wind_speed >= 32         # 32+ mph: Gale force
-        
+        wind_gale = wind_speed >= 32  # 32+ mph: Gale force
+
         gust_factor = wind_gust / max(wind_speed, 1)  # Gust ratio for turbulence
         is_gusty = gust_factor > 1.5 and wind_gust > 10
         is_very_gusty = gust_factor > 2.0 and wind_gust > 15
@@ -165,22 +167,30 @@ class WeatherDetector:
         )
 
         # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
-        if rain_rate > 0.01 or rain_state in ["wet", "rain", "drizzle", "precipitation"]:
+        if rain_rate > 0.01 or rain_state in [
+            "wet",
+            "rain",
+            "drizzle",
+            "precipitation",
+        ]:
             precipitation_intensity = self._classify_precipitation_intensity(rain_rate)
-            
+
             # Determine precipitation type based on temperature
             if is_freezing:
                 if rain_rate > 0.1:
                     return "snowy"  # Heavy snow
                 else:
                     return "snowy"  # Light snow/flurries
-            
+
             # Rain with storm conditions
-            if (pressure_extremely_low or wind_gale or 
-                (pressure_very_low and wind_strong) or
-                (is_very_gusty and wind_gust > 25)):
+            if (
+                pressure_extremely_low
+                or wind_gale
+                or (pressure_very_low and wind_strong)
+                or (is_very_gusty and wind_gust > 25)
+            ):
                 return "stormy"  # Thunderstorm/severe weather
-            
+
             # Regular rain classification
             if precipitation_intensity == "heavy" or rain_rate > 0.25:
                 return "rainy"  # Heavy rain
@@ -192,22 +202,29 @@ class WeatherDetector:
         # PRIORITY 2: SEVERE WEATHER CONDITIONS (No precipitation but extreme conditions)
         if pressure_extremely_low and (wind_strong or is_very_gusty):
             return "stormy"  # Severe weather system approaching
-        
+
         if wind_gale:  # Gale force winds
             return "stormy"  # Windstorm
 
         # PRIORITY 3: FOG CONDITIONS (Critical for safety)
         fog_conditions = self._analyze_fog_conditions(
-            outdoor_temp, humidity, dewpoint, temp_dewpoint_spread, 
-            wind_speed, solar_radiation, is_daytime
+            outdoor_temp,
+            humidity,
+            dewpoint,
+            temp_dewpoint_spread,
+            wind_speed,
+            solar_radiation,
+            is_daytime,
         )
         if fog_conditions != "none":
             return fog_conditions
 
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
         if is_daytime:
-            cloud_cover = self._analyze_cloud_cover(solar_radiation, solar_lux, uv_index)
-            
+            cloud_cover = self._analyze_cloud_cover(
+                solar_radiation, solar_lux, uv_index
+            )
+
             # Clear conditions
             if cloud_cover <= 10 and pressure_high:
                 return "sunny"
@@ -252,95 +269,111 @@ class WeatherDetector:
         """Calculate dewpoint using Magnus formula (meteorologically accurate)."""
         if humidity <= 0:
             return temp_f - 50  # Approximate for very dry conditions
-            
+
         # Convert to Celsius for calculation
         temp_c = (temp_f - 32) * 5 / 9
-        
+
         # Magnus formula constants
         a = 17.27
         b = 237.7
-        
+
         # Calculate dewpoint in Celsius
         gamma = (a * temp_c) / (b + temp_c) + math.log(humidity / 100.0)
         dewpoint_c = (b * gamma) / (a - gamma)
-        
+
         # Convert back to Fahrenheit
         return dewpoint_c * 9 / 5 + 32
 
     def _classify_precipitation_intensity(self, rain_rate: float) -> str:
         """Classify precipitation intensity (meteorological standards)."""
         if rain_rate >= 0.5:
-            return "heavy"      # Heavy rain
+            return "heavy"  # Heavy rain
         elif rain_rate >= 0.1:
-            return "moderate"   # Moderate rain
+            return "moderate"  # Moderate rain
         elif rain_rate >= 0.01:
-            return "light"      # Light rain/drizzle
+            return "light"  # Light rain/drizzle
         else:
-            return "trace"      # Trace amounts
+            return "trace"  # Trace amounts
 
-    def _analyze_fog_conditions(self, temp: float, humidity: float, dewpoint: float, 
-                               spread: float, wind_speed: float, solar_rad: float, 
-                               is_daytime: bool) -> str:
+    def _analyze_fog_conditions(
+        self,
+        temp: float,
+        humidity: float,
+        dewpoint: float,
+        spread: float,
+        wind_speed: float,
+        solar_rad: float,
+        is_daytime: bool,
+    ) -> str:
         """
         Advanced fog analysis using meteorological principles.
-        
+
         Fog formation requires:
         - High humidity (>90%)
         - Small temperature-dewpoint spread (<4°F)
         - Light winds (<7 mph) for radiation fog
         - Specific conditions for other fog types
         """
-        
+
         # Radiation fog (most common - clear nights, light winds)
-        if (humidity >= 95 and spread <= 3 and wind_speed <= 5 and 
-            (not is_daytime or solar_rad < 10)):
+        if (
+            humidity >= 95
+            and spread <= 3
+            and wind_speed <= 5
+            and (not is_daytime or solar_rad < 10)
+        ):
             return "foggy"
-        
+
         # Dense fog conditions
         if humidity >= 98 and spread <= 2 and wind_speed <= 3:
             return "foggy"
-        
+
         # Advection fog (moist air over cooler surface)
         if humidity >= 92 and spread <= 4 and 3 <= wind_speed <= 12:
             return "foggy"
-        
+
         # Evaporation fog (after rain, warm ground)
         if humidity >= 90 and spread <= 5 and wind_speed <= 8 and temp > 40:
             # Check if conditions suggest recent precipitation
             return "foggy"
-        
+
         return "none"
 
-    def _analyze_cloud_cover(self, solar_radiation: float, solar_lux: float, 
-                            uv_index: float) -> float:
+    def _analyze_cloud_cover(
+        self, solar_radiation: float, solar_lux: float, uv_index: float
+    ) -> float:
         """
         Estimate cloud cover percentage using solar radiation analysis.
-        
+
         Based on theoretical clear-sky solar radiation models and
         actual measured values to determine cloud opacity.
         """
-        
+
         # Rough clear-sky solar radiation estimates (varies by season/location)
         # These would ideally be calculated based on solar position
         max_solar_radiation = 1000  # W/m² theoretical maximum
-        max_solar_lux = 100000      # lx theoretical maximum  
-        max_uv_index = 11           # UV Index maximum
-        
+        max_solar_lux = 100000  # lx theoretical maximum
+        max_uv_index = 11  # UV Index maximum
+
         # Calculate cloud cover from each measurement
-        solar_cloud_cover = max(0, min(100, 100 - (solar_radiation / max_solar_radiation * 100)))
+        solar_cloud_cover = max(
+            0, min(100, 100 - (solar_radiation / max_solar_radiation * 100))
+        )
         lux_cloud_cover = max(0, min(100, 100 - (solar_lux / max_solar_lux * 100)))
         uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
-        
+
         # Weight the measurements (solar radiation is most reliable for cloud cover)
         if solar_radiation > 0:
-            cloud_cover = (solar_cloud_cover * 0.6 + lux_cloud_cover * 0.3 + uv_cloud_cover * 0.1)
+            cloud_cover = (
+                solar_cloud_cover * 0.6 + lux_cloud_cover * 0.3 + uv_cloud_cover * 0.1
+            )
         elif solar_lux > 0:
-            cloud_cover = (lux_cloud_cover * 0.8 + uv_cloud_cover * 0.2)
+            cloud_cover = lux_cloud_cover * 0.8 + uv_cloud_cover * 0.2
         elif uv_index > 0:
             cloud_cover = uv_cloud_cover
         else:
             cloud_cover = 100  # No solar input = complete overcast or night
-        
+
         return cloud_cover
 
     def _estimate_visibility(
@@ -348,7 +381,7 @@ class WeatherDetector:
     ) -> float:
         """
         Estimate visibility based on weather condition and meteorological data.
-        
+
         Uses scientific visibility reduction factors:
         - Fog: Major visibility reduction (0.1-2 km)
         - Rain: Moderate reduction based on intensity
@@ -363,11 +396,11 @@ class WeatherDetector:
         wind_gust = sensor_data.get("wind_gust", 0)
         humidity = sensor_data.get("humidity", 50)
         outdoor_temp = sensor_data.get("outdoor_temp", 70)
-        
+
         # Calculate dewpoint for more accurate fog assessment
         dewpoint = self._calculate_dewpoint(outdoor_temp, humidity)
         temp_dewpoint_spread = outdoor_temp - dewpoint
-        
+
         is_daytime = solar_radiation > 5 or solar_lux > 50
 
         if condition == "foggy":
@@ -375,16 +408,16 @@ class WeatherDetector:
             if temp_dewpoint_spread <= 1:
                 return 0.3  # Dense fog: <0.5 km
             elif temp_dewpoint_spread <= 2:
-                return 0.8  # Thick fog: <1 km  
+                return 0.8  # Thick fog: <1 km
             elif temp_dewpoint_spread <= 3:
                 return 1.5  # Moderate fog: 1-2 km
             else:
                 return 2.5  # Light fog/mist: 2-3 km
-                
+
         elif condition in ["rainy", "snowy"]:
             # Precipitation visibility reduction
             base_visibility = 15.0 if condition == "rainy" else 8.0
-            
+
             # Intensity-based reduction
             if rain_rate > 0.5:  # Heavy precipitation
                 intensity_factor = 0.3
@@ -394,13 +427,13 @@ class WeatherDetector:
                 intensity_factor = 0.7
             else:  # Very light/drizzle
                 intensity_factor = 0.85
-                
+
             # Wind effect (blowing precipitation reduces visibility)
             wind_factor = max(0.6, 1.0 - (wind_speed / 50))
-            
+
             visibility = base_visibility * intensity_factor * wind_factor
             return round(max(0.5, visibility), 1)
-            
+
         elif condition == "stormy":
             # Storm visibility varies greatly
             if rain_rate > 0.1:  # Rain with storm
@@ -408,7 +441,7 @@ class WeatherDetector:
             else:  # Dry storm (dust, debris)
                 storm_vis = 8.0 - (wind_gust / 10)
             return round(max(0.8, storm_vis), 1)
-            
+
         elif condition == "clear-night":
             # Excellent night visibility
             if humidity < 50:
@@ -417,7 +450,7 @@ class WeatherDetector:
                 return 20.0  # Clear
             else:
                 return 15.0  # Slight haze
-                
+
         elif condition == "sunny":
             # Daytime clear conditions
             if solar_radiation > 800:  # Very clear atmosphere
@@ -428,7 +461,7 @@ class WeatherDetector:
                 return 20.0
             else:  # Hazy
                 return 15.0
-                
+
         elif condition in ["partly_cloudy", "cloudy"]:
             # Cloud-based visibility
             if is_daytime:
@@ -449,7 +482,7 @@ class WeatherDetector:
                     return 15.0  # Slight haze
                 else:
                     return 12.0  # More humid, reduced visibility
-        
+
         # Default visibility
         return 15.0
 

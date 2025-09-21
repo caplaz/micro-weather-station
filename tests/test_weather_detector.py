@@ -1,4 +1,5 @@
 """Test the weather detector functionality."""
+
 import pytest
 from unittest.mock import Mock, MagicMock
 from homeassistant.core import HomeAssistant
@@ -50,7 +51,15 @@ class TestWeatherDetector:
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "solar_radiation":
                 state = Mock()
-                state.state = "500.0"  # High solar radiation
+                state.state = "800.0"  # High solar radiation for sunny conditions
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "solar_lux":
+                state = Mock()
+                state.state = "75000.0"  # High solar lux for clear skies
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "uv_index":
+                state = Mock()
+                state.state = "7.0"  # High UV index for clear skies
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "rain_rate":
                 state = Mock()
@@ -60,21 +69,21 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         # Map to correct sensor entity IDs from options
         sensor_mapping = {
             "sensor.outdoor_temp": "sensor.outdoor_temperature",
             "sensor.solar_radiation": "sensor.solar_radiation",
-            "sensor.rain_rate": "sensor.rain_rate", 
+            "sensor.rain_rate": "sensor.rain_rate",
             "sensor.rain_state": "sensor.rain_state",
         }
-        
+
         for src, dest in sensor_mapping.items():
             if src in mock_states:
                 mock_states[dest] = mock_states[src]
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         assert result["condition"] == "sunny"
@@ -100,9 +109,9 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         assert result["condition"] == "rainy"
@@ -128,9 +137,9 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         assert result["condition"] == "stormy"
@@ -152,12 +161,12 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         # Map to the correct sensor entity ID
         mock_states["sensor.outdoor_temperature"] = mock_states["sensor.outdoor_temp"]
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         assert result["condition"] == "snowy"
@@ -183,9 +192,9 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         assert result["condition"] == "cloudy"
@@ -198,14 +207,14 @@ class TestWeatherDetector:
             state = Mock()
             state.state = str(value)
             mock_states[f"sensor.{sensor_key}"] = state
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         assert "forecast" in result
         assert len(result["forecast"]) == 5
-        
+
         # Check forecast structure
         forecast_item = result["forecast"][0]
         assert "datetime" in forecast_item
@@ -225,12 +234,12 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         # Map to the correct sensor entity ID from options
         mock_states["sensor.outdoor_temperature"] = mock_states["sensor.outdoor_temp"]
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         # 72°F should be approximately 22.2°C
@@ -249,9 +258,9 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         # 29.92 inHg should be approximately 1013 hPa
@@ -270,9 +279,9 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         # 5.5 mph should be approximately 8.9 km/h
@@ -286,9 +295,9 @@ class TestWeatherDetector:
             state = Mock()
             state.state = str(value)
             mock_states[f"sensor.{sensor_key}"] = state
-        
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
-        
+
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         assert "visibility" in result
