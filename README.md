@@ -76,8 +76,8 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.0.0.zip
-   unzip v1.0.0.zip
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.1.0.zip
+   unzip v1.1.0.zip
 
    # Option B: Clone repository
    git clone https://github.com/caplaz/micro-weather-station.git
@@ -751,6 +751,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### v1.1.0
+
+- **Major Code Refactoring**: Split monolithic weather_detector.py (~1300 lines) into focused, maintainable modules
+- **Modular Architecture**: Improved code organization with separate concerns:
+  - `weather_utils.py`: Unit conversion functions (Celsius, hPa, km/h)
+  - `weather_analysis.py`: Meteorological algorithms and trend analysis
+  - `weather_forecast.py`: Advanced forecasting with historical patterns
+  - `weather_detector.py`: Core integration and orchestration (refactored)
+- **Enhanced Test Coverage**: Comprehensive test suites for each module (64 total tests)
+- **Improved Maintainability**: Better separation of concerns and code reusability
+- **Future-Ready Architecture**: Easier to extend with new features and algorithms
+
 ### v1.0.0
 
 - Initial release
@@ -764,7 +776,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.0.0
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.1.0
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
