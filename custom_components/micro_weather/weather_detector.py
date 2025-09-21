@@ -115,29 +115,44 @@ class WeatherDetector:
         outdoor_temp = sensor_data.get("outdoor_temp", 70)
         pressure = sensor_data.get("pressure", 29.92)
 
+        # Log current sensor readings for debugging
+        _LOGGER.info(
+            f"Weather detection - Rain: {rain_rate} in/h, State: {rain_state}, "
+            f"Wind: {wind_speed} mph (gust: {wind_gust} mph), "
+            f"Pressure: {pressure} inHg, Solar: {solar_radiation} W/m², "
+            f"Lux: {solar_lux} lx, Temp: {outdoor_temp}°F"
+        )
+
         # Determine if it's daytime based on solar radiation/lux
         is_daytime = solar_radiation > 0 or solar_lux > 0 or uv_index > 0
 
         # Convert pressure to trend (you might want to store historical data for better pressure trends)
-        pressure_low = pressure < 29.80  # Low pressure indicates storms
+        pressure_very_low = pressure < 29.50  # Very low pressure for severe storms
+        pressure_low = pressure < 29.70       # Low pressure threshold
 
         # Priority-based condition detection
 
         # 1. Rain conditions (highest priority)
         if rain_rate > 0.1 or rain_state.lower() != "dry":
-            if wind_gust > 25 or pressure_low:
-                return "stormy"  # Heavy rain with wind or low pressure
+            _LOGGER.info(f"Rain detected: rate={rain_rate}, state={rain_state}")
+            if wind_gust > 25 or pressure_very_low:
+                return "stormy"  # Heavy rain with wind or very low pressure
             elif outdoor_temp < 35:  # Below 35°F likely snow
                 return "snowy"
             else:
                 return "rainy"
 
-        # 2. Wind-based conditions
-        if wind_gust > 30 or (wind_speed > 20 and pressure_low):
+        # 2. Wind-based conditions (only with actual severe wind)
+        if wind_gust > 30:  # Only very high gusts indicate storms without rain
+            _LOGGER.info(f"High wind gust detected: {wind_gust} mph")
+            return "stormy"
+        elif wind_speed > 25 and pressure_very_low:  # Higher threshold for wind+pressure storms
+            _LOGGER.info(f"High wind + low pressure: wind={wind_speed}, pressure={pressure}")
             return "stormy"
 
         # 3. Solar radiation based conditions (if daytime)
         if is_daytime:
+            _LOGGER.info(f"Daytime detected - solar: {solar_radiation} W/m², lux: {solar_lux}")
             # Daytime conditions
             if solar_radiation > 300:  # High solar radiation
                 return "sunny"
@@ -152,14 +167,25 @@ class WeatherDetector:
                     return "cloudy"
         else:
             # Night time - use other indicators
-            if wind_speed < 3 and pressure >= 29.80 and solar_lux == 0:
+            humidity = sensor_data.get("humidity", 50)
+            _LOGGER.info(f"Nighttime detected - humidity: {humidity}%, wind: {wind_speed} mph, pressure: {pressure}")
+            
+            # High humidity with calm conditions suggests fog potential
+            if humidity > 95 and wind_speed < 2:
+                _LOGGER.info("Foggy conditions detected (high humidity + calm wind)")
+                return "foggy"
+            elif wind_speed < 3 and pressure >= 29.70:
+                _LOGGER.info("Clear night conditions detected")
                 return "clear-night"  # Clear night sky
             elif wind_speed < 5 and not pressure_low:
+                _LOGGER.info("Cloudy night conditions detected")
                 return "cloudy"  # Calm night, assume cloudy
             else:
+                _LOGGER.info("Partly cloudy night conditions detected")
                 return "partly_cloudy"
 
         # Default fallback
+        _LOGGER.info("Using default fallback condition")
         return "partly_cloudy"
 
     def _estimate_visibility(
