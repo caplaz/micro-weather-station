@@ -31,7 +31,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
+class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
     """Handle a config flow for Micro Weather Station."""
 
     VERSION = 1
