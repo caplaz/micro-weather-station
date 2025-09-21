@@ -10,7 +10,9 @@ from typing import Any, Dict, List, Optional
 class WeatherAnalysis:
     """Handles weather condition analysis and historical trend calculations."""
 
-    def __init__(self, sensor_history: Optional[Dict[str, deque]] = None):
+    def __init__(
+        self, sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None
+    ):
         """Initialize weather analysis with optional sensor history.
 
         Args:
@@ -784,5 +786,5 @@ class WeatherAnalysis:
                 sectors["west"] += 1
 
         # Return the sector with the most observations
-        prevailing = max(sectors, key=sectors.get)
+        prevailing = max(sectors, key=lambda k: sectors[k])
         return prevailing

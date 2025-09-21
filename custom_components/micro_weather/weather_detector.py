@@ -81,7 +81,7 @@ class WeatherDetector:
 
         # Historical data storage (last 48 hours, 15-minute intervals = ~192 readings)
         self._history_maxlen = 192  # 48 hours * 4 readings per hour
-        self._sensor_history: Dict[str, deque] = {
+        self._sensor_history: Dict[str, deque[Dict[str, Any]]] = {
             "outdoor_temp": deque(maxlen=self._history_maxlen),
             "humidity": deque(maxlen=self._history_maxlen),
             "pressure": deque(maxlen=self._history_maxlen),
@@ -90,7 +90,9 @@ class WeatherDetector:
             "solar_radiation": deque(maxlen=self._history_maxlen),
             "rain_rate": deque(maxlen=self._history_maxlen),
         }
-        self._condition_history = deque(maxlen=self._history_maxlen)
+        self._condition_history: deque[Dict[str, Any]] = deque(
+            maxlen=self._history_maxlen
+        )
 
         # Initialize analysis and forecast modules
         self.analysis = WeatherAnalysis(self._sensor_history)
