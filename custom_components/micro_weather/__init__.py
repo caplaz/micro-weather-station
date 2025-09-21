@@ -26,24 +26,26 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.WEATHER]  # Removed sensor platform to avoid duplication
+PLATFORMS: list[Platform] = [
+    Platform.WEATHER
+]  # Removed sensor platform to avoid duplication
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Micro Weather Station from a config entry.
-    
+
     This function initializes the integration by:
     1. Creating a data coordinator for managing sensor updates
     2. Setting up the weather platform
     3. Registering update listeners for configuration changes
-    
+
     Args:
         hass: Home Assistant instance
         entry: Configuration entry containing user settings
-        
+
     Returns:
         bool: True if setup was successful, False otherwise
-        
+
     Raises:
         ConfigEntryNotReady: If required sensors are not available
     """
@@ -68,10 +70,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Update options and force immediate refresh.
-    
+
     Called when user modifies integration configuration. Forces an immediate
     data refresh to apply new sensor mappings and settings.
-    
+
     Args:
         hass: Home Assistant instance
         entry: Updated configuration entry
@@ -85,14 +87,14 @@ async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry.
-    
+
     Cleanly removes the integration by unloading all platforms and
     removing stored data from Home Assistant.
-    
+
     Args:
         hass: Home Assistant instance
         entry: Configuration entry to unload
-        
+
     Returns:
         bool: True if unload was successful
     """
@@ -106,19 +108,19 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 class MicroWeatherCoordinator(DataUpdateCoordinator):
     """Class to manage fetching micro weather data.
-    
+
     This coordinator handles periodic updates of weather data by:
     1. Reading configured sensor entities
     2. Processing sensor data through weather detection algorithms
     3. Providing consolidated weather information to the weather platform
-    
+
     The coordinator respects user-configured update intervals and handles
     errors gracefully to maintain integration stability.
     """
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the weather data coordinator.
-        
+
         Args:
             hass: Home Assistant instance
             entry: Configuration entry with sensor mappings and settings
@@ -133,14 +135,14 @@ class MicroWeatherCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Update weather data from real sensors.
-        
+
         Fetches current data from all configured sensors and processes it
         through the weather detection algorithms to determine current conditions.
-        
+
         Returns:
             dict: Weather data including current conditions, temperature, humidity,
                   pressure, wind data, and forecast information
-                  
+
         Raises:
             UpdateFailed: If critical sensors are unavailable or data is invalid
         """

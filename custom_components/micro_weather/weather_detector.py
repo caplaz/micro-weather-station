@@ -49,17 +49,17 @@ _LOGGER = logging.getLogger(__name__)
 
 class WeatherDetector:
     """Detect weather conditions from real sensor data.
-    
+
     This class analyzes real-time sensor data to determine accurate weather
     conditions using meteorological principles. It supports multiple sensor
     types and implements intelligent algorithms for:
-    
+
     - Storm detection (precipitation + wind analysis)
     - Fog detection (humidity + dewpoint + solar radiation)
     - Cloud cover assessment (solar radiation patterns)
     - Snow detection (temperature-based precipitation type)
     - Weather forecasting (pressure trends)
-    
+
     Attributes:
         hass: Home Assistant instance for accessing sensor states
         options: Configuration options with sensor entity mappings
@@ -68,7 +68,7 @@ class WeatherDetector:
 
     def __init__(self, hass: HomeAssistant, options: Mapping[str, Any]) -> None:
         """Initialize the weather detector.
-        
+
         Args:
             hass: Home Assistant instance for accessing entity states
             options: Configuration mapping sensor types to entity IDs
@@ -96,13 +96,13 @@ class WeatherDetector:
 
     def get_weather_data(self) -> Dict[str, Any]:
         """Get current weather data from sensors.
-        
+
         Orchestrates the complete weather analysis process:
         1. Reads current sensor values
         2. Determines weather condition using meteorological algorithms
         3. Converts units to standard formats
         4. Generates forecast data
-        
+
         Returns:
             dict: Complete weather data including:
                 - temperature: Current temperature in Celsius
@@ -141,11 +141,11 @@ class WeatherDetector:
 
     def _get_sensor_values(self) -> Dict[str, Any]:
         """Get current values from all configured sensors.
-        
+
         Reads the current state of all configured sensor entities and converts
         them to appropriate data types. Handles errors gracefully by logging
         warnings for invalid sensor states.
-        
+
         Returns:
             dict: Sensor data with keys matching sensor types and values as
                   floats (for numeric sensors) or strings (for state sensors)
@@ -340,18 +340,18 @@ class WeatherDetector:
 
     def _calculate_dewpoint(self, temp_f: float, humidity: float) -> float:
         """Calculate dewpoint using Magnus formula (meteorologically accurate).
-        
+
         The dewpoint is the temperature at which air becomes saturated with
         water vapor. This implementation uses the Magnus-Tetens formula,
         which is accurate for typical atmospheric conditions.
-        
+
         Args:
             temp_f: Temperature in Fahrenheit
             humidity: Relative humidity as percentage (0-100)
-            
+
         Returns:
             float: Dewpoint temperature in Fahrenheit
-            
+
         Note:
             Falls back to approximation for very dry conditions (humidity <= 0)
         """
@@ -394,21 +394,21 @@ class WeatherDetector:
         is_daytime: bool,
     ) -> str:
         """Advanced fog analysis using meteorological principles.
-        
+
         Analyzes atmospheric conditions to determine fog likelihood using
         scientific criteria for fog formation. The algorithm considers:
-        
+
         - Humidity levels (fog requires near-saturation)
         - Temperature-dewpoint spread (closer = higher fog probability)
         - Wind speed (light winds favor fog formation)
         - Solar radiation (low radiation indicates existing fog)
         - Time of day (radiation fog typically forms at night/early morning)
-        
+
         Fog Types Detected:
         - Dense fog: Extremely high humidity (99%+) with minimal spread
         - Radiation fog: High humidity (98%+) with light winds at night
         - Advection fog: Moist air moving over cooler surface
-        
+
         Args:
             temp: Current temperature in Fahrenheit
             humidity: Relative humidity percentage
@@ -417,10 +417,10 @@ class WeatherDetector:
             wind_speed: Wind speed in mph
             solar_rad: Solar radiation in W/m²
             is_daytime: Boolean indicating if it's currently daytime
-            
+
         Returns:
             str: "foggy" if fog conditions are met, "clear" otherwise
-            
+
         Note:
             Uses conservative thresholds to reduce false positives after
             user feedback about incorrect fog detection.

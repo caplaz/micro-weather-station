@@ -53,9 +53,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         CONF_OUTDOOR_TEMP_SENSOR: user_input.get(
                             CONF_OUTDOOR_TEMP_SENSOR
                         ),
-                        CONF_DEWPOINT_SENSOR: user_input.get(
-                            CONF_DEWPOINT_SENSOR
-                        ),
+                        CONF_DEWPOINT_SENSOR: user_input.get(CONF_DEWPOINT_SENSOR),
                         CONF_HUMIDITY_SENSOR: user_input.get(CONF_HUMIDITY_SENSOR),
                         CONF_PRESSURE_SENSOR: user_input.get(CONF_PRESSURE_SENSOR),
                         CONF_WIND_SPEED_SENSOR: user_input.get(CONF_WIND_SPEED_SENSOR),
@@ -182,9 +180,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_OUTDOOR_TEMP_SENSOR: user_input.get(
                             CONF_OUTDOOR_TEMP_SENSOR
                         ),
-                        CONF_DEWPOINT_SENSOR: user_input.get(
-                            CONF_DEWPOINT_SENSOR
-                        ),
+                        CONF_DEWPOINT_SENSOR: user_input.get(CONF_DEWPOINT_SENSOR),
                         CONF_HUMIDITY_SENSOR: user_input.get(CONF_HUMIDITY_SENSOR),
                         CONF_PRESSURE_SENSOR: user_input.get(CONF_PRESSURE_SENSOR),
                         CONF_WIND_SPEED_SENSOR: user_input.get(CONF_WIND_SPEED_SENSOR),
