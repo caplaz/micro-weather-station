@@ -9,7 +9,7 @@
   "requirements": ["voluptuous>=0.13.1"],
   "config_flow": true,
   "integration_type": "device",
-  "iot_class": "local_polling",
+  "iot_class": "calculated",
   "homeassistant": "2023.1.0",
   "loggers": ["custom_components.micro_weather"]
 }
