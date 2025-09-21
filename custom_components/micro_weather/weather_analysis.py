@@ -1,0 +1,788 @@
+"""Weather analysis and trend calculation functions."""
+
+from collections import deque
+from datetime import datetime, timedelta
+import math
+import statistics
+from typing import Any, Dict, List, Optional
+
+
+class WeatherAnalysis:
+    """Handles weather condition analysis and historical trend calculations."""
+
+    def __init__(self, sensor_history: Optional[Dict[str, deque]] = None):
+        """Initialize weather analysis with optional sensor history.
+
+        Args:
+            sensor_history: Dictionary of sensor historical data deques
+        """
+        self._sensor_history = sensor_history or {}
+
+    def determine_weather_condition(self, sensor_data: Dict[str, Any]) -> str:
+        """
+        Advanced meteorological weather condition detection.
+
+        Uses scientific weather analysis principles:
+        - Precipitation analysis (intensity, type, persistence)
+        - Atmospheric pressure systems
+        - Solar radiation for cloud cover assessment
+        - Wind patterns for storm identification
+        - Temperature/humidity for fog and frost conditions
+        - Dewpoint analysis for precipitation potential
+        """
+
+        # Extract sensor values with better defaults
+        rain_rate = sensor_data.get("rain_rate", 0.0)
+        rain_state = sensor_data.get("rain_state", "dry").lower()
+        wind_speed = sensor_data.get("wind_speed", 0.0)
+        wind_gust = sensor_data.get("wind_gust", 0.0)
+        solar_radiation = sensor_data.get("solar_radiation", 0.0)
+        solar_lux = sensor_data.get("solar_lux", 0.0)
+        uv_index = sensor_data.get("uv_index", 0.0)
+        outdoor_temp = sensor_data.get("outdoor_temp", 70.0)
+        humidity = sensor_data.get("humidity", 50.0)
+        pressure = sensor_data.get("pressure", 29.92)
+
+        # Calculate derived meteorological parameters
+        # Use dewpoint sensor if available, otherwise calculate from temp/humidity
+        dewpoint_raw = sensor_data.get("dewpoint")
+        if dewpoint_raw is not None:
+            dewpoint = float(dewpoint_raw)
+        else:
+            dewpoint = self.calculate_dewpoint(outdoor_temp, humidity)
+        temp_dewpoint_spread = outdoor_temp - dewpoint
+        is_freezing = outdoor_temp <= 32.0
+
+        # Advanced daytime detection (solar elevation proxy)
+        is_daytime = solar_radiation > 5 or solar_lux > 50 or uv_index > 0.1
+        is_twilight = (solar_lux > 10 and solar_lux < 100) or (
+            solar_radiation > 1 and solar_radiation < 50
+        )
+
+        # Pressure analysis (meteorologically accurate thresholds)
+        pressure_very_high = pressure > 30.20  # High pressure system
+        pressure_high = pressure > 30.00  # Above normal
+        pressure_normal = 29.80 <= pressure <= 30.20  # Normal range
+        pressure_low = pressure < 29.80  # Low pressure system
+        pressure_very_low = pressure < 29.50  # Storm system
+        pressure_extremely_low = pressure < 29.20  # Severe storm
+
+        # Wind analysis (Beaufort scale adapted)
+        wind_calm = wind_speed < 1  # 0-1 mph: Calm
+        wind_light = 1 <= wind_speed < 8  # 1-7 mph: Light air to light breeze
+        wind_strong = 19 <= wind_speed < 32  # 19-31 mph: Strong breeze to near gale
+        wind_gale = wind_speed >= 32  # 32+ mph: Gale force
+
+        gust_factor = wind_gust / max(wind_speed, 1)  # Gust ratio for turbulence
+        is_gusty = gust_factor > 1.5 and wind_gust > 10
+        is_very_gusty = gust_factor > 2.0 and wind_gust > 15
+
+        # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
+        if rain_rate > 0.01 or rain_state in [
+            "wet",
+            "rain",
+            "drizzle",
+            "precipitation",
+        ]:
+            precipitation_intensity = self.classify_precipitation_intensity(rain_rate)
+
+            # Determine precipitation type based on temperature
+            if is_freezing:
+                if rain_rate > 0.1:
+                    return "snowy"  # Heavy snow
+                else:
+                    return "snowy"  # Light snow/flurries
+
+            # Rain with storm conditions
+            if (
+                pressure_extremely_low
+                or wind_gale
+                or (pressure_very_low and wind_strong)
+                or (is_very_gusty and wind_gust > 25)
+            ):
+                return "stormy"  # Thunderstorm/severe weather
+
+            # Regular rain classification
+            if precipitation_intensity == "heavy" or rain_rate > 0.25:
+                return "rainy"  # Heavy rain
+            elif precipitation_intensity == "moderate" or rain_rate > 0.1:
+                return "rainy"  # Moderate rain
+            else:
+                return "rainy"  # Light rain/drizzle
+
+        # PRIORITY 2: SEVERE WEATHER CONDITIONS
+        # (No precipitation but extreme conditions)
+        if pressure_extremely_low and (wind_strong or is_very_gusty):
+            return "stormy"  # Severe weather system approaching
+
+        if wind_gale:  # Gale force winds
+            return "stormy"  # Windstorm
+
+        # PRIORITY 3: FOG CONDITIONS (Critical for safety)
+        fog_conditions = self.analyze_fog_conditions(
+            outdoor_temp,
+            humidity,
+            dewpoint,
+            temp_dewpoint_spread,
+            wind_speed,
+            solar_radiation,
+            is_daytime,
+        )
+        if fog_conditions != "none":
+            return fog_conditions
+
+        # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
+        if is_daytime:
+            cloud_cover = self.analyze_cloud_cover(solar_radiation, solar_lux, uv_index)
+
+            # Clear conditions
+            if cloud_cover <= 10 and pressure_high:
+                return "sunny"
+            elif cloud_cover <= 25:
+                return "sunny"
+            elif cloud_cover <= 50:
+                return "partly_cloudy"
+            elif cloud_cover <= 75:
+                return "cloudy"
+            else:
+                # Overcast with potential for development
+                if pressure_low and humidity > 80:
+                    return "cloudy"  # Threatening overcast
+                else:
+                    return "cloudy"
+
+        # PRIORITY 5: TWILIGHT CONDITIONS
+        elif is_twilight:
+            if solar_lux > 50 and pressure_normal:
+                return "partly_cloudy"
+            else:
+                return "cloudy"
+
+        # PRIORITY 6: NIGHTTIME CONDITIONS
+        else:
+            # Night analysis based on atmospheric conditions
+            if pressure_very_high and wind_calm and humidity < 70:
+                return "clear-night"  # Perfect clear night
+            elif pressure_high and not is_gusty and humidity < 80:
+                return "clear-night"  # Clear night
+            elif pressure_normal and wind_light:
+                return "partly_cloudy"  # Partly cloudy night
+            elif pressure_low or humidity > 85:
+                return "cloudy"  # Cloudy/overcast night
+            else:
+                return "partly_cloudy"  # Default night condition
+
+        # FALLBACK: Should rarely be reached
+        return "partly_cloudy"
+
+    def calculate_dewpoint(self, temp_f: float, humidity: float) -> float:
+        """Calculate dewpoint using Magnus formula (meteorologically accurate).
+
+        The dewpoint is the temperature at which air becomes saturated with
+        water vapor. This implementation uses the Magnus-Tetens formula,
+        which is accurate for typical atmospheric conditions.
+
+        Args:
+            temp_f: Temperature in Fahrenheit
+            humidity: Relative humidity as percentage (0-100)
+
+        Returns:
+            float: Dewpoint temperature in Fahrenheit
+
+        Note:
+            Falls back to approximation for very dry conditions (humidity <= 0)
+        """
+        if humidity <= 0:
+            return temp_f - 50  # Approximate for very dry conditions
+
+        # Convert to Celsius for calculation
+        temp_c = (temp_f - 32) * 5 / 9
+
+        # Magnus formula constants (Tetens 1930, Murray 1967)
+        a = 17.27
+        b = 237.7
+
+        # Calculate dewpoint in Celsius using Magnus-Tetens approximation
+        gamma = (a * temp_c) / (b + temp_c) + math.log(humidity / 100.0)
+        dewpoint_c = (b * gamma) / (a - gamma)
+
+        # Convert back to Fahrenheit
+        return dewpoint_c * 9 / 5 + 32
+
+    def classify_precipitation_intensity(self, rain_rate: float) -> str:
+        """Classify precipitation intensity (meteorological standards)."""
+        if rain_rate >= 0.5:
+            return "heavy"  # Heavy rain
+        elif rain_rate >= 0.1:
+            return "moderate"  # Moderate rain
+        elif rain_rate >= 0.01:
+            return "light"  # Light rain/drizzle
+        else:
+            return "trace"  # Trace amounts
+
+    def analyze_fog_conditions(
+        self,
+        temp: float,
+        humidity: float,
+        dewpoint: float,
+        spread: float,
+        wind_speed: float,
+        solar_rad: float,
+        is_daytime: bool,
+    ) -> str:
+        """Advanced fog analysis using meteorological principles.
+
+        Analyzes atmospheric conditions to determine fog likelihood using
+        scientific criteria for fog formation. The algorithm considers:
+
+        - Humidity levels (fog requires near-saturation)
+        - Temperature-dewpoint spread (closer = higher fog probability)
+        - Wind speed (light winds favor fog formation)
+        - Solar radiation (low radiation indicates existing fog)
+        - Time of day (radiation fog typically forms at night/early morning)
+
+        Fog Types Detected:
+        - Dense fog: Extremely high humidity (99%+) with minimal spread
+        - Radiation fog: High humidity (98%+) with light winds at night
+        - Advection fog: Moist air moving over cooler surface
+
+        Args:
+            temp: Current temperature in Fahrenheit
+            humidity: Relative humidity percentage
+            dewpoint: Dewpoint temperature in Fahrenheit
+            spread: Temperature minus dewpoint in Fahrenheit
+            wind_speed: Wind speed in mph
+            solar_rad: Solar radiation in W/m²
+            is_daytime: Boolean indicating if it's currently daytime
+
+        Returns:
+            str: "foggy" if fog conditions are met, "clear" otherwise
+
+        Note:
+            Uses conservative thresholds to reduce false positives after
+            user feedback about incorrect fog detection.
+        """
+
+        # Dense fog conditions
+        # (very restrictive - must be extremely close to saturation)
+        if humidity >= 99 and spread <= 1 and wind_speed <= 2:
+            return "foggy"
+
+        # Radiation fog (more restrictive than before to reduce false positives)
+        if (
+            humidity >= 98  # Raised from 95 to 98 - requires near saturation
+            and spread <= 2  # Reduced from 3 to 2 - closer to dewpoint required
+            and wind_speed <= 3  # Reduced from 5 to 3 - lighter winds required
+            and (not is_daytime or solar_rad < 5)  # More restrictive solar condition
+        ):
+            return "foggy"
+
+        # Advection fog (moist air over cooler surface) - kept similar
+        if (
+            humidity >= 95 and spread <= 3 and 3 <= wind_speed <= 12
+        ):  # Raised humidity threshold
+            return "foggy"
+
+        # Evaporation fog (after rain, warm ground) - more restrictive
+        if (
+            humidity >= 95 and spread <= 3 and wind_speed <= 6 and temp > 40
+        ):  # Raised thresholds
+            # Check if conditions suggest recent precipitation
+            return "foggy"
+
+        return "none"
+
+    def analyze_cloud_cover(
+        self, solar_radiation: float, solar_lux: float, uv_index: float
+    ) -> float:
+        """
+        Estimate cloud cover percentage using solar radiation analysis.
+
+        Based on theoretical clear-sky solar radiation models and
+        actual measured values to determine cloud opacity.
+        """
+
+        # Rough clear-sky solar radiation estimates (varies by season/location)
+        # These would ideally be calculated based on solar position
+        max_solar_radiation = 1000  # W/m² theoretical maximum
+        max_solar_lux = 100000  # lx theoretical maximum
+        max_uv_index = 11  # UV Index maximum
+
+        # Calculate cloud cover from each measurement
+        solar_cloud_cover = max(
+            0, min(100, 100 - (solar_radiation / max_solar_radiation * 100))
+        )
+        lux_cloud_cover = max(0, min(100, 100 - (solar_lux / max_solar_lux * 100)))
+        uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
+
+        # Weight the measurements (solar radiation is most reliable for cloud cover)
+        if solar_radiation > 0:
+            cloud_cover = (
+                solar_cloud_cover * 0.6 + lux_cloud_cover * 0.3 + uv_cloud_cover * 0.1
+            )
+        elif solar_lux > 0:
+            cloud_cover = lux_cloud_cover * 0.8 + uv_cloud_cover * 0.2
+        elif uv_index > 0:
+            cloud_cover = uv_cloud_cover
+        else:
+            cloud_cover = 100  # No solar input = complete overcast or night
+
+        return cloud_cover
+
+    def estimate_visibility(self, condition: str, sensor_data: Dict[str, Any]) -> float:
+        """
+        Estimate visibility based on weather condition and meteorological data.
+
+        Uses scientific visibility reduction factors:
+        - Fog: Major visibility reduction (0.1-2 km)
+        - Rain: Moderate reduction based on intensity
+        - Snow: Severe reduction, especially with wind
+        - Storms: Variable based on precipitation and wind
+        - Clear: Excellent visibility based on atmospheric clarity
+        """
+        solar_lux = sensor_data.get("solar_lux", 0)
+        solar_radiation = sensor_data.get("solar_radiation", 0)
+        rain_rate = sensor_data.get("rain_rate", 0)
+        wind_speed = sensor_data.get("wind_speed", 0)
+        wind_gust = sensor_data.get("wind_gust", 0)
+        humidity = sensor_data.get("humidity", 50)
+        outdoor_temp = sensor_data.get("outdoor_temp", 70)
+
+        # Calculate dewpoint for more accurate fog assessment
+        dewpoint = self.calculate_dewpoint(outdoor_temp, humidity)
+        temp_dewpoint_spread = outdoor_temp - dewpoint
+
+        is_daytime = solar_radiation > 5 or solar_lux > 50
+
+        if condition == "foggy":
+            # Fog visibility based on density (dewpoint spread)
+            if temp_dewpoint_spread <= 1:
+                return 0.3  # Dense fog: <0.5 km
+            elif temp_dewpoint_spread <= 2:
+                return 0.8  # Thick fog: <1 km
+            elif temp_dewpoint_spread <= 3:
+                return 1.5  # Moderate fog: 1-2 km
+            else:
+                return 2.5  # Light fog/mist: 2-3 km
+
+        elif condition in ["rainy", "snowy"]:
+            # Precipitation visibility reduction
+            base_visibility = 15.0 if condition == "rainy" else 8.0
+
+            # Intensity-based reduction
+            if rain_rate > 0.5:  # Heavy precipitation
+                intensity_factor = 0.3
+            elif rain_rate > 0.25:  # Moderate precipitation
+                intensity_factor = 0.5
+            elif rain_rate > 0.1:  # Light precipitation
+                intensity_factor = 0.7
+            else:  # Very light/drizzle
+                intensity_factor = 0.85
+
+            # Wind effect (blowing precipitation reduces visibility)
+            wind_factor = max(0.6, 1.0 - (wind_speed / 50))
+
+            visibility = base_visibility * intensity_factor * wind_factor
+            return round(max(0.5, visibility), 1)
+
+        elif condition == "stormy":
+            # Storm visibility varies greatly
+            if rain_rate > 0.1:  # Rain with storm
+                storm_vis = 3.0 - (rain_rate * 2)
+            else:  # Dry storm (dust, debris)
+                storm_vis = 8.0 - (wind_gust / 10)
+            return round(max(0.8, storm_vis), 1)
+
+        elif condition == "clear-night":
+            # Excellent night visibility
+            if humidity < 50:
+                return 25.0  # Very clear, dry air
+            elif humidity < 70:
+                return 20.0  # Clear
+            else:
+                return 15.0  # Slight haze
+
+        elif condition == "sunny":
+            # Daytime clear conditions
+            if solar_radiation > 800:  # Very clear atmosphere
+                return 30.0
+            elif solar_radiation >= 600:  # Clear
+                return 25.0
+            elif solar_radiation > 400:  # Good
+                return 20.0
+            else:  # Hazy
+                return 15.0
+
+        elif condition in ["partly_cloudy", "cloudy"]:
+            # Cloud-based visibility
+            if is_daytime:
+                # Use solar data to estimate atmospheric clarity
+                if solar_lux > 50000:
+                    return 25.0  # High clouds, clear air
+                elif solar_lux > 20000:
+                    return 20.0  # Some haze
+                elif solar_lux > 5000:
+                    return 15.0  # Moderate haze
+                else:
+                    return 12.0  # Overcast, some haze
+            else:
+                # Night visibility with clouds
+                if humidity < 75:
+                    return 18.0  # Clear air
+                elif humidity < 85:
+                    return 15.0  # Slight haze
+                else:
+                    return 12.0  # More humid, reduced visibility
+
+        # Default visibility
+        return 15.0
+
+    def store_historical_data(self, sensor_data: Dict[str, Any]) -> None:
+        """Store current sensor readings in historical buffer.
+
+        Args:
+            sensor_data: Current sensor readings to store
+        """
+        timestamp = datetime.now()
+
+        for sensor_key, value in sensor_data.items():
+            if sensor_key in self._sensor_history and value is not None:
+                self._sensor_history[sensor_key].append(
+                    {"timestamp": timestamp, "value": value}
+                )
+
+    def get_historical_trends(self, sensor_key: str, hours: int = 24) -> Dict[str, Any]:
+        """Calculate historical trends for a sensor over the specified time period.
+
+        Args:
+            sensor_key: The sensor key to analyze
+            hours: Number of hours to look back
+
+        Returns:
+            dict: Trend analysis including:
+                - current: Most recent value
+                - average: Average over the period
+                - trend: Rate of change per hour
+                - min/max: Min/max values
+                - volatility: Standard deviation
+        """
+        if sensor_key not in self._sensor_history:
+            return {}
+
+        # Get data from the last N hours
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        recent_data = [
+            entry
+            for entry in self._sensor_history[sensor_key]
+            if entry["timestamp"] > cutoff_time
+        ]
+
+        if len(recent_data) < 2:
+            return {}
+
+        values = [entry["value"] for entry in recent_data]
+        timestamps = [entry["timestamp"] for entry in recent_data]
+
+        # Calculate time differences in hours
+        time_diffs = [(t - timestamps[0]).total_seconds() / 3600 for t in timestamps]
+
+        try:
+            # Basic statistics
+            current = values[-1]
+            average = statistics.mean(values)
+            minimum = min(values)
+            maximum = max(values)
+            volatility = statistics.stdev(values) if len(values) > 1 else 0
+
+            # Trend calculation (linear regression slope)
+            trend = self.calculate_trend(time_diffs, values)
+
+            return {
+                "current": current,
+                "average": average,
+                "trend": trend,  # Change per hour
+                "min": minimum,
+                "max": maximum,
+                "volatility": volatility,
+                "sample_count": len(values),
+            }
+        except statistics.StatisticsError:
+            return {}
+
+    def calculate_trend(self, x_values: List[float], y_values: List[float]) -> float:
+        """Calculate linear trend (slope) using simple linear regression.
+
+        Args:
+            x_values: Independent variable values (time)
+            y_values: Dependent variable values (sensor readings)
+
+        Returns:
+            float: Slope of the trend line (change per unit time)
+        """
+        if len(x_values) != len(y_values) or len(x_values) < 2:
+            return 0.0
+
+        n = len(x_values)
+        sum_x = sum(x_values)
+        sum_y = sum(y_values)
+        sum_xy = sum(x * y for x, y in zip(x_values, y_values))
+        sum_x2 = sum(x * x for x in x_values)
+
+        denominator = n * sum_x2 - sum_x * sum_x
+        if denominator == 0:
+            return 0.0
+
+        slope = (n * sum_xy - sum_x * sum_y) / denominator
+        return slope
+
+    def analyze_pressure_trends(self) -> Dict[str, Any]:
+        """Analyze pressure trends for weather prediction.
+
+        Returns:
+            dict: Pressure trend analysis including:
+                - current_trend: Short-term pressure change
+                - long_term_trend: 24-hour pressure trend
+                - pressure_system: Type of pressure system
+                - storm_probability: Probability of storm development
+        """
+        # Get pressure trends over different time periods
+        short_trend = self.get_historical_trends("pressure", hours=3)  # 3-hour trend
+        long_trend = self.get_historical_trends("pressure", hours=24)  # 24-hour trend
+
+        if not short_trend or not long_trend:
+            return {"pressure_system": "unknown", "storm_probability": 0.0}
+
+        current_pressure = long_trend["current"]
+        short_term_change = short_trend["trend"] * 3  # 3-hour change
+        long_term_change = long_trend["trend"] * 24  # 24-hour change
+
+        # Classify pressure system
+        if current_pressure > 1020:
+            pressure_system = "high_pressure"
+        elif current_pressure < 1000:
+            pressure_system = "low_pressure"
+        else:
+            pressure_system = "normal"
+
+        # Calculate storm probability based on pressure trends
+        storm_probability = 0.0
+
+        # Rapid pressure drop indicates approaching storm
+        if short_term_change < -2:  # Falling >2 hPa in 3 hours
+            storm_probability += 40
+
+        # Sustained pressure drop over 24 hours
+        if long_term_change < -5:  # Falling >5 hPa in 24 hours
+            storm_probability += 30
+
+        # Very low pressure indicates storm
+        if current_pressure < 990:
+            storm_probability += 30
+
+        # Incorporate wind direction analysis for enhanced storm prediction
+        wind_direction_analysis = self.analyze_wind_direction_trends()
+        direction_stability = wind_direction_analysis.get("direction_stability", 0.5)
+        significant_shift = wind_direction_analysis.get("significant_shift", False)
+        direction_change_rate = wind_direction_analysis.get(
+            "direction_change_rate", 0.0
+        )
+
+        # Wind direction changes can indicate approaching weather systems
+        if significant_shift:
+            # Major wind direction shift often precedes weather changes
+            storm_probability += 15
+
+        # Rapid wind direction changes with pressure drops = strong storm signal
+        if direction_change_rate > 30 and (
+            short_term_change < -1 or long_term_change < -3
+        ):
+            storm_probability += 20
+
+        # Unstable winds with low pressure = increased storm probability
+        if direction_stability < 0.3 and pressure_system == "low_pressure":
+            storm_probability += 10
+
+        # Cap storm probability
+        storm_probability = min(100.0, storm_probability)
+
+        return {
+            "current_trend": short_term_change,
+            "long_term_trend": long_term_change,
+            "pressure_system": pressure_system,
+            "storm_probability": storm_probability,
+        }
+
+    def analyze_wind_direction_trends(self) -> Dict[str, Any]:
+        """Analyze wind direction trends for weather prediction.
+
+        Wind direction analysis is complex due to circular nature (0-360°).
+        This method handles direction changes that may indicate approaching
+        weather systems or changing weather patterns.
+
+        Returns:
+            dict: Wind direction trend analysis including:
+                - average_direction: Mean wind direction in degrees
+                - direction_stability: How consistent direction has been (0-1)
+                - direction_change_rate: Rate of direction change in °/hour
+                - significant_shift: Boolean indicating major direction change
+                - prevailing_direction: Most common direction sector
+        """
+        # Get wind direction trends over different time periods
+        short_trend = self.get_historical_trends(
+            "wind_direction", hours=6
+        )  # 6-hour trend
+        long_trend = self.get_historical_trends(
+            "wind_direction", hours=24
+        )  # 24-hour trend
+
+        if not short_trend or not long_trend:
+            return {
+                "average_direction": None,
+                "direction_stability": 0.0,
+                "direction_change_rate": 0.0,
+                "significant_shift": False,
+                "prevailing_direction": "unknown",
+            }
+
+        # Get recent wind direction data for detailed analysis
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        recent_data = [
+            entry
+            for entry in self._sensor_history["wind_direction"]
+            if entry["timestamp"] > cutoff_time
+        ]
+
+        if len(recent_data) < 3:
+            return {
+                "average_direction": long_trend["current"],
+                "direction_stability": 0.0,
+                "direction_change_rate": 0.0,
+                "significant_shift": False,
+                "prevailing_direction": "unknown",
+            }
+
+        directions = [entry["value"] for entry in recent_data]
+        timestamps = [entry["timestamp"] for entry in recent_data]
+
+        # Calculate average direction (circular mean)
+        avg_direction = self.calculate_circular_mean(directions)
+
+        # Calculate direction stability (lower volatility = more stable)
+        stability = max(0.0, 1.0 - (long_trend.get("volatility", 0) / 180.0))
+
+        # Calculate direction change rate
+        if len(directions) >= 2:
+            # Calculate angular differences (handling wraparound)
+            direction_changes = []
+            for i in range(1, len(directions)):
+                change = self.calculate_angular_difference(
+                    directions[i - 1], directions[i]
+                )
+                direction_changes.append(change)
+
+            # Average change per hour
+            total_time_hours = (timestamps[-1] - timestamps[0]).total_seconds() / 3600
+            if total_time_hours > 0:
+                avg_change_per_hour = (
+                    sum(abs(c) for c in direction_changes) / total_time_hours
+                )
+            else:
+                avg_change_per_hour = 0.0
+        else:
+            avg_change_per_hour = 0.0
+
+        # Detect significant direction shift (rapid change > 45° in 6 hours)
+        significant_shift = False
+        if len(directions) >= 2:
+            recent_change = self.calculate_angular_difference(
+                directions[0], directions[-1]
+            )
+            if abs(recent_change) > 45:  # More than 45° change in 24 hours
+                significant_shift = True
+
+        # Determine prevailing direction (most common 90° sector)
+        prevailing_direction = self.calculate_prevailing_direction(directions)
+
+        return {
+            "average_direction": avg_direction,
+            "direction_stability": stability,
+            "direction_change_rate": avg_change_per_hour,
+            "significant_shift": significant_shift,
+            "prevailing_direction": prevailing_direction,
+        }
+
+    def calculate_circular_mean(self, directions: List[float]) -> float:
+        """Calculate the circular mean of wind directions.
+
+        Args:
+            directions: List of wind directions in degrees (0-360)
+
+        Returns:
+            float: Circular mean direction in degrees
+        """
+        if not directions:
+            return 0.0
+
+        # Convert to radians
+        radians = [math.radians(d) for d in directions]
+
+        # Calculate circular mean
+        sin_sum = sum(math.sin(r) for r in radians)
+        cos_sum = sum(math.cos(r) for r in radians)
+
+        mean_radians = math.atan2(sin_sum, cos_sum)
+
+        # Convert back to degrees (0-360)
+        mean_degrees = math.degrees(mean_radians) % 360
+
+        return mean_degrees
+
+    def calculate_angular_difference(self, dir1: float, dir2: float) -> float:
+        """Calculate the smallest angular difference between two directions.
+
+        Args:
+            dir1: First direction in degrees
+            dir2: Second direction in degrees
+
+        Returns:
+            float: Angular difference in degrees (-180 to +180)
+        """
+        diff = (dir2 - dir1) % 360
+        if diff > 180:
+            diff -= 360
+        return diff
+
+    def calculate_prevailing_direction(self, directions: List[float]) -> str:
+        """Determine the prevailing wind direction sector.
+
+        Args:
+            directions: List of wind directions in degrees
+
+        Returns:
+            str: Prevailing direction as cardinal direction
+        """
+        if not directions:
+            return "unknown"
+
+        # Count directions in each 90° sector
+        sectors = {
+            "north": 0,  # 315-45°
+            "east": 0,  # 45-135°
+            "south": 0,  # 135-225°
+            "west": 0,  # 225-315°
+        }
+
+        for direction in directions:
+            normalized = direction % 360
+            if 315 <= normalized or normalized < 45:
+                sectors["north"] += 1
+            elif 45 <= normalized < 135:
+                sectors["east"] += 1
+            elif 135 <= normalized < 225:
+                sectors["south"] += 1
+            else:  # 225 <= normalized < 315
+                sectors["west"] += 1
+
+        # Return the sector with the most observations
+        prevailing = max(sectors, key=sectors.get)
+        return prevailing
