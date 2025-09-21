@@ -39,6 +39,7 @@ CONDITION_MAP = {
     "snowy": ATTR_CONDITION_SNOWY,
     "stormy": ATTR_CONDITION_LIGHTNING_RAINY,
     "foggy": ATTR_CONDITION_FOG,
+    "clear-night": ATTR_CONDITION_SUNNY,  # Clear night maps to sunny
 }
 
 

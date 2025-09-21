@@ -21,7 +21,6 @@ from .const import (
     CONF_WIND_DIRECTION_SENSOR,
     CONF_WIND_GUST_SENSOR,
     CONF_WIND_SPEED_SENSOR,
-    WEATHER_PATTERNS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -153,8 +152,8 @@ class WeatherDetector:
                     return "cloudy"
         else:
             # Night time - use other indicators
-            if uv_index > 0:  # Shouldn't have UV at night, but if clear might leak some
-                return "clear-night"  # Will map to sunny in HA
+            if wind_speed < 3 and pressure >= 29.80 and solar_lux == 0:
+                return "clear-night"  # Clear night sky
             elif wind_speed < 5 and not pressure_low:
                 return "cloudy"  # Calm night, assume cloudy
             else:
