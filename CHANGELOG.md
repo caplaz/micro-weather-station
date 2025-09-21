@@ -1,3 +1,32 @@
+## 1.1.0 (2025-09-21)
+
+### Features
+
+- **Major Code Refactoring**: Split monolithic weather_detector.py (~1300 lines) into focused, maintainable modules
+- **Modular Architecture**: Improved code organization with separate concerns:
+  - `weather_utils.py`: Unit conversion functions (Celsius, hPa, km/h)
+  - `weather_analysis.py`: Meteorological algorithms and trend analysis
+  - `weather_forecast.py`: Advanced forecasting with historical patterns
+  - `weather_detector.py`: Core integration and orchestration (refactored)
+- **Enhanced Test Coverage**: Comprehensive test suites for each module (64 total tests)
+- **Improved Maintainability**: Better separation of concerns and code reusability
+- **Future-Ready Architecture**: Easier to extend with new features and algorithms
+
+### Technical Improvements
+
+- **Code Quality**: All pre-commit hooks pass (black, isort, flake8)
+- **Test Organization**: Split monolithic test file into focused test modules matching the new architecture
+- **Performance**: Maintained all original functionality while improving code structure
+- **Documentation**: Updated code documentation and module organization
+- **Backward Compatibility**: All existing functionality preserved
+
+### Bug Fixes
+
+- Fixed test entity ID mappings to match configuration options
+- Corrected forecast temperature bounds and expectations
+- Resolved precipitation test logic and seasonal adjustment types
+- Fixed unit conversion precision expectations in tests
+
 ## 1.0.0 (2025-09-19)
 
 ### Features
