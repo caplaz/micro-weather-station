@@ -94,7 +94,7 @@ jobs:
         run: |
           # Set up Python environment
           python -m pip install --upgrade pip
-          pip install homeassistant==2025.9.4
+          pip install homeassistant==2025.1.4
 
           # Test that the component can be imported
           export PYTHONPATH="${PWD}:${PYTHONPATH}"
@@ -126,7 +126,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.13"]
-        home-assistant-version: ["2025.9.4"]
+        home-assistant-version: ["2025.1.4"]
 
     steps:
       - uses: actions/checkout@v4
