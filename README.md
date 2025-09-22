@@ -474,7 +474,7 @@ automation:
           message: "Temperature is high: {{ states('sensor.micro_weather_station_temperature') }}°C"
 ```
 
-## Lovelcaplaz Cards
+## Lovelace Cards
 
 ### Weather Card
 
