@@ -433,9 +433,9 @@ class WeatherAnalysis:
         if "solar_radiation" not in self._sensor_history:
             return current_radiation
 
-        # Get readings from the last 10 minutes (assuming 1-minute update intervals)
-        # This provides ~10 readings for averaging while being responsive to changes
-        cutoff_time = datetime.now() - timedelta(minutes=10)
+        # Get readings from the last 15 minutes (assuming 1-minute update intervals)
+        # This provides ~15 readings for averaging while being responsive to changes
+        cutoff_time = datetime.now() - timedelta(minutes=15)
         recent_readings = [
             entry["value"]
             for entry in self._sensor_history["solar_radiation"]
