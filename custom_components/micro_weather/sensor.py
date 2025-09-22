@@ -13,6 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SENSOR_TYPES
+from .version import __version__
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class MicroWeatherSensor(CoordinatorEntity, SensorEntity):
             "name": "Micro Weather Station",
             "manufacturer": "Micro Weather",
             "model": "MWS-1",
-            "sw_version": "1.0.0",
+            "sw_version": __version__,
         }
 
     @property
