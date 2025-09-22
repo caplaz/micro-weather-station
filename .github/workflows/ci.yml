@@ -55,6 +55,9 @@ jobs:
           category: integration
           ignore: brands
 
+      - name: Validate with hassfest
+        uses: home-assistant/actions/hassfest@master
+
       - name: Validate Custom Component Structure
         run: |
           # Check required files exist
