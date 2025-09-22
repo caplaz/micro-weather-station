@@ -109,7 +109,8 @@ class TestWeatherDetector:
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "rain_state":
                 state = Mock()
-                state.state = "Rain"
+                # Moisture sensor reports "Wet" when precipitation is detected
+                state.state = "Wet"
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "rain_rate":
                 state = Mock()

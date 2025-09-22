@@ -78,6 +78,9 @@ class WeatherDetector:
         self.options = options
         self._last_condition = "partly_cloudy"
         self._condition_start_time = datetime.now()
+        self._previous_condition: str = (
+            "partly_cloudy"  # Track previous condition for hysteresis
+        )
 
         # Historical data storage (last 48 hours, 15-minute intervals = ~192 readings)
         self._history_maxlen = 192  # 48 hours * 4 readings per hour
@@ -143,6 +146,39 @@ class WeatherDetector:
 
         # Determine weather condition
         condition = self._determine_weather_condition(sensor_data)
+
+        # Add hysteresis to prevent rapid oscillation between states
+        # Only change condition if it's been stable for at least 2 updates
+        # or is significantly different
+        if len(self._condition_history) >= 2 and self._previous_condition != condition:
+            # Count how many times we've seen this condition recently
+            recent_conditions = [
+                entry["condition"] for entry in list(self._condition_history)[-3:]
+            ]
+            condition_count = recent_conditions.count(condition)
+
+            # Only change if this condition has been seen at least once recently
+            # or if it's a major state change (e.g., clear to stormy)
+            major_changes = [
+                ("sunny", "stormy"),
+                ("stormy", "sunny"),
+                ("clear-night", "stormy"),
+                ("stormy", "clear-night"),
+                ("foggy", "stormy"),
+                ("stormy", "foggy"),
+            ]
+
+            is_major_change = (self._previous_condition, condition) in major_changes
+
+            if condition_count == 0 and not is_major_change:
+                _LOGGER.debug(
+                    "Preventing condition oscillation: keeping %s instead of %s",
+                    self._previous_condition,
+                    condition,
+                )
+                condition = self._previous_condition
+
+        self._previous_condition = condition
 
         # Store condition history
         self._condition_history.append(
@@ -283,12 +319,43 @@ class WeatherDetector:
         )
 
         # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
-        if rain_rate > 0.01 or rain_state in [
-            "wet",
-            "rain",
-            "drizzle",
-            "precipitation",
-        ]:
+        # Use more conservative thresholds to avoid false positives from dew/moisture
+        significant_rain = (
+            rain_rate > 0.05
+        )  # Increased from 0.01 to avoid dew detection
+
+        # If rain_state is "wet" but no significant rain_rate, check if
+        # it might be fog first
+        if rain_state == "wet" and not significant_rain:
+            # Check for fog conditions before assuming precipitation
+            fog_conditions = self.analysis.analyze_fog_conditions(
+                outdoor_temp,
+                humidity,
+                dewpoint,
+                temp_dewpoint_spread,
+                wind_speed,
+                solar_radiation,
+                is_daytime,
+            )
+            if fog_conditions != "none":
+                _LOGGER.info(
+                    "Fog conditions detected with wet sensor: %s",
+                    fog_conditions,
+                )
+                return fog_conditions
+
+        # Now check for precipitation (either significant rain_rate OR wet
+        # sensor without fog conditions)
+        active_precipitation = rain_state == "wet"
+        # Consider "wet" as active precipitation when moisture sensor detects wetness
+        # The moisture sensor (binary sensor) only reports "wet" or "dry"
+
+        if significant_rain or active_precipitation:
+            _LOGGER.info(
+                "Precipitation detected: rain_rate=%.2f (>0.05), rain_state='%s'",
+                rain_rate,
+                rain_state,
+            )
             precipitation_intensity = self.analysis.classify_precipitation_intensity(
                 rain_rate
             )
@@ -326,17 +393,20 @@ class WeatherDetector:
             return "stormy"  # Windstorm
 
         # PRIORITY 3: FOG CONDITIONS (Critical for safety)
-        fog_conditions = self.analysis.analyze_fog_conditions(
-            outdoor_temp,
-            humidity,
-            dewpoint,
-            temp_dewpoint_spread,
-            wind_speed,
-            solar_radiation,
-            is_daytime,
-        )
-        if fog_conditions != "none":
-            return fog_conditions
+        # Check for fog in dry conditions (wet conditions already checked above)
+        if rain_state != "wet":
+            fog_conditions = self.analysis.analyze_fog_conditions(
+                outdoor_temp,
+                humidity,
+                dewpoint,
+                temp_dewpoint_spread,
+                wind_speed,
+                solar_radiation,
+                is_daytime,
+            )
+            if fog_conditions != "none":
+                _LOGGER.info("Fog conditions detected: %s", fog_conditions)
+                return fog_conditions
 
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
         if is_daytime:

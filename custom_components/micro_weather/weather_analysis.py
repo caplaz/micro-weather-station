@@ -80,12 +80,30 @@ class WeatherAnalysis:
         is_very_gusty = gust_factor > 2.0 and wind_gust > 15
 
         # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
-        if rain_rate > 0.01 or rain_state in [
-            "wet",
-            "rain",
-            "drizzle",
-            "precipitation",
-        ]:
+        # First check if we have clear precipitation indicators
+        significant_rain = rain_rate > 0.01
+
+        # If rain_state is "wet" but no significant rain_rate, check if
+        # it might be fog first
+        if rain_state == "wet" and not significant_rain:
+            # Check for fog conditions before assuming precipitation
+            fog_conditions = self.analyze_fog_conditions(
+                outdoor_temp,
+                humidity,
+                dewpoint,
+                temp_dewpoint_spread,
+                wind_speed,
+                solar_radiation,
+                is_daytime,
+            )
+            if fog_conditions != "none":
+                # PRIORITY 1A: FOG CONDITIONS (when moisture sensor shows
+                # wet but it's fog)
+                return fog_conditions
+
+        # Now check for precipitation (either significant rain_rate OR wet
+        # sensor without fog conditions)
+        if significant_rain or rain_state == "wet":
             precipitation_intensity = self.classify_precipitation_intensity(rain_rate)
 
             # Determine precipitation type based on temperature
@@ -121,17 +139,19 @@ class WeatherAnalysis:
             return "stormy"  # Windstorm
 
         # PRIORITY 3: FOG CONDITIONS (Critical for safety)
-        fog_conditions = self.analyze_fog_conditions(
-            outdoor_temp,
-            humidity,
-            dewpoint,
-            temp_dewpoint_spread,
-            wind_speed,
-            solar_radiation,
-            is_daytime,
-        )
-        if fog_conditions != "none":
-            return fog_conditions
+        # Check for fog in dry conditions (wet conditions already checked above)
+        if rain_state != "wet":
+            fog_conditions = self.analyze_fog_conditions(
+                outdoor_temp,
+                humidity,
+                dewpoint,
+                temp_dewpoint_spread,
+                wind_speed,
+                solar_radiation,
+                is_daytime,
+            )
+            if fog_conditions != "none":
+                return fog_conditions
 
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
         if is_daytime:

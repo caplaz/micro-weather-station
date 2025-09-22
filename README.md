@@ -76,8 +76,8 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.1.0.zip
-   unzip v1.1.0.zip
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.2.0.zip
+   unzip v1.2.0.zip
 
    # Option B: Clone repository
    git clone https://github.com/caplaz/micro-weather-station.git
@@ -331,7 +331,7 @@ Wind Speed: sensor.wind_speed # Optional - wind conditions, storm detection
 Wind Direction: sensor.wind_direction # Optional - wind patterns, storm tracking
 Wind Gust: sensor.wind_gust # Optional - severe weather detection
 Rain Rate: sensor.rain_rate_piezo # Optional - precipitation intensity
-Rain State: sensor.rain_state_piezo # Optional - boolean precipitation detection
+Rain State: sensor.rain_state_piezo # Optional - binary moisture/precipitation sensor (reports "wet" or "dry")
 Solar Radiation: sensor.solar_radiation # Optional - cloud cover analysis
 Solar Lux: sensor.solar_lux # Optional - day/night detection backup
 UV Index: sensor.uv_index # Optional - clear sky confirmation
@@ -592,6 +592,33 @@ This integration is perfect for:
 
 3. **Check Update Interval**: Verify sensors update within configured interval
 
+#### Rain Detection Issues
+
+**Problem**: Incorrect precipitation or fog detection.
+
+**Common Causes & Solutions**:
+
+1. **Invalid Rain State Values**:
+
+   ```yaml
+   # ❌ WRONG - These values don't work with moisture sensors:
+   sensor.rain_state: "rain", "drizzle", "precipitation"
+
+   # ✅ CORRECT - Binary moisture sensors only report:
+   sensor.rain_state: "wet" or "dry"
+   ```
+
+2. **Fog vs Precipitation**:
+
+   - Fog can make moisture sensors read "wet" without actual precipitation
+   - The integration automatically distinguishes between fog moisture and rain
+   - Check humidity (>95%) and dewpoint spread (<3°F) for fog conditions
+
+3. **Rain Rate Sensitivity**:
+   - Very light rain rates (<0.01 in/hr) may not trigger precipitation detection
+   - This prevents false alerts from dew or light fog moisture
+   - Increase rain gauge sensitivity if needed
+
 ### Testing and Validation
 
 #### Manual Testing Steps
@@ -751,6 +778,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### v1.2.0
+
+- **Fixed Rain State Logic**: Corrected moisture sensor handling to only recognize "wet" or "dry" states
+- **Enhanced Fog Detection**: Improved fog vs precipitation detection when moisture sensor shows "wet"
+- **Smart Moisture Analysis**: Added intelligent logic to distinguish between precipitation and fog moisture
+- **Improved Accuracy**: Better weather condition detection in ambiguous moisture scenarios
+
 ### v1.1.0
 
 - **Major Code Refactoring**: Split monolithic weather_detector.py (~1300 lines) into focused, maintainable modules
@@ -776,11 +810,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.1.0
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.2.0
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.1.0
+[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.2.0
 [releases]: https://github.com/caplaz/micro-weather-station/releases
 [logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png

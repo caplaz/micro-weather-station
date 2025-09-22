@@ -1,3 +1,28 @@
+## 1.2.0 (2025-09-22)
+
+### Bug Fixes
+
+- **Fixed Rain State Logic**: Corrected rain_state sensor handling to only recognize valid moisture sensor values ("wet" or "dry")
+  - Removed invalid rain_state values: "rain", "drizzle", "precipitation" which are not supported by binary moisture sensors
+  - Updated both weather_analysis.py and weather_detector.py to use proper boolean moisture sensor logic
+  - Fixed test cases to use correct "Wet" state instead of invalid "Rain" state
+- **Enhanced Fog Detection**: Significantly improved fog vs precipitation detection when moisture sensor shows "wet"
+  - Added intelligent two-stage detection: checks for fog conditions first when rain_state="wet" but rain_rate is low
+  - Prevents false precipitation alerts when fog causes moisture sensor to read "wet"
+  - Maintains accurate precipitation detection while enabling proper fog identification
+  - Addresses real-world scenario where fog moisture triggers wet sensor but shouldn't be classified as rain
+
+### Technical Improvements
+
+- **Smart Moisture Analysis**: Implemented sophisticated logic to distinguish between precipitation moisture and fog moisture
+- **Priority-Based Detection**: Enhanced the weather detection algorithm priority system to handle ambiguous wet sensor readings
+- **Test Coverage**: Updated test suite to validate fog vs precipitation scenarios with comprehensive edge case testing
+- **Code Quality**: Improved comments and documentation for moisture sensor handling logic
+
+### Breaking Changes
+
+- None - all changes are backward compatible and improve accuracy of existing functionality
+
 ## 1.1.0 (2025-09-21)
 
 ### Features

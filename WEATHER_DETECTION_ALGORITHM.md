@@ -2,156 +2,289 @@
 
 This document explains how the Micro Weather Station determines weather conditions from your real sensor data.
 
-## Your Available Sensors
+## Algorithm Overview
 
-Based on your sensor list, here's how each sensor is used in weather detection:
+The weather detection system uses a sophisticated priority-based algorithm with meteorological principles to analyze sensor data and determine accurate weather conditions.
 
-### Primary Sensors for Weather Detection
+### Key Improvements (v1.2.0)
 
-1. **Outdoor Temperature** (59.9 °F) - Primary temperature source
-2. **Rain Rate Piezo** (0.0 in/h) - Precipitation detection
-3. **Rain State Piezo** (Dry) - Current precipitation state
-4. **Solar Radiation** (0 W/m²) - Cloud cover and daylight conditions
-5. **Solar Lux** (0.0 lx) - Light levels for cloud detection
-6. **Wind Speed** (5.8 mph) - Wind conditions
-7. **Wind Gust** (13.9 mph) - Storm detection
-8. **Relative Pressure** (29.22 inHg) - Atmospheric pressure
-
-### Supporting Sensors
-
-- **Indoor Temperature** (72.3 °F) - Temperature differential
-- **Indoor Humidity** (66%) - Humidity levels
-- **UV Index** (0 UV index) - Clear sky indicator
-- **Wind Direction** (233°) - Wind data
-- **Indoor Dewpoint** (60.3 °F) - Humidity calculations
+- **Enhanced Rain Detection**: Fixed rain_state logic to properly handle binary moisture sensors ("wet"/"dry" only)
+- **Smart Fog Detection**: Distinguishes between fog moisture and precipitation when sensor shows "wet"
+- **Advanced Pressure Analysis**: Uses meteorologically accurate pressure thresholds
+- **Improved Daytime Detection**: Multi-sensor approach for accurate day/night/twilight detection
 
 ## Weather Condition Detection Logic
 
-### Priority-Based Detection
+### Priority-Based Detection System
 
-The algorithm uses a priority system to determine weather conditions:
+The algorithm uses a comprehensive 6-priority system:
 
-#### 1. **Rain Conditions** (Highest Priority)
+#### Priority 1: Active Precipitation (Highest Priority)
+
+**Smart Moisture Analysis:**
 
 ```
-IF rain_rate > 0.1 in/h OR rain_state != "Dry":
-    IF wind_gust > 25 mph OR pressure < 29.80 inHg:
-        → "stormy" (Heavy rain with wind or low pressure)
-    ELIF outdoor_temp < 35°F:
-        → "snowy" (Cold precipitation)
+Weather Analysis Module:
+IF rain_rate > 0.01 in/h (significant precipitation):
+    → Proceed to precipitation classification
+
+Weather Detector Module:
+IF rain_rate > 0.05 in/h (conservative threshold to avoid dew detection):
+    → Proceed to precipitation classification
+
+ELIF rain_state = "wet" AND rain_rate ≤ threshold:
+    → Check for fog conditions first
+    IF fog conditions detected (humidity ≥98%, dewpoint_spread ≤2°F, wind ≤3mph):
+        → "foggy"
     ELSE:
-        → "rainy" (Regular rain)
+        → Proceed to precipitation classification
 ```
 
-#### 2. **Wind-Based Storm Detection**
+**Note**: The system uses two different rain rate thresholds:
+
+- **0.01 in/h** in weather_analysis.py (more sensitive)
+- **0.05 in/h** in weather_detector.py (more conservative to avoid false positives from dew)
+
+**Precipitation Classification:**
 
 ```
-IF wind_gust > 30 mph OR (wind_speed > 20 mph AND pressure < 29.80 inHg):
-    → "stormy"
+IF outdoor_temp ≤ 32°F:
+    → "snowy" (any precipitation at freezing temps)
+ELIF pressure < 29.20 inHg OR wind_gust ≥ 32mph:
+    → "stormy" (severe weather conditions)
+ELIF rain_rate ≥ 0.25 in/h:
+    → "rainy" (heavy rain)
+ELIF rain_rate ≥ 0.1 in/h:
+    → "rainy" (moderate rain)
+ELSE:
+    → "rainy" (light rain/drizzle)
 ```
 
-#### 3. **Solar Radiation Based Conditions** (Daytime)
+#### Priority 2: Severe Weather Conditions
 
 ```
-IF solar_radiation > 0 OR solar_lux > 0 OR uv_index > 0:  # Daytime detection
-    IF solar_radiation > 300 W/m²:
-        → "sunny" (High solar radiation)
-    ELIF solar_radiation > 100 W/m²:
-        → "partly_cloudy" (Moderate solar radiation)
-    ELIF solar_radiation > 10 W/m²:
-        → "cloudy" (Low solar radiation)
-    ELSE:
-        IF solar_lux < 1000 lx:
-            → "foggy" (Very low visibility)
-        ELSE:
-            → "cloudy"
+IF pressure < 29.20 inHg AND (wind_speed ≥19mph OR wind_gust >15mph with gust_factor >2.0):
+    → "stormy" (severe weather system)
+IF wind_speed ≥ 32mph:
+    → "stormy" (gale force winds)
 ```
 
-#### 4. **Nighttime Conditions**
+#### Priority 3: Fog Conditions (Critical for Safety)
+
+**Advanced Fog Analysis (when rain_state ≠ "wet"):**
 
 ```
-IF solar_radiation = 0 AND solar_lux = 0 AND uv_index = 0:  # Nighttime
-    IF wind_speed < 5 mph AND pressure >= 29.80 inHg:
-        → "cloudy" (Calm night)
-    ELSE:
-        → "partly_cloudy"
+Dense Fog: humidity ≥99% AND dewpoint_spread ≤1°F AND wind ≤2mph
+Radiation Fog: humidity ≥98% AND dewpoint_spread ≤2°F AND wind ≤3mph AND (nighttime OR solar <5 W/m²)
+Advection Fog: humidity ≥95% AND dewpoint_spread ≤3°F AND 3mph ≤ wind ≤12mph
+Evaporation Fog: humidity ≥95% AND dewpoint_spread ≤3°F AND wind ≤6mph AND temp >40°F
 ```
 
-## Current Reading Analysis
+#### Priority 4: Daytime Conditions
 
-Based on your current sensor readings:
+**Daytime Detection:** `solar_radiation > 5 W/m² OR solar_lux > 50 lx OR uv_index > 0.1`
 
-- **Solar Radiation**: 0 W/m² (no solar input - nighttime)
-- **Solar Lux**: 0.0 lx (dark - nighttime)
-- **UV Index**: 0 (no UV - nighttime)
-- **Rain State**: Dry (no precipitation)
-- **Rain Rate**: 0.0 in/h (no precipitation)
-- **Wind Speed**: 5.8 mph (light winds)
-- **Wind Gust**: 13.9 mph (moderate gusts)
-- **Pressure**: 29.22 inHg (normal pressure)
+**Cloud Cover Analysis:**
 
-**Predicted Condition**: `partly_cloudy` or `cloudy`
+```
+IF cloud_cover ≤10% AND pressure >30.00 inHg:
+    → "sunny"
+ELIF cloud_cover ≤25%:
+    → "sunny"
+ELIF cloud_cover ≤50%:
+    → "partly_cloudy"
+ELIF cloud_cover ≤75%:
+    → "cloudy"
+ELSE:
+    → "cloudy" (overcast)
+```
 
-- It's nighttime (all solar sensors = 0)
-- No precipitation
-- Light winds (5.8 mph)
-- Normal pressure (29.22 inHg)
+#### Priority 5: Twilight Conditions
 
-## Visibility Estimation
+**Twilight Detection:** `(10 lx < solar_lux < 100 lx) OR (1 W/m² < solar_radiation < 50 W/m²)`
 
-Visibility is estimated based on weather conditions and sensor data:
+```
+IF solar_lux > 50 lx AND pressure normal:
+    → "partly_cloudy"
+ELSE:
+    → "cloudy"
+```
 
-- **Foggy**: 0.5-5 km (based on solar_lux/10000)
-- **Rainy/Snowy**: 2-8 km (reduced by rain_rate)
-- **Stormy**: 1-5 km (reduced by wind_gust)
-- **Nighttime**: 15 km (standard night visibility)
-- **Clear Day**: 15-25 km (based on solar_lux levels)
+#### Priority 6: Nighttime Conditions
+
+**Nighttime Detection:** All solar sensors ≤ threshold values
+
+```
+IF pressure >30.20 inHg AND wind <1mph AND humidity <70%:
+    → "clear-night" (perfect clear night)
+ELIF pressure >30.00 inHg AND not gusty AND humidity <80%:
+    → "clear-night" (clear night)
+ELIF pressure normal AND 1mph ≤ wind <8mph:
+    → "partly_cloudy" (partly cloudy night)
+ELIF pressure <29.80 inHg OR humidity >85%:
+    → "cloudy" (cloudy/overcast night)
+ELSE:
+    → "partly_cloudy" (default night condition)
+```
+
+## Pressure Analysis System
+
+**Meteorologically Accurate Thresholds:**
+
+- **Very High Pressure**: >30.20 inHg (high pressure system)
+- **High Pressure**: >30.00 inHg (above normal)
+- **Normal Pressure**: 29.80-30.20 inHg (normal range)
+- **Low Pressure**: <29.80 inHg (low pressure system)
+- **Very Low Pressure**: <29.50 inHg (storm system)
+- **Extremely Low Pressure**: <29.20 inHg (severe storm)
+
+## Wind Analysis (Beaufort Scale Adapted)
+
+- **Calm**: <1 mph
+- **Light**: 1-7 mph (light air to light breeze)
+- **Strong**: 19-31 mph (strong breeze to near gale)
+- **Gale**: ≥32 mph (gale force)
+- **Gusty**: gust_factor >1.5 AND wind_gust >10 mph
+- **Very Gusty**: gust_factor >2.0 AND wind_gust >15 mph
+
+## Rain State Sensor Requirements
+
+**Important:** The rain_state sensor must be a binary moisture sensor that reports only:
+
+- `"wet"` - when moisture is detected
+- `"dry"` - when no moisture is detected
+
+**Invalid values** (will not work): `"rain"`, `"drizzle"`, `"precipitation"`
+
+## Fog vs Precipitation Detection
+
+The system intelligently distinguishes between:
+
+1. **Fog Moisture**: High humidity, minimal dewpoint spread, light winds
+2. **Precipitation Moisture**: Measurable rain rate OR wet sensor without fog conditions
+
+This prevents false precipitation alerts when fog causes the moisture sensor to read "wet".
+
+## Visibility Estimation Algorithm
+
+Visibility is scientifically estimated based on weather conditions and meteorological data:
+
+**Fog Conditions:**
+
+- Dense fog (dewpoint_spread ≤1°F): 0.3 km
+- Thick fog (dewpoint_spread ≤2°F): 0.8 km
+- Moderate fog (dewpoint_spread ≤3°F): 1.5 km
+- Light fog/mist: 2.5 km
+
+**Precipitation Conditions:**
+
+- Heavy precipitation (≥0.5 in/h): Visibility × 0.3
+- Moderate precipitation (≥0.25 in/h): Visibility × 0.5
+- Light precipitation (≥0.1 in/h): Visibility × 0.7
+- Drizzle: Visibility × 0.85
+- Wind reduces visibility further
+
+**Storm Conditions:**
+
+- With precipitation: 3.0 - (rain_rate × 2) km
+- Dry storm: 8.0 - (wind_gust ÷ 10) km
+
+**Clear Conditions:**
+
+- Clear night (low humidity): 20-25 km
+- Sunny day (high solar): 25-30 km
+- Cloudy conditions: 12-20 km (based on atmospheric clarity)
+
+## Dewpoint Calculation
+
+The system uses the Magnus-Tetens formula for accurate dewpoint calculation:
+
+```
+dewpoint_celsius = (b × γ) / (a - γ)
+where γ = (a × temp_celsius) / (b + temp_celsius) + ln(humidity/100)
+a = 17.27, b = 237.7 (Magnus constants)
+```
+
+This is critical for fog detection and humidity analysis.
+
+## Cloud Cover Analysis
+
+Cloud cover percentage is estimated using solar radiation analysis:
+
+```
+solar_cloud_cover = 100 - (solar_radiation / 1000 * 100)
+lux_cloud_cover = 100 - (solar_lux / 100000 * 100)
+uv_cloud_cover = 100 - (uv_index / 11 * 100)
+
+Weighted: solar_radiation × 0.6 + solar_lux × 0.3 + uv_index × 0.1
+```
+
+## Sensor Data Requirements
+
+### Required Sensors
+
+- **Outdoor Temperature**: Essential for all calculations
+- **Humidity**: Required for fog detection and dewpoint calculations
+
+### Optional but Recommended Sensors
+
+- **Rain Rate**: Precipitation intensity measurement
+- **Rain State**: Binary moisture sensor (wet/dry only)
+- **Solar Radiation**: Primary cloud cover detection
+- **Solar Lux**: Secondary daylight/cloud detection
+- **UV Index**: Clear sky confirmation
+- **Wind Speed**: Storm detection and fog analysis
+- **Wind Gust**: Severe weather identification
+- **Pressure**: Atmospheric system analysis
+
+### Sensor Configuration Notes
+
+**Rain State Sensor Requirements:**
+
+- Must be binary moisture/precipitation sensor
+- Valid states: "wet", "dry" (case insensitive)
+- Invalid states: "rain", "drizzle", "precipitation"
+- Examples: Rain sensors, leaf wetness sensors, moisture detectors
 
 ## Unit Conversions
 
-The integration automatically converts between units:
+The integration automatically handles unit conversions:
 
-- **Temperature**: Fahrenheit → Celsius: `(°F - 32) × 5/9`
+- **Temperature**: °F ↔ °C: `(°F - 32) × 5/9`
 - **Pressure**: inHg → hPa: `inHg × 33.8639`
 - **Wind Speed**: mph → km/h: `mph × 1.60934`
 
-## Forecast Generation
+## Historical Data and Trends
 
-A simple 5-day forecast is generated based on:
+The system maintains historical data for:
 
-- Current conditions with slight variations
-- Temperature trends with ±2°C daily changes
-- Weather pattern persistence with gradual changes
-
-## Example Sensor Mappings
-
-For your specific sensors, you would configure:
-
-```yaml
-Outdoor Temperature Sensor: sensor.outdoor_temperature
-Indoor Temperature Sensor: sensor.indoor_temperature
-Humidity Sensor: sensor.indoor_humidity
-Pressure Sensor: sensor.relative_pressure
-Wind Speed Sensor: sensor.wind_speed
-Wind Direction Sensor: sensor.wind_direction
-Wind Gust Sensor: sensor.wind_gust
-Rain Rate Sensor: sensor.rain_rate_piezo
-Rain State Sensor: sensor.rain_state_piezo
-Solar Radiation Sensor: sensor.solar_radiation
-Solar Lux Sensor: sensor.solar_lux
-UV Index Sensor: sensor.uv_index
-```
+- **Pressure Trends**: 3-hour and 24-hour pressure changes
+- **Wind Direction**: Circular averaging and stability analysis
+- **Temperature Patterns**: Long-term trending
+- **Storm Probability**: Based on pressure drops and wind shifts
 
 ## Weather Condition Mapping
 
-The integration maps conditions to Home Assistant weather states:
+Home Assistant weather entity mappings:
 
-- `sunny` → Clear
+- `sunny` → Clear (day)
+- `clear-night` → Clear (night)
 - `cloudy` → Cloudy
 - `partly_cloudy` → Partly Cloudy
 - `rainy` → Rainy
 - `snowy` → Snowy
-- `stormy` → Lightning Rainy
+- `stormy` → Lightning Rainy / Severe Weather
 - `foggy` → Fog
 
-This algorithm provides realistic weather condition detection based on your actual sensor data, creating a much more accurate representation than simulated data.
+## Algorithm Accuracy
+
+This advanced algorithm provides highly accurate weather detection by:
+
+1. **Using Real Sensor Data**: No simulated or estimated values
+2. **Meteorological Principles**: Based on scientific weather analysis
+3. **Priority System**: Handles conflicting sensor readings intelligently
+4. **Fog vs Rain Logic**: Distinguishes moisture sources accurately
+5. **Pressure Analysis**: Incorporates atmospheric pressure systems
+6. **Multi-Sensor Validation**: Cross-references multiple data sources
+
+The result is weather detection that matches or exceeds professional weather stations while using your existing Home Assistant sensor infrastructure.
