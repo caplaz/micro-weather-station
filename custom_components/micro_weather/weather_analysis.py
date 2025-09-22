@@ -2,9 +2,12 @@
 
 from collections import deque
 from datetime import datetime, timedelta
+import logging
 import math
 import statistics
 from typing import Any, Dict, List, Optional
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class WeatherAnalysis:
@@ -332,6 +335,7 @@ class WeatherAnalysis:
         - Actual solar elevation angle from sun.sun sensor (when configured)
         - Realistic maximum values based on current solar position
         - Seasonal variations in solar intensity
+        - Moving average of solar radiation to filter temporary fluctuations
 
         Args:
             solar_radiation: Current solar radiation in W/m²
@@ -343,6 +347,10 @@ class WeatherAnalysis:
         Returns:
             float: Estimated cloud cover percentage (0-100)
         """
+
+        # Use moving average of solar radiation to filter temporary fluctuations
+        # like passing clouds, while still responding to genuine weather changes
+        avg_solar_radiation = self._get_solar_radiation_average(solar_radiation)
 
         # Calculate realistic clear-sky maximums based on solar elevation
         # Solar radiation follows a sine relationship with elevation
@@ -386,13 +394,13 @@ class WeatherAnalysis:
 
         # Calculate cloud cover from each measurement using realistic maximums
         solar_cloud_cover = max(
-            0, min(100, 100 - (solar_radiation / max_solar_radiation * 100))
+            0, min(100, 100 - (avg_solar_radiation / max_solar_radiation * 100))
         )
         lux_cloud_cover = max(0, min(100, 100 - (solar_lux / max_solar_lux * 100)))
         uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
 
         # Weight the measurements (solar radiation is most reliable for cloud cover)
-        if solar_radiation > 10:  # Only use if we have meaningful solar data
+        if avg_solar_radiation > 10:  # Only use if we have meaningful solar data
             cloud_cover = (
                 solar_cloud_cover * 0.8 + lux_cloud_cover * 0.15 + uv_cloud_cover * 0.05
             )
@@ -400,13 +408,69 @@ class WeatherAnalysis:
             cloud_cover = lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
         elif uv_index > 0.5:  # Last resort
             cloud_cover = uv_cloud_cover
-        elif solar_radiation == 0 and solar_lux == 0 and uv_index == 0:
+        elif avg_solar_radiation == 0 and solar_lux == 0 and uv_index == 0:
             # No solar input at all - assume complete overcast (night or very cloudy)
             cloud_cover = 100
         else:
             cloud_cover = 50  # Unknown - assume partly cloudy
 
         return cloud_cover
+
+    def _get_solar_radiation_average(self, current_radiation: float) -> float:
+        """
+        Calculate moving average of solar radiation to filter temporary fluctuations.
+
+        Uses recent historical data to smooth out short-term variations like
+        passing clouds, while still responding to genuine weather changes.
+        This prevents rapid condition changes due to brief solar interruptions.
+
+        Args:
+            current_radiation: Current solar radiation reading in W/m²
+
+        Returns:
+            float: Averaged solar radiation value
+        """
+        if "solar_radiation" not in self._sensor_history:
+            return current_radiation
+
+        # Get readings from the last 10 minutes (assuming 1-minute update intervals)
+        # This provides ~10 readings for averaging while being responsive to changes
+        cutoff_time = datetime.now() - timedelta(minutes=10)
+        recent_readings = [
+            entry["value"]
+            for entry in self._sensor_history["solar_radiation"]
+            if entry["timestamp"] > cutoff_time and entry["value"] > 0
+        ]
+
+        # Need at least 3 readings for meaningful averaging
+        if len(recent_readings) < 3:
+            return current_radiation
+
+        # Calculate weighted average favoring recent readings
+        # Give more weight to recent values to remain responsive
+        weights = []
+        for i in range(len(recent_readings)):
+            # Linear weighting: most recent = 1.0, oldest = 0.3
+            weight = 0.3 + (0.7 * i / (len(recent_readings) - 1))
+            weights.append(weight)
+
+        weighted_sum = sum(
+            value * weight for value, weight in zip(recent_readings, weights)
+        )
+        total_weight = sum(weights)
+
+        if total_weight > 0:
+            averaged_radiation = weighted_sum / total_weight
+            _LOGGER.debug(
+                "Solar radiation average: %.1f W/m² "
+                "(from %d readings, current: %.1f)",
+                averaged_radiation,
+                len(recent_readings),
+                current_radiation,
+            )
+            return averaged_radiation
+
+        return current_radiation
 
     def estimate_visibility(self, condition: str, sensor_data: Dict[str, Any]) -> float:
         """
