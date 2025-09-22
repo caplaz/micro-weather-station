@@ -315,22 +315,76 @@ class WeatherAnalysis:
         return "none"
 
     def analyze_cloud_cover(
-        self, solar_radiation: float, solar_lux: float, uv_index: float
+        self,
+        solar_radiation: float,
+        solar_lux: float,
+        uv_index: float,
+        solar_elevation: float = 45.0,
     ) -> float:
         """
         Estimate cloud cover percentage using solar radiation analysis.
 
-        Based on theoretical clear-sky solar radiation models and
-        actual measured values to determine cloud opacity.
+        Uses Home Assistant sun.sun sensor data for accurate solar position
+        calculations when available. Falls back to default elevation angle
+        if sun sensor is not configured. This provides much more accurate
+        cloud cover estimates by accounting for:
+
+        - Actual solar elevation angle from sun.sun sensor (when configured)
+        - Realistic maximum values based on current solar position
+        - Seasonal variations in solar intensity
+
+        Args:
+            solar_radiation: Current solar radiation in W/m²
+            solar_lux: Current solar illuminance in lux
+            uv_index: Current UV index value
+            solar_elevation: Solar elevation angle in degrees from sun.sun sensor
+                           (defaults to 45° if not configured)
+
+        Returns:
+            float: Estimated cloud cover percentage (0-100)
         """
 
-        # Rough clear-sky solar radiation estimates (varies by season/location)
-        # These would ideally be calculated based on solar position
-        max_solar_radiation = 1000  # W/m² theoretical maximum
-        max_solar_lux = 100000  # lx theoretical maximum
-        max_uv_index = 11  # UV Index maximum
+        # Calculate realistic clear-sky maximums based on solar elevation
+        # Solar radiation follows a sine relationship with elevation
+        # At 90° elevation (directly overhead): ~1000 W/m²
+        # At lower elevations: proportionally less
 
-        # Calculate cloud cover from each measurement
+        elevation_rad = math.radians(solar_elevation)
+        elevation_factor = math.sin(elevation_rad) if solar_elevation > 0 else 0.1
+
+        # Base maximum solar radiation (calibrated for typical installations)
+        # This value should be calibrated based on historical clear-sky readings
+        base_max_radiation = 500  # W/m² at 90° elevation (calibrated estimate)
+
+        # Adjust for actual elevation angle
+        max_solar_radiation = base_max_radiation * elevation_factor
+
+        # Ensure minimum values even at low elevation
+        max_solar_radiation = max(50, max_solar_radiation)
+
+        # Calculate lux maximum (roughly 100-150 lux per W/m² depending on spectrum)
+        # Use 120 lx/W/m² as a reasonable average
+        max_solar_lux = max_solar_radiation * 120
+
+        # UV index maximum scales with solar elevation
+        # UV is more sensitive to elevation than total radiation
+        max_uv_index = max(1, 11 * elevation_factor)
+
+        # Seasonal adjustment based on current month
+        month = datetime.now().month
+        seasonal_factor = 1.0
+        if month in [12, 1, 2]:  # Winter
+            seasonal_factor = 0.75
+        elif month in [3, 4, 9, 10]:  # Spring/Fall
+            seasonal_factor = 0.9
+        elif month in [5, 6, 7, 8]:  # Summer
+            seasonal_factor = 1.0
+
+        max_solar_radiation *= seasonal_factor
+        max_solar_lux *= seasonal_factor
+        max_uv_index *= seasonal_factor
+
+        # Calculate cloud cover from each measurement using realistic maximums
         solar_cloud_cover = max(
             0, min(100, 100 - (solar_radiation / max_solar_radiation * 100))
         )
@@ -338,16 +392,19 @@ class WeatherAnalysis:
         uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
 
         # Weight the measurements (solar radiation is most reliable for cloud cover)
-        if solar_radiation > 0:
+        if solar_radiation > 10:  # Only use if we have meaningful solar data
             cloud_cover = (
-                solar_cloud_cover * 0.6 + lux_cloud_cover * 0.3 + uv_cloud_cover * 0.1
+                solar_cloud_cover * 0.8 + lux_cloud_cover * 0.15 + uv_cloud_cover * 0.05
             )
-        elif solar_lux > 0:
-            cloud_cover = lux_cloud_cover * 0.8 + uv_cloud_cover * 0.2
-        elif uv_index > 0:
+        elif solar_lux > 1000:  # Fallback to lux if radiation is low
+            cloud_cover = lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
+        elif uv_index > 0.5:  # Last resort
             cloud_cover = uv_cloud_cover
+        elif solar_radiation == 0 and solar_lux == 0 and uv_index == 0:
+            # No solar input at all - assume complete overcast (night or very cloudy)
+            cloud_cover = 100
         else:
-            cloud_cover = 100  # No solar input = complete overcast or night
+            cloud_cover = 50  # Unknown - assume partly cloudy
 
         return cloud_cover
 

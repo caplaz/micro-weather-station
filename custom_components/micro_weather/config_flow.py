@@ -18,6 +18,7 @@ from .const import (
     CONF_RAIN_STATE_SENSOR,
     CONF_SOLAR_LUX_SENSOR,
     CONF_SOLAR_RADIATION_SENSOR,
+    CONF_SUN_SENSOR,
     CONF_UPDATE_INTERVAL,
     CONF_UV_INDEX_SENSOR,
     CONF_WIND_DIRECTION_SENSOR,
@@ -67,6 +68,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         ),
                         CONF_SOLAR_LUX_SENSOR: user_input.get(CONF_SOLAR_LUX_SENSOR),
                         CONF_UV_INDEX_SENSOR: user_input.get(CONF_UV_INDEX_SENSOR),
+                        CONF_SUN_SENSOR: user_input.get(CONF_SUN_SENSOR),
                         CONF_UPDATE_INTERVAL: user_input.get(
                             CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
                         ),
@@ -135,6 +137,9 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_UV_INDEX_SENSOR): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor")
                 ),
+                vol.Optional(CONF_SUN_SENSOR): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sun")
+                ),
                 vol.Required(
                     CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL
                 ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
@@ -194,6 +199,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         ),
                         CONF_SOLAR_LUX_SENSOR: user_input.get(CONF_SOLAR_LUX_SENSOR),
                         CONF_UV_INDEX_SENSOR: user_input.get(CONF_UV_INDEX_SENSOR),
+                        CONF_SUN_SENSOR: user_input.get(CONF_SUN_SENSOR),
                         CONF_UPDATE_INTERVAL: user_input.get(
                             CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
                         ),
@@ -296,6 +302,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor")
                 ),
+                vol.Optional(
+                    CONF_SUN_SENSOR,
+                    default=current_options.get(CONF_SUN_SENSOR),
+                ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sun")),
                 vol.Required(
                     CONF_UPDATE_INTERVAL,
                     default=current_options.get(

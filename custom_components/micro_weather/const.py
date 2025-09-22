@@ -23,6 +23,7 @@ CONF_RAIN_STATE_SENSOR = "rain_state_sensor"
 CONF_SOLAR_RADIATION_SENSOR = "solar_radiation_sensor"
 CONF_SOLAR_LUX_SENSOR = "solar_lux_sensor"
 CONF_UV_INDEX_SENSOR = "uv_index_sensor"
+CONF_SUN_SENSOR = "sun_sensor"
 
 # Default configuration values
 DEFAULT_TEMPERATURE_RANGE = (-10, 35)  # Celsius

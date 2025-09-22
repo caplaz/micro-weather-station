@@ -13,6 +13,10 @@ The weather detection system uses a sophisticated priority-based algorithm with 
 - **Advanced Pressure Analysis**: Uses meteorologically accurate pressure thresholds
 - **Improved Daytime Detection**: Multi-sensor approach for accurate day/night/twilight detection
 
+### Key Improvements (v1.3.0)
+
+- **Solar Elevation Integration**: Added sun sensor support for precise cloud cover calculations based on solar position
+
 ## Weather Condition Detection Logic
 
 ### Priority-Based Detection System
@@ -98,6 +102,8 @@ ELIF cloud_cover ≤75%:
 ELSE:
     → "cloudy" (overcast)
 ```
+
+**Solar Elevation Enhancement:** When sun sensor is configured, cloud cover calculations are adjusted based on solar elevation angle, providing more accurate daytime weather detection throughout the day.
 
 #### Priority 5: Twilight Conditions
 
@@ -209,15 +215,29 @@ This is critical for fog detection and humidity analysis.
 
 ## Cloud Cover Analysis
 
-Cloud cover percentage is estimated using solar radiation analysis:
+Cloud cover percentage is estimated using solar radiation analysis with solar elevation compensation:
 
 ```
-solar_cloud_cover = 100 - (solar_radiation / 1000 * 100)
+solar_cloud_cover = 100 - (solar_radiation / expected_solar_radiation * 100)
 lux_cloud_cover = 100 - (solar_lux / 100000 * 100)
 uv_cloud_cover = 100 - (uv_index / 11 * 100)
 
 Weighted: solar_radiation × 0.6 + solar_lux × 0.3 + uv_index × 0.1
 ```
+
+**Solar Elevation Compensation:**
+
+The system uses solar elevation data (from sun sensor) to calculate expected solar radiation:
+
+```
+expected_solar_radiation = max_solar_radiation × sin(solar_elevation)
+```
+
+- **Higher elevation** = More expected solar radiation (better cloud cover accuracy)
+- **Lower elevation** = Less expected solar radiation (accounts for sun angle)
+- **Fallback**: 45° elevation if sun sensor not configured
+
+This provides more accurate cloud cover percentages throughout the day, accounting for the sun's position in the sky.
 
 ## Sensor Data Requirements
 
@@ -233,6 +253,7 @@ Weighted: solar_radiation × 0.6 + solar_lux × 0.3 + uv_index × 0.1
 - **Solar Radiation**: Primary cloud cover detection
 - **Solar Lux**: Secondary daylight/cloud detection
 - **UV Index**: Clear sky confirmation
+- **Sun Sensor**: Solar elevation data for precise cloud cover calculations
 - **Wind Speed**: Storm detection and fog analysis
 - **Wind Gust**: Severe weather identification
 - **Pressure**: Atmospheric system analysis

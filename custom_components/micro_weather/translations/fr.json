@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Configuration de Micro Station Météo",
-        "description": "Connectez vos capteurs météorologiques pour créer une entité météo intelligente.\n\n**Requis :** Seule la température extérieure est requise.\n\n**Comment chaque capteur est utilisé :**\n\n🌡️ **Capteur Point de Rosée** (optionnel)\n• Mesure directe du point de rosée pour une précision maximale\n• Utilisé dans l'algorithme de détection du brouillard (>98% humidité + point de rosée)\n• Améliore les calculs d'indice de confort\n• Fallback : Calculé à partir température + humidité si non disponible\n\n💧 **Capteur Humidité** (optionnel)\n• Essentiel pour détection brouillard (se déclenche avec >98% humidité)\n• Utilisé dans calculs indice confort et indice chaleur\n• Aide à déterminer probabilité de précipitations\n• Combiné avec rayonnement solaire pour analyse couverture nuageuse\n\n📊 **Capteur Pression** (optionnel)\n• Composant central pour prévisions météo (5 jours et horaires)\n• Détection orages (chutes rapides pression indiquent orages)\n• Analyse tendances pour prédiction patterns météorologiques\n• Utilisé pour calculer stabilité météo et probabilité changement\n\n💨 **Capteur Vitesse Vent** (optionnel)\n• Détermine conditions venteuses dans état météo\n• Détection orages (>25 km/h + pluie = conditions orageuses)\n• Calculs sensation thermique par vent\n• Alertes météo extrême et prévisions liées au vent\n\n🧭 **Capteur Direction Vent** (optionnel)\n• Fournit données direction vent pour rapports météo détaillés\n• Utilisé dans suivi orages et analyse patterns météorologiques\n• Améliore précision prévisions avec données directionnelles vent\n\n🌪️ **Capteur Rafales Vent** (optionnel)\n• Détection météo extrême et mesure intensité orages\n• Alertes sécurité pour conditions vent dangereuses\n• Classification améliorée orages (rafales vs vents constants)\n\n🌧️ **Capteur Intensité Pluie** (optionnel)\n• Mesure directe intensité précipitations\n• Active conditions météo pluvieuses/orageuses\n• Utilisé pour prévisions précipitations\n• Remplace autres conditions quand pluie détectée\n\n🌦️ **Capteur État Pluie** (optionnel)\n• Détection booléenne pluie (états sec/humide)\n• Remplacement immédiat condition météo quand humide\n• Détection précipitations de secours si capteur intensité non disponible\n\n☀️ **Capteur Rayonnement Solaire** (optionnel)\n• Détection primaire couverture nuageuse (>400 W/m² = ensoleillé, <100 = nuageux)\n• Classification jour/nuit et intensité solaire\n• Utilisé dans détection brouillard (rayonnement faible + humidité élevée)\n• Remplace autres conditions pour détection ciel dégagé\n\n💡 **Capteur Lux Solaire** (optionnel)\n• Détection jour/nuit basée sur lumière\n• Détection couverture nuageuse de secours si capteur rayonnement non disponible\n• Calculs visibilité et détection crépuscule\n\n🛡️ **Capteur Indice UV** (optionnel)\n• Confirmation ciel dégagé (UV élevé = définitivement ensoleillé)\n• Mesure intensité solaire pour recommandations sécurité\n• Précision améliorée détection temps ensoleillé\n\n**Conseils Configuration :**\n• Utilisez Outils Développement → États pour trouver IDs entités capteurs\n• Les capteurs température doivent avoir device_class='temperature'\n• Les capteurs pression doivent utiliser pression relative/barométrique\n• Intervalle mise à jour : 1-60 minutes (fréquence actualisation données météo)\n• Plus de capteurs = détection météo plus précise !",
+        "description": "Connectez vos capteurs météorologiques pour créer une entité météo intelligente.\n\n**Requis :** Seule la température extérieure est requise.\n\n**Comment chaque capteur est utilisé :**\n\n🌡️ **Capteur Point de Rosée** (optionnel)\n• Mesure directe du point de rosée pour une précision maximale\n• Utilisé dans l'algorithme de détection du brouillard (>98% humidité + point de rosée)\n• Améliore les calculs d'indice de confort\n• Fallback : Calculé à partir température + humidité si non disponible\n\n💧 **Capteur Humidité** (optionnel)\n• Essentiel pour détection brouillard (se déclenche avec >98% humidité)\n• Utilisé dans calculs indice confort et indice chaleur\n• Aide à déterminer probabilité de précipitations\n• Combiné avec rayonnement solaire pour analyse couverture nuageuse\n\n📊 **Capteur Pression** (optionnel)\n• Composant central pour prévisions météo (5 jours et horaires)\n• Détection orages (chutes rapides pression indiquent orages)\n• Analyse tendances pour prédiction patterns météorologiques\n• Utilisé pour calculer stabilité météo et probabilité changement\n\n💨 **Capteur Vitesse Vent** (optionnel)\n• Détermine conditions venteuses dans état météo\n• Détection orages (>25 km/h + pluie = conditions orageuses)\n• Calculs sensation thermique par vent\n• Alertes météo extrême et prévisions liées au vent\n\n🧭 **Capteur Direction Vent** (optionnel)\n• Fournit données direction vent pour rapports météo détaillés\n• Utilisé dans suivi orages et analyse patterns météorologiques\n• Améliore précision prévisions avec données directionnelles vent\n\n🌪️ **Capteur Rafales Vent** (optionnel)\n• Détection météo extrême et mesure intensité orages\n• Alertes sécurité pour conditions vent dangereuses\n• Classification améliorée orages (rafales vs vents constants)\n\n🌧️ **Capteur Intensité Pluie** (optionnel)\n• Mesure directe intensité précipitations\n• Active conditions météo pluvieuses/orageuses\n• Utilisé pour prévisions précipitations\n• Remplace autres conditions quand pluie détectée\n\n🌦️ **Capteur État Pluie** (optionnel)\n• Détection booléenne pluie (états sec/humide)\n• Remplacement immédiat condition météo quand humide\n• Détection précipitations de secours si capteur intensité non disponible\n\n☀️ **Capteur Rayonnement Solaire** (optionnel)\n• Détection primaire couverture nuageuse (>400 W/m² = ensoleillé, <100 = nuageux)\n• Classification jour/nuit et intensité solaire\n• Utilisé dans détection brouillard (rayonnement faible + humidité élevée)\n• Remplace autres conditions pour détection ciel dégagé\n\n💡 **Capteur Lux Solaire** (optionnel)\n• Détection jour/nuit basée sur lumière\n• Détection couverture nuageuse de secours si capteur rayonnement non disponible\n• Calculs visibilité et détection crépuscule\n\n🛡️ **Capteur Indice UV** (optionnel)\n• Confirmation ciel dégagé (UV élevé = définitivement ensoleillé)\n• Mesure intensité solaire pour recommandations sécurité\n• Précision améliorée détection temps ensoleillé\n\n☀️ **Capteur Solaire** (optionnel)\n• Données élévation solaire pour calculs précis couverture nuageuse\n• Améliore détection météo en considérant position soleil\n• Élévation plus élevée = plus rayonnement solaire attendu\n• Fallback : 45° élévation si non configuré\n\n**Conseils Configuration :**\n• Utilisez Outils Développement → États pour trouver IDs entités capteurs\n• Les capteurs température doivent avoir device_class='temperature'\n• Les capteurs pression doivent utiliser pression relative/barométrique\n• Intervalle mise à jour : 1-60 minutes (fréquence actualisation données météo)\n• Plus de capteurs = détection météo plus précise !",
         "data": {
           "outdoor_temp_sensor": "Capteur Température Extérieure",
           "dewpoint_sensor": "Capteur Point de Rosée",
@@ -17,6 +17,7 @@
           "solar_radiation_sensor": "Capteur Rayonnement Solaire",
           "solar_lux_sensor": "Capteur Lux Solaire",
           "uv_index_sensor": "Capteur Indice UV",
+          "sun_sensor": "Capteur Solaire",
           "update_interval": "Intervalle Mise à Jour (minutes)"
         },
         "data_description": {
@@ -32,6 +33,7 @@
           "solar_radiation_sensor": "Capteur optionnel pour détection primaire couverture nuageuse (>400 W/m² = ensoleillé, <100 = nuageux). Utilisé dans détection brouillard et remplace autres conditions pour détection ciel dégagé.",
           "solar_lux_sensor": "Capteur optionnel pour détection jour/nuit basée sur lumière. Détection couverture nuageuse de secours et calculs visibilité quand capteur rayonnement solaire non disponible.",
           "uv_index_sensor": "Capteur optionnel pour confirmation ciel dégagé (UV élevé = définitivement ensoleillé). Fournit mesure intensité solaire pour recommandations sécurité et précision améliorée détection temps ensoleillé.",
+          "sun_sensor": "Capteur optionnel fournissant données élévation solaire pour calculs précis couverture nuageuse. Améliore précision détection météo en considérant position soleil (élévation plus élevée = plus rayonnement solaire attendu). Fallback vers 45° élévation si non configuré.",
           "update_interval": "Fréquence actualisation données météo et consultation capteurs. Plage : 1-60 minutes. Valeurs plus basses fournissent mises à jour plus réactives mais peuvent augmenter charge système."
         }
       }
@@ -44,8 +46,8 @@
   "options": {
     "step": {
       "init": {
-        "title": "Mettre à Jour Capteurs Station Météo",
-        "description": "Modifiez la configuration des capteurs de votre station météorologique.\n\n**Les modifications prennent effet immédiatement.** L'entité météo se mettra à jour selon le nouvel intervalle et la configuration des capteurs.",
+        "title": "Configuration Capteurs Météo",
+        "description": "Configurez les capteurs météo pour détection précise conditions météorologiques. Tous capteurs sont optionnels sauf température extérieure. Le capteur solaire fournit données élévation solaire pour calculs précis couverture nuageuse.",
         "data": {
           "outdoor_temp_sensor": "Capteur Température Extérieure",
           "dewpoint_sensor": "Capteur Point de Rosée",
@@ -54,11 +56,12 @@
           "wind_speed_sensor": "Capteur Vitesse Vent",
           "wind_direction_sensor": "Capteur Direction Vent",
           "wind_gust_sensor": "Capteur Rafales Vent",
-          "rain_rate_sensor": "Capteur Intensité Pluie",
+          "rain_rate_sensor": "Capteur Taux Pluie",
           "rain_state_sensor": "Capteur État Pluie",
           "solar_radiation_sensor": "Capteur Rayonnement Solaire",
           "solar_lux_sensor": "Capteur Lux Solaire",
           "uv_index_sensor": "Capteur Indice UV",
+          "sun_sensor": "Capteur Solaire",
           "update_interval": "Intervalle Mise à Jour (minutes)"
         },
         "data_description": {
@@ -74,13 +77,10 @@
           "solar_radiation_sensor": "Capteur optionnel pour détection primaire couverture nuageuse (>400 W/m² = ensoleillé, <100 = nuageux). Utilisé dans détection brouillard et remplace autres conditions pour détection ciel dégagé.",
           "solar_lux_sensor": "Capteur optionnel pour détection jour/nuit basée sur lumière. Détection couverture nuageuse de secours et calculs visibilité quand capteur rayonnement solaire non disponible.",
           "uv_index_sensor": "Capteur optionnel pour confirmation ciel dégagé (UV élevé = définitivement ensoleillé). Fournit mesure intensité solaire pour recommandations sécurité et précision améliorée détection temps ensoleillé.",
+          "sun_sensor": "Capteur optionnel fournissant données élévation solaire pour calculs précis couverture nuageuse. Améliore précision détection météo en considérant position soleil (élévation plus élevée = plus rayonnement solaire attendu). Fallback vers 45° élévation si non configuré.",
           "update_interval": "Fréquence actualisation données météo et consultation capteurs. Plage : 1-60 minutes. Valeurs plus basses fournissent mises à jour plus réactives mais peuvent augmenter charge système."
         }
       }
-    },
-    "error": {
-      "missing_outdoor_temp": "❌ Le capteur de température extérieure est requis. Veuillez sélectionner un capteur de température qui mesure les conditions extérieures.",
-      "unknown": "❌ Une erreur inattendue s'est produite lors de la configuration. Veuillez vérifier votre sélection de capteurs et réessayer."
     }
   }
 }

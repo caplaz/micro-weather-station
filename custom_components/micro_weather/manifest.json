@@ -1,7 +1,7 @@
 {
   "domain": "micro_weather",
   "name": "Micro Weather Station",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "documentation": "https://github.com/caplaz/micro-weather-station",
   "issue_tracker": "https://github.com/caplaz/micro-weather-station/issues",
   "dependencies": [],

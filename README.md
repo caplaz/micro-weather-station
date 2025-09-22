@@ -76,8 +76,8 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.2.0.zip
-   unzip v1.2.0.zip
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.3.0.zip
+   unzip v1.3.0.zip
 
    # Option B: Clone repository
    git clone https://github.com/caplaz/micro-weather-station.git
@@ -187,19 +187,20 @@ The configuration flow will guide you through selecting your sensors:
 
 Configure additional sensors for enhanced weather detection:
 
-| Configuration Field | Example Entity ID        | Purpose                             |
-| ------------------- | ------------------------ | ----------------------------------- |
-| Dewpoint            | `sensor.dewpoint`        | Direct dewpoint measurement         |
-| Humidity            | `sensor.humidity`        | Humidity readings and fog detection |
-| Pressure            | `sensor.pressure`        | Storm prediction and forecasting    |
-| Wind Speed          | `sensor.wind_speed`      | Wind condition detection            |
-| Wind Direction      | `sensor.wind_direction`  | Wind data and storm analysis        |
-| Wind Gust           | `sensor.wind_gust`       | Storm and severe weather detection  |
-| Rain Rate           | `sensor.rain_rate`       | Precipitation rate measurement      |
-| Rain State          | `sensor.rain_detector`   | Precipitation state detection       |
-| Solar Radiation     | `sensor.solar_radiation` | Cloud cover and solar analysis      |
-| Solar Lux           | `sensor.light_sensor`    | Day/night and cloud detection       |
-| UV Index            | `sensor.uv_index`        | Clear sky and sun intensity         |
+| Configuration Field | Example Entity ID        | Purpose                                 |
+| ------------------- | ------------------------ | --------------------------------------- |
+| Dewpoint            | `sensor.dewpoint`        | Direct dewpoint measurement             |
+| Humidity            | `sensor.humidity`        | Humidity readings and fog detection     |
+| Pressure            | `sensor.pressure`        | Storm prediction and forecasting        |
+| Wind Speed          | `sensor.wind_speed`      | Wind condition detection                |
+| Wind Direction      | `sensor.wind_direction`  | Wind data and storm analysis            |
+| Wind Gust           | `sensor.wind_gust`       | Storm and severe weather detection      |
+| Rain Rate           | `sensor.rain_rate`       | Precipitation rate measurement          |
+| Rain State          | `sensor.rain_detector`   | Precipitation state detection           |
+| Solar Radiation     | `sensor.solar_radiation` | Cloud cover and solar analysis          |
+| Solar Lux           | `sensor.light_sensor`    | Day/night and cloud detection           |
+| UV Index            | `sensor.uv_index`        | Clear sky and sun intensity             |
+| Sun Sensor          | `sensor.sun_elevation`   | Solar elevation for precise cloud cover |
 
 ### Step 3: Testing Your Configuration
 
@@ -305,19 +306,20 @@ automation:
 
 ### Optional Sensors
 
-| Sensor Type     | Description                   | Used For                                          |
-| --------------- | ----------------------------- | ------------------------------------------------- |
-| Dewpoint        | Dewpoint temperature sensor   | Direct dewpoint measurement for improved accuracy |
-| Humidity        | Humidity percentage sensor    | Humidity readings and fog detection               |
-| Pressure        | Atmospheric pressure sensor   | Storm detection and weather forecasting           |
-| Wind Speed      | Wind speed sensor             | Wind conditions and storm detection               |
-| Wind Direction  | Wind direction sensor         | Wind data and storm tracking                      |
-| Wind Gust       | Wind gust sensor              | Severe weather and storm detection                |
-| Rain Rate       | Precipitation rate sensor     | Precipitation intensity measurement               |
-| Rain State      | Rain state sensor (dry/wet)   | Boolean precipitation detection                   |
-| Solar Radiation | Solar radiation sensor (W/m²) | Cloud cover detection and solar analysis          |
-| Solar Lux       | Light level sensor (lx)       | Day/night and cloud detection (backup)            |
-| UV Index        | UV index sensor               | Clear sky detection and solar intensity           |
+| Sensor Type     | Description                   | Used For                                               |
+| --------------- | ----------------------------- | ------------------------------------------------------ |
+| Dewpoint        | Dewpoint temperature sensor   | Direct dewpoint measurement for improved accuracy      |
+| Humidity        | Humidity percentage sensor    | Humidity readings and fog detection                    |
+| Pressure        | Atmospheric pressure sensor   | Storm detection and weather forecasting                |
+| Wind Speed      | Wind speed sensor             | Wind conditions and storm detection                    |
+| Wind Direction  | Wind direction sensor         | Wind data and storm tracking                           |
+| Wind Gust       | Wind gust sensor              | Severe weather and storm detection                     |
+| Rain Rate       | Precipitation rate sensor     | Precipitation intensity measurement                    |
+| Rain State      | Rain state sensor (dry/wet)   | Boolean precipitation detection                        |
+| Solar Radiation | Solar radiation sensor (W/m²) | Cloud cover detection and solar analysis               |
+| Solar Lux       | Light level sensor (lx)       | Day/night and cloud detection (backup)                 |
+| UV Index        | UV index sensor               | Clear sky detection and solar intensity                |
+| Sun Sensor      | Solar elevation sensor        | Precise cloud cover calculations based on sun position |
 
 ### Example Sensor Configuration
 
@@ -335,6 +337,7 @@ Rain State: sensor.rain_state_piezo # Optional - binary moisture/precipitation s
 Solar Radiation: sensor.solar_radiation # Optional - cloud cover analysis
 Solar Lux: sensor.solar_lux # Optional - day/night detection backup
 UV Index: sensor.uv_index # Optional - clear sky confirmation
+Sun Sensor: sensor.sun_elevation # Optional - solar elevation for precise cloud cover calculations
 ```
 
 **Note**: Indoor temperature sensor has been removed. This integration focuses on outdoor weather conditions using only outdoor environmental sensors.
@@ -778,6 +781,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### v1.3.0
+
+- **Solar Elevation Integration**: Added sun sensor support for precise cloud cover calculations based on solar position
+
 ### v1.2.0
 
 - **Fixed Rain State Logic**: Corrected moisture sensor handling to only recognize "wet" or "dry" states
@@ -810,11 +817,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.2.0
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.0
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.2.0
+[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.0
 [releases]: https://github.com/caplaz/micro-weather-station/releases
 [logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png

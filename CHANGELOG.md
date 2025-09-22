@@ -1,3 +1,14 @@
+## 1.3.0 (2025-09-22)
+
+### Features
+
+- **Solar Elevation Integration**: Added sun sensor support for precise cloud cover calculations based on solar position
+  - New optional sun sensor configuration field for solar elevation data
+  - Enhanced cloud cover analysis using solar elevation angle for more accurate daytime weather detection
+  - Improved weather condition accuracy throughout the day by accounting for sun position
+  - Fallback to 45° elevation when sun sensor not configured
+  - Added comprehensive translations for sun sensor in all supported languages (English, German, Spanish, French, Italian)
+
 ## 1.2.0 (2025-09-22)
 
 ### Bug Fixes

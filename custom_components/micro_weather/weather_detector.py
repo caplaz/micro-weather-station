@@ -37,6 +37,7 @@ from .const import (
     CONF_RAIN_STATE_SENSOR,
     CONF_SOLAR_LUX_SENSOR,
     CONF_SOLAR_RADIATION_SENSOR,
+    CONF_SUN_SENSOR,
     CONF_UV_INDEX_SENSOR,
     CONF_WIND_DIRECTION_SENSOR,
     CONF_WIND_GUST_SENSOR,
@@ -115,6 +116,7 @@ class WeatherDetector:
             "solar_radiation": options.get(CONF_SOLAR_RADIATION_SENSOR),
             "solar_lux": options.get(CONF_SOLAR_LUX_SENSOR),
             "uv_index": options.get(CONF_UV_INDEX_SENSOR),
+            "sun": options.get(CONF_SUN_SENSOR),
         }
 
     def get_weather_data(self) -> Dict[str, Any]:
@@ -236,6 +238,26 @@ class WeatherDetector:
                     _LOGGER.warning(
                         "Could not convert sensor {entity_id} value: {state.state}"
                     )
+
+        # Get sun.sun sensor data for solar position calculations
+        sun_entity_id = self.sensors.get("sun")
+        if sun_entity_id:
+            sun_state = self.hass.states.get(sun_entity_id)
+            if sun_state and sun_state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+                try:
+                    # Get solar elevation from sun.sun attributes
+                    solar_elevation = float(sun_state.attributes.get("elevation", 0))
+                    sensor_data["solar_elevation"] = solar_elevation
+                except (ValueError, TypeError):
+                    _LOGGER.warning(
+                        "Could not get solar elevation from sun sensor %s",
+                        sun_entity_id,
+                    )
+        else:
+            # Fallback: use default elevation if no sun sensor configured
+            sensor_data["solar_elevation"] = (
+                45.0  # Reasonable default for moderate solar angle
+            )
 
         return sensor_data
 
@@ -410,8 +432,11 @@ class WeatherDetector:
 
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
         if is_daytime:
+            solar_elevation = sensor_data.get(
+                "solar_elevation", 45.0
+            )  # Default to 45° if not available
             cloud_cover = self.analysis.analyze_cloud_cover(
-                solar_radiation, solar_lux, uv_index
+                solar_radiation, solar_lux, uv_index, solar_elevation
             )
 
             # Clear conditions

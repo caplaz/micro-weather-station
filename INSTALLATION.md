@@ -228,19 +228,20 @@ Enhance weather detection by configuring additional sensors:
 
 #### Available Optional Sensors
 
-| Sensor Type        | Purpose                             | Example Entity                |
-| ------------------ | ----------------------------------- | ----------------------------- |
-| Indoor Temperature | Temperature differential analysis   | `sensor.indoor_temperature`   |
-| Humidity           | Humidity readings and fog detection | `sensor.humidity_sensor`      |
-| Pressure           | Storm prediction and forecasting    | `sensor.barometric_pressure`  |
-| Wind Speed         | Wind condition detection            | `sensor.wind_speed`           |
-| Wind Direction     | Wind data analysis                  | `sensor.wind_direction`       |
-| Wind Gust          | Storm detection                     | `sensor.wind_gust_speed`      |
-| Rain Rate          | Precipitation measurement           | `sensor.rain_rate_per_hour`   |
-| Rain State         | Rain detection                      | `sensor.rain_detector_state`  |
-| Solar Radiation    | Cloud cover analysis                | `sensor.solar_radiation_wm2`  |
-| Solar Lux          | Light level detection               | `sensor.outdoor_light_sensor` |
-| UV Index           | Clear sky detection                 | `sensor.uv_index_sensor`      |
+| Sensor Type        | Purpose                                 | Example Entity                |
+| ------------------ | --------------------------------------- | ----------------------------- |
+| Indoor Temperature | Temperature differential analysis       | `sensor.indoor_temperature`   |
+| Humidity           | Humidity readings and fog detection     | `sensor.humidity_sensor`      |
+| Pressure           | Storm prediction and forecasting        | `sensor.barometric_pressure`  |
+| Wind Speed         | Wind condition detection                | `sensor.wind_speed`           |
+| Wind Direction     | Wind data analysis                      | `sensor.wind_direction`       |
+| Wind Gust          | Storm detection                         | `sensor.wind_gust_speed`      |
+| Rain Rate          | Precipitation measurement               | `sensor.rain_rate_per_hour`   |
+| Rain State         | Rain detection                          | `sensor.rain_detector_state`  |
+| Solar Radiation    | Cloud cover analysis                    | `sensor.solar_radiation_wm2`  |
+| Solar Lux          | Light level detection                   | `sensor.outdoor_light_sensor` |
+| UV Index           | Clear sky detection                     | `sensor.uv_index_sensor`      |
+| Sun Sensor         | Solar elevation for precise cloud cover | `sensor.sun_elevation`        |
 
 #### Configuration Tips
 
