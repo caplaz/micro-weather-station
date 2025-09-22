@@ -218,7 +218,7 @@ class WeatherDetector:
             dict: Sensor data with keys matching sensor types and values as
                   floats (for numeric sensors) or strings (for state sensors)
         """
-        sensor_data = {}
+        sensor_data: Dict[str, Any] = {}
 
         for sensor_key, entity_id in self.sensors.items():
             if not entity_id:
@@ -231,9 +231,7 @@ class WeatherDetector:
                     if sensor_key == "rain_state":
                         sensor_data[sensor_key] = state.state.lower()
                     else:
-                        sensor_data[sensor_key] = float(
-                            state.state
-                        )  # type: ignore[assignment]
+                        sensor_data[sensor_key] = float(state.state)
                 except (ValueError, TypeError):
                     _LOGGER.warning(
                         "Could not convert sensor {entity_id} value: {state.state}"
@@ -275,50 +273,52 @@ class WeatherDetector:
         """
 
         # Extract sensor values with better defaults
-        rain_rate = sensor_data.get("rain_rate", 0.0)
-        rain_state = sensor_data.get("rain_state", "dry").lower()
-        wind_speed = sensor_data.get("wind_speed", 0.0)
-        wind_gust = sensor_data.get("wind_gust", 0.0)
-        solar_radiation = sensor_data.get("solar_radiation", 0.0)
-        solar_lux = sensor_data.get("solar_lux", 0.0)
-        uv_index = sensor_data.get("uv_index", 0.0)
-        outdoor_temp = sensor_data.get("outdoor_temp", 70.0)
-        humidity = sensor_data.get("humidity", 50.0)
-        pressure = sensor_data.get("pressure", 29.92)
+        rain_rate: float = sensor_data.get("rain_rate", 0.0)
+        rain_state: str = sensor_data.get("rain_state", "dry").lower()
+        wind_speed: float = sensor_data.get("wind_speed", 0.0)
+        wind_gust: float = sensor_data.get("wind_gust", 0.0)
+        solar_radiation: float = sensor_data.get("solar_radiation", 0.0)
+        solar_lux: float = sensor_data.get("solar_lux", 0.0)
+        uv_index: float = sensor_data.get("uv_index", 0.0)
+        outdoor_temp: float = sensor_data.get("outdoor_temp", 70.0)
+        humidity: float = sensor_data.get("humidity", 50.0)
+        pressure: float = sensor_data.get("pressure", 29.92)
 
         # Calculate derived meteorological parameters
         # Use dewpoint sensor if available, otherwise calculate from temp/humidity
         dewpoint_raw = sensor_data.get("dewpoint")
         if dewpoint_raw is not None:
-            dewpoint = float(dewpoint_raw)
+            dewpoint: float = float(dewpoint_raw)
         else:
             dewpoint = self.analysis.calculate_dewpoint(outdoor_temp, humidity)
-        temp_dewpoint_spread = outdoor_temp - dewpoint
-        is_freezing = outdoor_temp <= 32.0
+        temp_dewpoint_spread: float = outdoor_temp - dewpoint
+        is_freezing: bool = outdoor_temp <= 32.0
 
         # Advanced daytime detection (solar elevation proxy)
-        is_daytime = solar_radiation > 5 or solar_lux > 50 or uv_index > 0.1
-        is_twilight = (solar_lux > 10 and solar_lux < 100) or (
+        is_daytime: bool = solar_radiation > 5 or solar_lux > 50 or uv_index > 0.1
+        is_twilight: bool = (solar_lux > 10 and solar_lux < 100) or (
             solar_radiation > 1 and solar_radiation < 50
         )
 
         # Pressure analysis (meteorologically accurate thresholds)
-        pressure_very_high = pressure > 30.20  # High pressure system
-        pressure_high = pressure > 30.00  # Above normal
-        pressure_normal = 29.80 <= pressure <= 30.20  # Normal range
-        pressure_low = pressure < 29.80  # Low pressure system
-        pressure_very_low = pressure < 29.50  # Storm system
-        pressure_extremely_low = pressure < 29.20  # Severe storm
+        pressure_very_high: bool = pressure > 30.20  # High pressure system
+        pressure_high: bool = pressure > 30.00  # Above normal
+        pressure_normal: bool = 29.80 <= pressure <= 30.20  # Normal range
+        pressure_low: bool = pressure < 29.80  # Low pressure system
+        pressure_very_low: bool = pressure < 29.50  # Storm system
+        pressure_extremely_low: bool = pressure < 29.20  # Severe storm
 
         # Wind analysis (Beaufort scale adapted)
-        wind_calm = wind_speed < 1  # 0-1 mph: Calm
-        wind_light = 1 <= wind_speed < 8  # 1-7 mph: Light air to light breeze
-        wind_strong = 19 <= wind_speed < 32  # 19-31 mph: Strong breeze to near gale
-        wind_gale = wind_speed >= 32  # 32+ mph: Gale force
+        wind_calm: bool = wind_speed < 1  # 0-1 mph: Calm
+        wind_light: bool = 1 <= wind_speed < 8  # 1-7 mph: Light air to light breeze
+        wind_strong: bool = (
+            19 <= wind_speed < 32
+        )  # 19-31 mph: Strong breeze to near gale
+        wind_gale: bool = wind_speed >= 32  # 32+ mph: Gale force
 
-        gust_factor = wind_gust / max(wind_speed, 1)  # Gust ratio for turbulence
-        is_gusty = gust_factor > 1.5 and wind_gust > 10
-        is_very_gusty = gust_factor > 2.0 and wind_gust > 15
+        gust_factor: float = wind_gust / max(wind_speed, 1)  # Gust ratio for turbulence
+        is_gusty: bool = gust_factor > 1.5 and wind_gust > 10
+        is_very_gusty: bool = gust_factor > 2.0 and wind_gust > 15
 
         _LOGGER.info(
             "Weather Analysis - Rain: %.2f in/h (%s), "
@@ -342,7 +342,7 @@ class WeatherDetector:
 
         # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
         # Use more conservative thresholds to avoid false positives from dew/moisture
-        significant_rain = (
+        significant_rain: bool = (
             rain_rate > 0.05
         )  # Increased from 0.01 to avoid dew detection
 
@@ -350,7 +350,7 @@ class WeatherDetector:
         # it might be fog first
         if rain_state == "wet" and not significant_rain:
             # Check for fog conditions before assuming precipitation
-            fog_conditions = self.analysis.analyze_fog_conditions(
+            fog_conditions: str = self.analysis.analyze_fog_conditions(
                 outdoor_temp,
                 humidity,
                 dewpoint,
@@ -368,7 +368,7 @@ class WeatherDetector:
 
         # Now check for precipitation (either significant rain_rate OR wet
         # sensor without fog conditions)
-        active_precipitation = rain_state == "wet"
+        active_precipitation: bool = rain_state == "wet"
         # Consider "wet" as active precipitation when moisture sensor detects wetness
         # The moisture sensor (binary sensor) only reports "wet" or "dry"
 
@@ -378,8 +378,8 @@ class WeatherDetector:
                 rain_rate,
                 rain_state,
             )
-            precipitation_intensity = self.analysis.classify_precipitation_intensity(
-                rain_rate
+            precipitation_intensity: str = (
+                self.analysis.classify_precipitation_intensity(rain_rate)
             )
 
             # Determine precipitation type based on temperature
@@ -417,7 +417,7 @@ class WeatherDetector:
         # PRIORITY 3: FOG CONDITIONS (Critical for safety)
         # Check for fog in dry conditions (wet conditions already checked above)
         if rain_state != "wet":
-            fog_conditions = self.analysis.analyze_fog_conditions(
+            dry_fog_conditions: str = self.analysis.analyze_fog_conditions(
                 outdoor_temp,
                 humidity,
                 dewpoint,
@@ -426,16 +426,16 @@ class WeatherDetector:
                 solar_radiation,
                 is_daytime,
             )
-            if fog_conditions != "none":
-                _LOGGER.info("Fog conditions detected: %s", fog_conditions)
-                return fog_conditions
+            if dry_fog_conditions != "none":
+                _LOGGER.info("Fog conditions detected: %s", dry_fog_conditions)
+                return dry_fog_conditions
 
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
         if is_daytime:
-            solar_elevation = sensor_data.get(
+            solar_elevation: float = sensor_data.get(
                 "solar_elevation", 45.0
             )  # Default to 45° if not available
-            cloud_cover = self.analysis.analyze_cloud_cover(
+            cloud_cover: float = self.analysis.analyze_cloud_cover(
                 solar_radiation, solar_lux, uv_index, solar_elevation
             )
 
