@@ -13,8 +13,11 @@ The weather detection system uses a sophisticated priority-based algorithm with 
 - **Advanced Pressure Analysis**: Uses meteorologically accurate pressure thresholds
 - **Improved Daytime Detection**: Multi-sensor approach for accurate day/night/twilight detection
 
-### Key Improvements (v1.3.0)
+### Key Improvements (v1.3.1)
 
+- **Solar Radiation Averaging**: Implemented 15-minute moving average for solar radiation readings to prevent rapid weather condition changes
+- **Stable Cloud Detection**: Reduces false weather transitions caused by temporary cloud shadows or sensor noise
+- **Enhanced Weather Stability**: Provides more reliable and consistent weather condition reporting
 - **Solar Elevation Integration**: Added sun sensor support for precise cloud cover calculations based on solar position
 
 ## Weather Condition Detection Logic

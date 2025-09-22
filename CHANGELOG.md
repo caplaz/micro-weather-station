@@ -1,3 +1,19 @@
+## 1.3.1 (2025-09-22)
+
+### Features
+
+- **Solar Radiation Averaging**: Implemented 15-minute moving average for solar radiation readings to prevent rapid weather condition changes
+  - Reduces false weather transitions caused by temporary cloud shadows or sensor noise
+  - Provides more stable and reliable cloud cover detection
+  - Improves overall weather condition accuracy and user experience
+  - Configurable averaging window for optimal performance
+
+### Changes
+
+- Enhanced HACS validation workflow with scheduled runs and manual dispatch
+- Added hassfest integration validation for improved Home Assistant compatibility
+- Updated CI/CD pipeline for better automated testing and validation
+
 ## 1.3.0 (2025-09-22)
 
 ### Features
