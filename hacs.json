@@ -1,5 +1,6 @@
 {
   "name": "Micro Weather Station",
+  "description": "A Home Assistant custom integration that creates a smart weather station by analyzing your existing sensor data to determine accurate weather conditions for your specific location and microclimate.",
   "render_readme": true,
   "filename": "micro_weather.zip",
   "homeassistant": "2023.1.0",
