@@ -76,6 +76,21 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             "model": "MWS-1",
             "sw_version": __version__,
         }
+        # Set initial state to unavailable until we have data
+        self._attr_available = bool(coordinator.data)
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        return bool(self.coordinator.data)
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added to hass."""
+        await super().async_added_to_hass()
+        # Trigger immediate refresh when entity is first added
+        # This ensures data is available quickly after HA restart
+        if not self.coordinator.data:
+            await self.coordinator.async_request_refresh()
 
     @property
     def condition(self) -> str | None:
@@ -83,6 +98,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         if self.coordinator.data:
             condition = self.coordinator.data.get("condition")
             return CONDITION_MAP.get(condition, condition)  # type: ignore[arg-type]
+        # Return None until we have data - don't show default partly cloudy
         return None
 
     @property
