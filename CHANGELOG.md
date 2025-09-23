@@ -1,3 +1,16 @@
+## 1.3.2 (2025-09-22)
+
+### Bug Fixes
+
+- **Sensor Value Conversion**: Fixed logging syntax for sensor conversion errors to properly display entity IDs and values
+- **Improved Error Handling**: Added validation for None/empty sensor states before conversion attempts
+- **Better Logging**: Enhanced error messages for sun sensor elevation data processing
+
+### Changes
+
+- Improved sensor state validation to reduce spurious warning messages
+- Enhanced error handling for invalid sensor data
+
 ## 1.3.1 (2025-09-22)
 
 ### Features

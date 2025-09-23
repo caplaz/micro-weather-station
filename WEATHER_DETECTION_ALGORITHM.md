@@ -13,6 +13,12 @@ The weather detection system uses a sophisticated priority-based algorithm with 
 - **Advanced Pressure Analysis**: Uses meteorologically accurate pressure thresholds
 - **Improved Daytime Detection**: Multi-sensor approach for accurate day/night/twilight detection
 
+### Key Improvements (v1.3.2)
+
+- **Bug Fixes**: Fixed logging syntax errors showing literal `{entity_id}` instead of actual values
+- **Sensor Validation**: Added validation for None/empty sensor states to prevent conversion warnings
+- **Improved Error Handling**: Enhanced sensor state validation in weather detection logic
+
 ### Key Improvements (v1.3.1)
 
 - **Solar Radiation Averaging**: Implemented 15-minute moving average for solar radiation readings to prevent rapid weather condition changes

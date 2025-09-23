@@ -76,8 +76,8 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.3.1.zip
-   unzip v1.3.1.zip
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.3.2.zip
+   unzip v1.3.2.zip
 
    # Option B: Clone repository
    git clone https://github.com/caplaz/micro-weather-station.git
@@ -781,6 +781,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### v1.3.2
+
+- **Bug Fixes**: Fixed logging syntax errors showing literal `{entity_id}` instead of actual values
+- **Sensor Validation**: Added validation for None/empty sensor states to prevent conversion warnings
+- **Improved Error Handling**: Enhanced sensor state validation in weather detection logic
+
 ### v1.3.1
 
 - **Solar Radiation Averaging**: Implemented 15-minute moving average for solar radiation readings to prevent rapid weather condition changes
@@ -824,11 +830,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.1
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.2
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.1
+[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.2
 [releases]: https://github.com/caplaz/micro-weather-station/releases
 [logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png
