@@ -1,3 +1,19 @@
+## 1.3.3 (2025-09-23)
+
+### Bug Fixes
+
+- **Nighttime Weather Detection**: Fixed false cloudy detection on clear nights with low pressure
+  - Improved nighttime condition logic to consider humidity levels alongside pressure
+  - Low pressure (< 29.80 inHg) no longer automatically triggers cloudy conditions
+  - Added nuanced conditions: clear-night for low pressure + low humidity (< 65%), cloudy for high humidity (> 85%)
+  - Fixes issue where clear nights were incorrectly reported as cloudy due to atmospheric pressure alone
+  - Applied consistent logic to both weather_detector.py and weather_analysis.py
+
+### Changes
+
+- Enhanced meteorological accuracy for nighttime weather conditions
+- Better handling of low-pressure systems with clear skies
+
 ## 1.3.2 (2025-09-22)
 
 ### Bug Fixes

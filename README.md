@@ -76,8 +76,8 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.3.2.zip
-   unzip v1.3.2.zip
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.3.3.zip
+   unzip v1.3.3.zip
 
    # Option B: Clone repository
    git clone https://github.com/caplaz/micro-weather-station.git
@@ -781,6 +781,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### v1.3.3
+
+- **Nighttime Weather Detection**: Fixed false cloudy detection on clear nights with low pressure
+  - Improved nighttime condition logic to consider humidity levels alongside pressure
+  - Low pressure (< 29.80 inHg) no longer automatically triggers cloudy conditions
+  - Added nuanced conditions: clear-night for low pressure + low humidity (< 65%), cloudy for high humidity (> 85%)
+  - Fixes issue where clear nights were incorrectly reported as cloudy due to atmospheric pressure alone
+  - Applied consistent logic to both weather_detector.py and weather_analysis.py
+
 ### v1.3.2
 
 - **Bug Fixes**: Fixed logging syntax errors showing literal `{entity_id}` instead of actual values
@@ -830,11 +839,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.2
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.3
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.2
+[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.3
 [releases]: https://github.com/caplaz/micro-weather-station/releases
 [logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png

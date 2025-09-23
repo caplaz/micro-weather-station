@@ -13,6 +13,14 @@ The weather detection system uses a sophisticated priority-based algorithm with 
 - **Advanced Pressure Analysis**: Uses meteorologically accurate pressure thresholds
 - **Improved Daytime Detection**: Multi-sensor approach for accurate day/night/twilight detection
 
+### Key Improvements (v1.3.3)
+
+- **Nighttime Weather Detection**: Fixed false cloudy detection on clear nights with low pressure
+  - Improved nighttime condition logic to consider humidity levels alongside pressure
+  - Low pressure (< 29.80 inHg) no longer automatically triggers cloudy conditions
+  - Added nuanced conditions: clear-night for low pressure + low humidity (< 65%), cloudy for high humidity (> 85%)
+  - Fixes issue where clear nights were incorrectly reported as cloudy due to atmospheric pressure alone
+
 ### Key Improvements (v1.3.2)
 
 - **Bug Fixes**: Fixed logging syntax errors showing literal `{entity_id}` instead of actual values
@@ -136,8 +144,14 @@ ELIF pressure >30.00 inHg AND not gusty AND humidity <80%:
     → "clear-night" (clear night)
 ELIF pressure normal AND 1mph ≤ wind <8mph:
     → "partly_cloudy" (partly cloudy night)
-ELIF pressure <29.80 inHg OR humidity >85%:
-    → "cloudy" (cloudy/overcast night)
+ELIF humidity >85%:
+    → "cloudy" (high humidity = likely cloudy/overcast night)
+ELIF pressure <29.80 inHg AND humidity >75% AND wind <3mph:
+    → "cloudy" (low pressure + high humidity + calm = cloudy)
+ELIF pressure <29.80 inHg AND humidity <65%:
+    → "clear-night" (low pressure but low humidity = can still be clear)
+ELIF pressure <29.80 inHg:
+    → "partly_cloudy" (low pressure with moderate conditions)
 ELSE:
     → "partly_cloudy" (default night condition)
 ```
