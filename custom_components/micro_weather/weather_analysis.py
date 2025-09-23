@@ -192,8 +192,16 @@ class WeatherAnalysis:
                 return "clear-night"  # Clear night
             elif pressure_normal and wind_light:
                 return "partly_cloudy"  # Partly cloudy night
-            elif pressure_low or humidity > 85:
-                return "cloudy"  # Cloudy/overcast night
+            elif humidity > 85:
+                return "cloudy"  # High humidity = likely cloudy/overcast night
+            elif pressure_low and humidity > 75 and wind_speed < 3:
+                return "cloudy"  # Low pressure + high humidity + calm = cloudy
+            elif pressure_low and humidity < 65:
+                return (
+                    "clear-night"  # Low pressure but low humidity = can still be clear
+                )
+            elif pressure_low:
+                return "partly_cloudy"  # Low pressure with moderate conditions
             else:
                 return "partly_cloudy"  # Default night condition
 
