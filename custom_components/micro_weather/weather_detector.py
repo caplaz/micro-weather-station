@@ -226,6 +226,13 @@ class WeatherDetector:
 
             state = self.hass.states.get(entity_id)
             if state and state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+                # Additional validation: check if state is not None and not empty
+                if state.state is None or state.state == "":
+                    _LOGGER.warning(
+                        "Sensor %s has empty or None state, skipping", entity_id
+                    )
+                    continue
+
                 try:
                     # Handle string sensors (rain state detection)
                     if sensor_key == "rain_state":
@@ -234,7 +241,7 @@ class WeatherDetector:
                         sensor_data[sensor_key] = float(state.state)
                 except (ValueError, TypeError):
                     _LOGGER.warning(
-                        "Could not convert sensor {entity_id} value: {state.state}"
+                        "Could not convert sensor %s value: %s", entity_id, state.state
                     )
 
         # Get sun.sun sensor data for solar position calculations
@@ -242,15 +249,25 @@ class WeatherDetector:
         if sun_entity_id:
             sun_state = self.hass.states.get(sun_entity_id)
             if sun_state and sun_state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-                try:
-                    # Get solar elevation from sun.sun attributes
-                    solar_elevation = float(sun_state.attributes.get("elevation", 0))
-                    sensor_data["solar_elevation"] = solar_elevation
-                except (ValueError, TypeError):
+                # Additional validation for sun sensor
+                if sun_state.state is None or sun_state.state == "":
                     _LOGGER.warning(
-                        "Could not get solar elevation from sun sensor %s",
+                        "Sun sensor %s has empty or None state, "
+                        "using default elevation",
                         sun_entity_id,
                     )
+                else:
+                    try:
+                        # Get solar elevation from sun.sun attributes
+                        solar_elevation = float(
+                            sun_state.attributes.get("elevation", 0)
+                        )
+                        sensor_data["solar_elevation"] = solar_elevation
+                    except (ValueError, TypeError):
+                        _LOGGER.warning(
+                            "Could not get solar elevation from sun sensor %s",
+                            sun_entity_id,
+                        )
         else:
             # Fallback: use default elevation if no sun sensor configured
             sensor_data["solar_elevation"] = (
