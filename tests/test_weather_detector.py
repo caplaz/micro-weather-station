@@ -186,22 +186,24 @@ class TestWeatherDetector:
         result = detector.get_weather_data()
         assert result["condition"] == "snowy"
 
-    def test_detect_cloudy_condition(self, mock_hass, mock_options, mock_sensor_data):
-        """Test detection of cloudy conditions."""
-        # Set up mock states for cloudy conditions
+    def test_detect_partly_cloudy_condition(
+        self, mock_hass, mock_options, mock_sensor_data
+    ):
+        """Test detection of partly cloudy conditions."""
+        # Set up mock states for partly cloudy conditions (moderate cloud cover)
         mock_states = {}
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "solar_radiation":
                 state = Mock()
-                state.state = "50.0"  # Low solar radiation
+                state.state = "400.0"  # Moderate solar radiation
                 mock_states[f"sensor.{sensor_key}"] = state
-            elif sensor_key == "rain_rate":
+            elif sensor_key == "solar_lux":
                 state = Mock()
-                state.state = "0.0"
+                state.state = "40000.0"  # Moderate lux
                 mock_states[f"sensor.{sensor_key}"] = state
-            elif sensor_key == "rain_state":
+            elif sensor_key == "uv_index":
                 state = Mock()
-                state.state = "Dry"
+                state.state = "4.0"  # Moderate UV
                 mock_states[f"sensor.{sensor_key}"] = state
             else:
                 state = Mock()
@@ -212,7 +214,230 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "cloudy"
+        assert result["condition"] == "partly_cloudy"
+
+    def test_detect_clear_night_condition(self, mock_hass, mock_options):
+        """Test detection of clear night conditions."""
+        # Set up sensor data for clear night
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Mock states for clear night (high pressure, calm winds, low humidity)
+        mock_states = {
+            "sensor.outdoor_temperature": Mock(state="70.0"),
+            "sensor.humidity": Mock(state="40.0"),
+            "sensor.pressure": Mock(state="30.10"),  # High pressure
+            "sensor.wind_speed": Mock(state="2.0"),  # Calm winds
+            "sensor.wind_gust": Mock(state="5.0"),
+            "sensor.solar_radiation": Mock(state="0.0"),  # Night
+            "sensor.solar_lux": Mock(state="0.0"),
+            "sensor.rain_rate": Mock(state="0.0"),
+        }
+
+        mock_hass.states.get.side_effect = lambda entity_id: mock_states.get(entity_id)
+
+        result = detector.get_weather_data()
+        assert result["condition"] == "clear-night"
+
+    def test_detect_foggy_condition(self, mock_hass, mock_options, mock_sensor_data):
+        """Test detection of foggy conditions."""
+        # Set up mock states for foggy conditions
+        mock_states = {}
+        for sensor_key, value in mock_sensor_data.items():
+            if sensor_key == "humidity":
+                state = Mock()
+                state.state = "95.0"  # Very high humidity
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "outdoor_temp":
+                state = Mock()
+                state.state = "65.0"  # Cool temperature
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "wind_speed":
+                state = Mock()
+                state.state = "2.0"  # Light wind
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "rain_rate":
+                state = Mock()
+                state.state = "0.0"  # No rain
+                mock_states[f"sensor.{sensor_key}"] = state
+            else:
+                state = Mock()
+                state.state = str(value)
+                mock_states[f"sensor.{sensor_key}"] = state
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+        assert result["condition"] == "foggy"
+
+    def test_detect_snowy_condition_edge_cases(
+        self, mock_hass, mock_options, mock_sensor_data
+    ):
+        """Test detection of snowy conditions with edge cases."""
+        # Test with freezing temperature and light precipitation
+        mock_states = {}
+        for sensor_key, value in mock_sensor_data.items():
+            if sensor_key == "rain_rate":
+                state = Mock()
+                state.state = "0.1"  # Light precipitation
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "outdoor_temp":
+                state = Mock()
+                state.state = "30.0"  # Below freezing
+                mock_states[f"sensor.{sensor_key}"] = state
+            else:
+                state = Mock()
+                state.state = str(value)
+                mock_states[f"sensor.{sensor_key}"] = state
+
+        # Map to the correct sensor entity ID
+        mock_states["sensor.outdoor_temperature"] = mock_states["sensor.outdoor_temp"]
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+        assert result["condition"] == "snowy"
+
+    def test_weather_condition_with_low_solar_radiation(self, mock_hass, mock_options):
+        """Test weather detection with low solar radiation scenario."""
+        # Simulate the user's actual sensor readings
+        mock_states = {
+            "sensor.outdoor_temperature": Mock(state="72.0"),
+            "sensor.humidity": Mock(state="65.0"),
+            "sensor.pressure": Mock(state="29.92"),
+            "sensor.wind_speed": Mock(state="5.5"),
+            "sensor.wind_direction": Mock(state="180.0"),
+            "sensor.wind_gust": Mock(state="8.0"),
+            "sensor.rain_rate": Mock(state="0.0"),
+            "sensor.rain_state": Mock(state="Dry"),
+            "sensor.solar_radiation": Mock(state="26.0"),  # User's actual reading
+            "sensor.solar_lux": Mock(state="15000.0"),  # User's actual reading
+            "sensor.uv_index": Mock(state="0.5"),  # User's reading
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+
+        # With the improved algorithm, this should detect partly cloudy
+        # (not cloudy as it would have before the fix)
+        assert result["condition"] == "partly_cloudy"
+
+        # Verify cloud cover is around 40% (the fallback value)
+        # Note: We can't directly test cloud cover here since it's internal to analysis
+        # but the condition detection should reflect the improved logic
+
+    def test_weather_condition_boundaries(self, mock_hass, mock_options):
+        """Test weather condition detection at boundary values."""
+        # Test boundary between sunny and partly cloudy
+        mock_states_sunny = {
+            "sensor.outdoor_temperature": Mock(state="75.0"),
+            "sensor.humidity": Mock(state="50.0"),
+            "sensor.pressure": Mock(state="30.10"),
+            "sensor.wind_speed": Mock(state="3.0"),
+            "sensor.wind_direction": Mock(state="90.0"),
+            "sensor.wind_gust": Mock(state="5.0"),
+            "sensor.rain_rate": Mock(state="0.0"),
+            "sensor.rain_state": Mock(state="Dry"),
+            "sensor.solar_radiation": Mock(state="750.0"),  # High radiation
+            "sensor.solar_lux": Mock(state="70000.0"),  # High lux
+            "sensor.uv_index": Mock(state="7.5"),  # High UV
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states_sunny.get(entity_id)
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+        assert result["condition"] == "sunny"
+
+        # Test boundary between partly cloudy and cloudy
+        mock_states_cloudy = {
+            "sensor.outdoor_temperature": Mock(state="70.0"),
+            "sensor.humidity": Mock(state="60.0"),
+            "sensor.pressure": Mock(state="29.92"),
+            "sensor.wind_speed": Mock(state="5.0"),
+            "sensor.wind_direction": Mock(state="180.0"),
+            "sensor.wind_gust": Mock(state="7.0"),
+            "sensor.rain_rate": Mock(state="0.0"),
+            "sensor.rain_state": Mock(state="Dry"),
+            "sensor.solar_radiation": Mock(state="100.0"),  # Low radiation
+            "sensor.solar_lux": Mock(state="8000.0"),  # Low lux
+            "sensor.uv_index": Mock(state="1.5"),  # Low UV
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states_cloudy.get(entity_id)
+        detector2 = WeatherDetector(mock_hass, mock_options)
+        result2 = detector2.get_weather_data()
+        assert result2["condition"] == "cloudy"
+
+    def test_weather_detection_with_missing_sensors(self, mock_hass, mock_options):
+        """Test weather detection when some sensors are unavailable."""
+        # Test with missing solar sensors (should still work)
+        mock_states = {
+            "sensor.outdoor_temperature": Mock(state="70.0"),
+            "sensor.humidity": Mock(state="60.0"),
+            "sensor.pressure": Mock(state="29.92"),
+            "sensor.wind_speed": Mock(state="5.0"),
+            "sensor.wind_direction": Mock(state="180.0"),
+            "sensor.wind_gust": Mock(state="8.0"),
+            "sensor.rain_rate": Mock(state="0.0"),
+            "sensor.rain_state": Mock(state="Dry"),
+            # Missing solar sensors
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+
+        # Should still provide a valid condition even with missing solar data
+        assert "condition" in result
+        assert result["condition"] is not None
+        assert isinstance(result["condition"], str)
+
+    def test_weather_detection_with_extreme_values(self, mock_hass, mock_options):
+        """Test weather detection with extreme sensor values."""
+        # Test with extreme heat
+        mock_states_hot = {
+            "sensor.outdoor_temperature": Mock(state="110.0"),  # Very hot
+            "sensor.humidity": Mock(state="10.0"),  # Very dry
+            "sensor.pressure": Mock(state="30.20"),  # High pressure
+            "sensor.wind_speed": Mock(state="2.0"),
+            "sensor.wind_direction": Mock(state="180.0"),
+            "sensor.wind_gust": Mock(state="3.0"),
+            "sensor.rain_rate": Mock(state="0.0"),
+            "sensor.rain_state": Mock(state="Dry"),
+            "sensor.solar_radiation": Mock(state="900.0"),
+            "sensor.solar_lux": Mock(state="85000.0"),
+            "sensor.uv_index": Mock(state="9.0"),
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states_hot.get(entity_id)
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+        assert result["condition"] == "sunny"  # Should still detect clear conditions
+
+        # Test with extreme cold
+        mock_states_cold = {
+            "sensor.outdoor_temperature": Mock(state="-10.0"),  # Very cold
+            "sensor.humidity": Mock(state="80.0"),  # Humid
+            "sensor.pressure": Mock(state="29.50"),  # Low pressure
+            "sensor.wind_speed": Mock(state="15.0"),
+            "sensor.wind_direction": Mock(state="270.0"),
+            "sensor.wind_gust": Mock(state="25.0"),
+            "sensor.rain_rate": Mock(state="0.0"),
+            "sensor.rain_state": Mock(state="Dry"),
+            "sensor.solar_radiation": Mock(state="200.0"),
+            "sensor.solar_lux": Mock(state="15000.0"),
+            "sensor.uv_index": Mock(state="2.0"),
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states_cold.get(entity_id)
+        detector2 = WeatherDetector(mock_hass, mock_options)
+        result2 = detector2.get_weather_data()
+        # Should detect some condition (likely cloudy or partly cloudy due to low solar)
+        assert result2["condition"] in ["partly_cloudy", "cloudy", "sunny"]
 
     def test_forecast_generation(self, mock_hass, mock_options, mock_sensor_data):
         """Test that forecast is generated."""

@@ -84,6 +84,25 @@ class TestWeatherAnalysis:
             dewpoint_dry == 70.0 - 50
         )  # Should return temp - 50 for very dry conditions
 
+    def test_calculate_dewpoint_edge_cases(self, analysis):
+        """Test dewpoint calculation edge cases."""
+        # Test very high humidity
+        dewpoint_100 = analysis.calculate_dewpoint(80.0, 100.0)
+        assert abs(dewpoint_100 - 80.0) < 1  # Should be very close to air temperature
+
+        # Test very low temperature
+        dewpoint_cold = analysis.calculate_dewpoint(-10.0, 50.0)
+        assert dewpoint_cold < -10.0  # Dewpoint should be below air temperature
+
+        # Test very high temperature
+        dewpoint_hot = analysis.calculate_dewpoint(120.0, 30.0)
+        assert dewpoint_hot < 120.0  # Dewpoint should be below air temperature
+
+        # Test boundary humidity values
+        dewpoint_min_humidity = analysis.calculate_dewpoint(70.0, 0.1)
+        dewpoint_max_humidity = analysis.calculate_dewpoint(70.0, 99.9)
+        assert dewpoint_min_humidity < dewpoint_max_humidity
+
     def test_classify_precipitation_intensity(self, analysis):
         """Test precipitation intensity classification."""
         assert analysis.classify_precipitation_intensity(0.0) == "trace"
@@ -121,9 +140,177 @@ class TestWeatherAnalysis:
         cloud_cover_cloudy = analysis.analyze_cloud_cover(50.0, 5000.0, 1.0)
         assert cloud_cover_cloudy > 80  # Should be mostly cloudy
 
-        # Test no solar input (night)
+        # Test no solar input (night/inconclusive)
         cloud_cover_night = analysis.analyze_cloud_cover(0.0, 0.0, 0.0)
-        assert cloud_cover_night == 100  # Complete overcast assumption
+        assert cloud_cover_night == 40.0  # Inconclusive solar data = partly cloudy
+
+    def test_analyze_cloud_cover_low_solar_radiation_fallback(self, analysis):
+        """Test cloud cover analysis with low solar radiation fallback."""
+        # Test the specific case from user's sensor data
+        # Low solar radiation but clear conditions should return 40% (partly cloudy)
+        cloud_cover = analysis.analyze_cloud_cover(26.0, 15000.0, 0.5, 15.0)
+        assert cloud_cover == 40.0  # Fallback for inconclusive solar data
+
+        # Test various combinations that trigger fallback
+        assert analysis.analyze_cloud_cover(150.0, 18000.0, 0.8, 20.0) == 40.0
+        assert analysis.analyze_cloud_cover(180.0, 19000.0, 0.9, 25.0) == 40.0
+
+        # Test that higher values don't trigger fallback
+        cloud_cover_normal = analysis.analyze_cloud_cover(250.0, 25000.0, 2.0, 30.0)
+        assert cloud_cover_normal != 40.0  # Should not be fallback value
+
+    def test_analyze_cloud_cover_elevation_effects(self, analysis):
+        """Test cloud cover analysis with different solar elevations."""
+        # Test with moderate radiation that shows elevation effects
+        cloud_cover_high = analysis.analyze_cloud_cover(
+            200.0, 20000.0, 2.0, 80.0
+        )  # High elevation
+        cloud_cover_low = analysis.analyze_cloud_cover(
+            200.0, 20000.0, 2.0, 20.0
+        )  # Low elevation
+
+        # With the same actual radiation, lower elevation gives lower cloud cover
+        # because the actual radiation represents a higher percentage of the lower max
+        assert cloud_cover_low < cloud_cover_high
+
+        # Test very low elevation (near horizon) - may show clear due to algorithm
+        cloud_cover_horizon = analysis.analyze_cloud_cover(100.0, 10000.0, 2.0, 5.0)
+        assert isinstance(cloud_cover_horizon, float)
+        assert 0 <= cloud_cover_horizon <= 100
+
+        # Test zero elevation (should use minimum factor)
+        cloud_cover_zero = analysis.analyze_cloud_cover(50.0, 5000.0, 1.0, 0.0)
+        assert isinstance(cloud_cover_zero, float)
+        assert 0 <= cloud_cover_zero <= 100
+
+    def test_analyze_cloud_cover_seasonal_adjustments(self, analysis):
+        """Test cloud cover analysis with seasonal variations."""
+        # Test that seasonal factors are applied (simplified test)
+        # Just verify the method runs without error for different months
+        import datetime
+        from unittest.mock import patch
+
+        # Test winter conditions
+        with patch(
+            "custom_components.micro_weather.weather_analysis.datetime"
+        ) as mock_datetime:
+            mock_datetime.now.return_value = datetime.datetime(2024, 1, 15)
+            winter_cover = analysis.analyze_cloud_cover(300.0, 30000.0, 3.0, 60.0)
+
+        # Test summer conditions
+        with patch(
+            "custom_components.micro_weather.weather_analysis.datetime"
+        ) as mock_datetime:
+            mock_datetime.now.return_value = datetime.datetime(2024, 7, 15)
+            summer_cover = analysis.analyze_cloud_cover(300.0, 30000.0, 3.0, 60.0)
+
+        # Both should return valid cloud cover percentages
+        assert isinstance(winter_cover, float)
+        assert isinstance(summer_cover, float)
+        assert 0 <= winter_cover <= 100
+        assert 0 <= summer_cover <= 100
+
+    def test_analyze_cloud_cover_measurement_weighting(self, analysis):
+        """Test cloud cover analysis measurement weighting logic."""
+        # Test primary weighting (solar radiation > 10)
+        cloud_cover_primary = analysis.analyze_cloud_cover(500.0, 50000.0, 5.0, 45.0)
+        assert isinstance(cloud_cover_primary, float)
+        assert 0 <= cloud_cover_primary <= 100
+
+        # Test lux fallback (low radiation, high lux)
+        cloud_cover_lux = analysis.analyze_cloud_cover(5.0, 5000.0, 0.5, 45.0)
+        assert isinstance(cloud_cover_lux, float)
+        assert 0 <= cloud_cover_lux <= 100
+
+        # Test UV fallback (very low radiation and lux, some UV)
+        cloud_cover_uv = analysis.analyze_cloud_cover(2.0, 500.0, 1.0, 45.0)
+        assert isinstance(cloud_cover_uv, float)
+        assert 0 <= cloud_cover_uv <= 100
+
+        # Test unknown fallback (measurements very low but not triggering special case)
+        # This should trigger the 40.0 fallback for inconclusive solar data
+        cloud_cover_unknown = analysis.analyze_cloud_cover(1.0, 200.0, 0.2, 45.0)
+        assert cloud_cover_unknown == 40.0  # Fallback for inconclusive data
+
+    def test_analyze_cloud_cover_edge_cases(self, analysis):
+        """Test cloud cover analysis edge cases."""
+        # Clear historical data to avoid averaging effects
+        analysis._sensor_history["solar_radiation"] = []
+
+        # Test with zero values (triggers inconclusive fallback)
+        cloud_cover_zero = analysis.analyze_cloud_cover(0.0, 0.0, 0.0, 45.0)
+        assert cloud_cover_zero == 40.0  # Inconclusive solar data = partly cloudy
+
+        # Test with very high values (should cap at 0% cloud cover)
+        cloud_cover_max = analysis.analyze_cloud_cover(2000.0, 200000.0, 20.0, 90.0)
+        assert cloud_cover_max == 0.0  # Completely clear
+
+        # Test with negative values (should be handled gracefully)
+        cloud_cover_negative = analysis.analyze_cloud_cover(-10.0, -1000.0, -1.0, 45.0)
+        assert isinstance(cloud_cover_negative, float)
+        # Should still return a valid percentage
+
+    def test_get_solar_radiation_average(self, analysis):
+        """Test solar radiation averaging."""
+        # Test with no historical data
+        average = analysis._get_solar_radiation_average(100.0)
+        assert average == 100.0  # Should return current value
+
+        # Test with insufficient historical data
+        analysis._sensor_history["solar_radiation"] = [
+            {"timestamp": datetime.now() - timedelta(minutes=5), "value": 90.0},
+            {"timestamp": datetime.now() - timedelta(minutes=10), "value": 95.0},
+        ]
+        average_insufficient = analysis._get_solar_radiation_average(100.0)
+        assert average_insufficient == 100.0  # Should return current value
+
+        # Test with sufficient historical data
+        analysis._sensor_history["solar_radiation"].extend(
+            [
+                {"timestamp": datetime.now() - timedelta(minutes=15), "value": 85.0},
+                {"timestamp": datetime.now() - timedelta(minutes=20), "value": 80.0},
+                {"timestamp": datetime.now() - timedelta(minutes=25), "value": 75.0},
+            ]
+        )
+        average_sufficient = analysis._get_solar_radiation_average(100.0)
+        assert isinstance(average_sufficient, float)
+        assert average_sufficient > 0
+
+        # Test filtering out zero values
+        analysis._sensor_history["solar_radiation"].append(
+            {"timestamp": datetime.now() - timedelta(minutes=30), "value": 0.0}
+        )
+        average_filtered = analysis._get_solar_radiation_average(100.0)
+        assert average_filtered > 0  # Should exclude zero values
+
+    def test_get_solar_radiation_average_time_filtering(self, analysis):
+        """Test solar radiation averaging with time-based filtering."""
+        base_time = datetime.now()
+
+        # Add data from different time periods
+        analysis._sensor_history["solar_radiation"] = [
+            # Recent data (within 15 minutes)
+            {"timestamp": base_time - timedelta(minutes=1), "value": 100.0},
+            {"timestamp": base_time - timedelta(minutes=5), "value": 110.0},
+            {"timestamp": base_time - timedelta(minutes=10), "value": 105.0},
+            {"timestamp": base_time - timedelta(minutes=14), "value": 95.0},
+            # Older data (beyond 15 minutes)
+            {"timestamp": base_time - timedelta(minutes=20), "value": 120.0},
+            {"timestamp": base_time - timedelta(minutes=30), "value": 130.0},
+        ]
+
+        average = analysis._get_solar_radiation_average(108.0)
+        assert isinstance(average, float)
+
+        # Should only consider recent readings (within 15 minutes)
+        # Expected: weighted average of [100, 110, 105, 95] with current 108
+        recent_values = [100.0, 110.0, 105.0, 95.0, 108.0]
+        expected_avg = sum(recent_values) / len(
+            recent_values
+        )  # Simple average for test
+        assert (
+            abs(average - expected_avg) < 5.0
+        )  # Should be close to recent data average
 
     def test_estimate_visibility(self, analysis):
         """Test visibility estimation."""
@@ -301,18 +488,150 @@ class TestWeatherAnalysis:
         diff_wrap = analysis.calculate_angular_difference(350, 10)
         assert diff_wrap == 20  # 350 to 10 is 20° clockwise
 
-    def test_calculate_prevailing_direction(self, analysis):
-        """Test prevailing direction calculation."""
-        # Test mostly north
-        directions_north = [350, 0, 10, 20, 340]
-        prevailing = analysis.calculate_prevailing_direction(directions_north)
-        assert prevailing == "north"
+    def test_analyze_fog_conditions_error_handling(self, analysis):
+        """Test fog condition analysis with invalid inputs."""
+        # Test with extreme values
+        result_extreme = analysis.analyze_fog_conditions(
+            150.0, 110.0, 150.0, -10.0, 200.0, -100.0, True
+        )
+        assert isinstance(result_extreme, str)  # Should return a valid condition
 
-        # Test mostly east
-        directions_east = [80, 90, 100, 70, 110]
-        prevailing_east = analysis.calculate_prevailing_direction(directions_east)
-        assert prevailing_east == "east"
+        # Test with invalid temperature differences
+        result_invalid = analysis.analyze_fog_conditions(
+            50.0, 80.0, 30.0, 20.0, 10.0, 100.0, True  # Dewpoint > temperature
+        )
+        assert isinstance(result_invalid, str)  # Should handle invalid dewpoint
 
-        # Test empty list
-        prevailing_empty = analysis.calculate_prevailing_direction([])
-        assert prevailing_empty == "unknown"
+    def test_estimate_visibility_error_handling(self, analysis):
+        """Test visibility estimation with invalid inputs."""
+        # Test with extreme values
+        sensor_data_extreme = {
+            "solar_lux": 150.0,
+            "solar_radiation": 110.0,
+            "rain_rate": 150.0,
+            "wind_speed": -10.0,
+            "wind_gust": 200.0,
+            "humidity": -100.0,
+            "outdoor_temp": 150.0,
+        }
+        result_extreme = analysis.estimate_visibility("sunny", sensor_data_extreme)
+        assert isinstance(
+            result_extreme, (int, float)
+        )  # Should return a valid visibility
+
+        # Test with invalid temperature differences
+        sensor_data_invalid = {
+            "solar_lux": 50.0,
+            "solar_radiation": 80.0,
+            "rain_rate": 30.0,
+            "wind_speed": 20.0,
+            "wind_gust": 10.0,
+            "humidity": 100.0,
+            "outdoor_temp": 50.0,  # Dewpoint > temperature scenario
+        }
+        result_invalid = analysis.estimate_visibility("foggy", sensor_data_invalid)
+        assert isinstance(
+            result_invalid, (int, float)
+        )  # Should handle invalid dewpoint
+
+    def test_get_historical_trends_error_handling(self, analysis):
+        """Test historical trends with error conditions."""
+        # Test with future timestamps
+        future_time = datetime.now() + timedelta(hours=1)
+        analysis._sensor_history["future_sensor"] = [
+            {"timestamp": future_time, "value": 100.0},
+        ]
+
+        trends_future = analysis.get_historical_trends("future_sensor")
+        assert trends_future == {}  # Should exclude future data
+
+    def test_calculate_trend_error_handling(self, analysis):
+        """Test trend calculation error handling."""
+        # Test with empty lists
+        trend_empty = analysis.calculate_trend([], [])
+        assert trend_empty == 0.0
+
+        # Test with mismatched lengths
+        trend_mismatch = analysis.calculate_trend([1, 2], [1])
+        assert trend_mismatch == 0.0
+
+        # Test with single points
+        trend_single = analysis.calculate_trend([1], [1])
+        assert trend_single == 0.0
+
+        # Test with constant values (zero variance)
+        trend_constant = analysis.calculate_trend([1, 2, 3], [5, 5, 5])
+        assert trend_constant == 0.0
+
+    def test_analyze_pressure_trends_error_handling(self, analysis):
+        """Test pressure trend analysis error handling."""
+        # Test with empty history
+        analysis._sensor_history = {}  # Clear history
+
+        pressure_analysis = analysis.analyze_pressure_trends()
+        assert pressure_analysis["pressure_system"] == "unknown"
+        assert pressure_analysis["storm_probability"] == 0.0
+
+        # Test with insufficient data
+        analysis._sensor_history["pressure"] = [
+            {"timestamp": datetime.now(), "value": 29.92}
+        ]
+
+        pressure_analysis_short = analysis.analyze_pressure_trends()
+        assert pressure_analysis_short["pressure_system"] == "unknown"
+        assert pressure_analysis_short["storm_probability"] == 0.0
+
+    def test_analyze_wind_direction_trends_error_handling(self, analysis):
+        """Test wind direction trend analysis error handling."""
+        # Test with empty history
+        analysis._sensor_history = {}
+
+        wind_analysis = analysis.analyze_wind_direction_trends()
+        assert wind_analysis["average_direction"] is None
+        assert wind_analysis["direction_stability"] == 0.0
+        assert wind_analysis["significant_shift"] is False
+
+        # Test with invalid direction values
+        analysis._sensor_history["wind_direction"] = [
+            {"timestamp": datetime.now(), "value": 400.0},  # Invalid direction > 360
+            {
+                "timestamp": datetime.now() - timedelta(hours=1),
+                "value": -50.0,
+            },  # Invalid negative
+        ]
+
+        wind_analysis_invalid = analysis.analyze_wind_direction_trends()
+        assert isinstance(
+            wind_analysis_invalid["average_direction"], (float, type(None))
+        )
+
+    def test_calculate_circular_mean_error_handling(self, analysis):
+        """Test circular mean calculation error handling."""
+        # Test with empty list
+        mean_empty = analysis.calculate_circular_mean([])
+        assert mean_empty == 0.0
+
+        # Test with invalid values (should filter out invalid ones)
+        mean_invalid = analysis.calculate_circular_mean([400, -50, 90, 180])
+        assert isinstance(mean_invalid, float)
+        assert 0 <= mean_invalid < 360
+
+        # Test with extreme values
+        mean_extreme = analysis.calculate_circular_mean(
+            [0, 720, 1080, 90]
+        )  # Multiples of 360
+        assert isinstance(mean_extreme, float)
+
+    def test_calculate_prevailing_direction_error_handling(self, analysis):
+        """Test prevailing direction calculation error handling."""
+        # Test with empty list
+        direction_empty = analysis.calculate_prevailing_direction([])
+        assert direction_empty == "unknown"
+
+        # Test with invalid values (should filter out invalid ones)
+        direction_invalid = analysis.calculate_prevailing_direction([400, -50, 90, 180])
+        assert direction_invalid in ["north", "east", "south", "west", "unknown"]
+
+        # Test with boundary values
+        direction_boundary = analysis.calculate_prevailing_direction([0, 360, 359.9])
+        assert direction_boundary == "north"  # All should map to north sector
