@@ -360,6 +360,12 @@ class WeatherAnalysis:
         # like passing clouds, while still responding to genuine weather changes
         avg_solar_radiation = self._get_solar_radiation_average(solar_radiation)
 
+        # If solar radiation is very low, it may not be reliable for cloud cover
+        # estimation (could be due to time of day, sensor issues, or actual low angle)
+        # In such cases, assume partly cloudy rather than overcast
+        if avg_solar_radiation < 200 and solar_lux < 20000 and uv_index < 1:
+            return 40.0  # Assume partly cloudy when solar data is inconclusive
+
         # Calculate realistic clear-sky maximums based on solar elevation
         # Solar radiation follows a sine relationship with elevation
         # At 90° elevation (directly overhead): ~1000 W/m²
@@ -370,7 +376,7 @@ class WeatherAnalysis:
 
         # Base maximum solar radiation (calibrated for typical installations)
         # This value should be calibrated based on historical clear-sky readings
-        base_max_radiation = 500  # W/m² at 90° elevation (calibrated estimate)
+        base_max_radiation = 1000  # W/m² at 90° elevation (corrected estimate)
 
         # Adjust for actual elevation angle
         max_solar_radiation = base_max_radiation * elevation_factor
@@ -401,9 +407,9 @@ class WeatherAnalysis:
         max_uv_index *= seasonal_factor
 
         # Calculate cloud cover from each measurement using realistic maximums
-        solar_cloud_cover = max(
-            0, min(100, 100 - (avg_solar_radiation / max_solar_radiation * 100))
-        )
+        radiation_ratio = avg_solar_radiation / max_solar_radiation
+        cloud_cover_reduction = radiation_ratio * 100
+        solar_cloud_cover = max(0, min(100, 100 - cloud_cover_reduction))
         lux_cloud_cover = max(0, min(100, 100 - (solar_lux / max_solar_lux * 100)))
         uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
 
