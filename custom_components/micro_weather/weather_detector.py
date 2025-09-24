@@ -45,6 +45,7 @@ from .const import (
 )
 from .weather_analysis import WeatherAnalysis
 from .weather_forecast import WeatherForecast
+from .weather_utils import convert_to_celsius, convert_to_hpa, convert_to_kmh
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -189,15 +190,21 @@ class WeatherDetector:
 
         # Convert units and prepare data
         weather_data = {
-            "temperature": self._convert_to_celsius(sensor_data.get("outdoor_temp")),
+            "temperature": self._convert_temperature(
+                sensor_data.get("outdoor_temp"), sensor_data.get("outdoor_temp_unit")
+            ),
             "humidity": sensor_data.get("humidity"),
-            "pressure": self._convert_to_hpa(sensor_data.get("pressure")),
-            "wind_speed": self._convert_to_kmh(sensor_data.get("wind_speed")),
+            "pressure": self._convert_pressure(
+                sensor_data.get("pressure"), sensor_data.get("pressure_unit")
+            ),
+            "wind_speed": self._convert_wind_speed(
+                sensor_data.get("wind_speed"), sensor_data.get("wind_speed_unit")
+            ),
             "wind_direction": sensor_data.get("wind_direction"),
             "visibility": self.analysis.estimate_visibility(condition, sensor_data),
             "condition": condition,
             "forecast": self.forecast.generate_enhanced_forecast(
-                condition, sensor_data
+                condition, self._prepare_forecast_sensor_data(sensor_data)
             ),
             "last_updated": datetime.now().isoformat(),
         }
@@ -239,6 +246,12 @@ class WeatherDetector:
                         sensor_data[sensor_key] = state.state.lower()
                     else:
                         sensor_data[sensor_key] = float(state.state)
+
+                        # Store the unit of measurement for conversion logic
+                        sensor_data[f"{sensor_key}_unit"] = state.attributes.get(
+                            "unit_of_measurement"
+                        )
+
                 except (ValueError, TypeError):
                     _LOGGER.warning(
                         "Could not convert sensor %s value: %s", entity_id, state.state
@@ -552,20 +565,113 @@ class WeatherDetector:
 
         return cloud_cover
 
-    def _convert_to_celsius(self, temp_f: Optional[float]) -> Optional[float]:
-        """Convert Fahrenheit to Celsius."""
-        if temp_f is None:
+    def _convert_temperature(
+        self, temp: Optional[float], unit: Optional[str]
+    ) -> Optional[float]:
+        """Convert temperature to Celsius if needed."""
+        if temp is None:
             return None
-        return round((temp_f - 32) * 5 / 9, 1)
 
-    def _convert_to_hpa(self, pressure_inhg: Optional[float]) -> Optional[float]:
-        """Convert inches of mercury to hPa."""
-        if pressure_inhg is None:
-            return None
-        return round(pressure_inhg * 33.8639, 1)
+        # If unit is Celsius or not specified, assume it's already in Celsius
+        if unit in ["°C", "C", "celsius"]:
+            return round(temp, 1)
+        # If unit is Fahrenheit, convert to Celsius using utils function
+        elif unit in ["°F", "F", "fahrenheit"]:
+            return convert_to_celsius(temp)
+        else:
+            # Unknown unit, assume Celsius (most common for weather stations)
+            _LOGGER.debug("Unknown temperature unit '%s', assuming Celsius", unit)
+            return round(temp, 1)
 
-    def _convert_to_kmh(self, speed_mph: Optional[float]) -> Optional[float]:
-        """Convert miles per hour to kilometers per hour."""
-        if speed_mph is None:
+    def _convert_pressure(
+        self, pressure: Optional[float], unit: Optional[str]
+    ) -> Optional[float]:
+        """Convert pressure to hPa if needed."""
+        if pressure is None:
             return None
-        return round(speed_mph * 1.60934, 1)
+
+        # If unit is hPa, mbar, or not specified, assume it's already in hPa
+        if unit in ["hPa", "mbar", "mb"]:
+            return round(pressure, 1)
+        # If unit is inHg, convert to hPa using utils function
+        elif unit in ["inHg", "inhg", '"Hg']:
+            return convert_to_hpa(pressure)
+        else:
+            # Unknown unit, assume hPa (most common for weather stations)
+            _LOGGER.debug("Unknown pressure unit '%s', assuming hPa", unit)
+            return round(pressure, 1)
+
+    def _convert_wind_speed(
+        self, speed: Optional[float], unit: Optional[str]
+    ) -> Optional[float]:
+        """Convert wind speed to km/h if needed."""
+        if speed is None:
+            return None
+
+        # If unit is km/h or not specified, assume it's already in km/h
+        if unit in ["km/h", "kmh", "kph"]:
+            return round(speed, 1)
+        # If unit is mph, convert to km/h using utils function
+        elif unit in ["mph", "mi/h"]:
+            return convert_to_kmh(speed)
+        # If unit is m/s, convert to km/h
+        elif unit in ["m/s", "ms"]:
+            return round(speed * 3.6, 1)
+        else:
+            # Unknown unit, assume km/h (most common for weather stations)
+            _LOGGER.debug("Unknown wind speed unit '%s', assuming km/h", unit)
+            return round(speed, 1)
+
+    def _prepare_forecast_sensor_data(
+        self, sensor_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Prepare sensor data for forecast module by converting to imperial units.
+
+        The forecast module expects imperial units (Fahrenheit, mph, inHg) for its
+        calculations, so we need to convert metric sensor data back to imperial.
+
+        Args:
+            sensor_data: Raw sensor data with units stored in {key}_unit fields
+
+        Returns:
+            dict: Sensor data converted to imperial units for forecast compatibility
+        """
+        forecast_data = sensor_data.copy()
+
+        # Convert temperature back to Fahrenheit if it was in Celsius
+        temp_unit = sensor_data.get("outdoor_temp_unit")
+        if temp_unit in ["°C", "C", "celsius"]:
+            temp_c = sensor_data.get("outdoor_temp")
+            if temp_c is not None:
+                forecast_data["outdoor_temp"] = round(temp_c * 9 / 5 + 32, 1)
+
+        # Convert wind speed back to mph if it was in km/h or m/s
+        wind_unit = sensor_data.get("wind_speed_unit")
+        if wind_unit in ["km/h", "kmh", "kph"]:
+            wind_kmh = sensor_data.get("wind_speed")
+            if wind_kmh is not None:
+                forecast_data["wind_speed"] = round(wind_kmh / 1.60934, 1)
+        elif wind_unit in ["m/s", "ms"]:
+            wind_ms = sensor_data.get("wind_speed")
+            if wind_ms is not None:
+                forecast_data["wind_speed"] = round(wind_ms / 0.44704, 1)  # m/s to mph
+
+        # Convert pressure back to inHg if it was in hPa
+        pressure_unit = sensor_data.get("pressure_unit")
+        if pressure_unit in ["hPa", "mbar", "mb"]:
+            pressure_hpa = sensor_data.get("pressure")
+            if pressure_hpa is not None:
+                forecast_data["pressure"] = round(pressure_hpa / 33.8639, 2)
+
+        # Wind gust also needs conversion if present
+        gust_unit = sensor_data.get("wind_gust_unit")
+        if gust_unit in ["km/h", "kmh", "kph"]:
+            gust_kmh = sensor_data.get("wind_gust")
+            if gust_kmh is not None:
+                forecast_data["wind_gust"] = round(gust_kmh / 1.60934, 1)
+        elif gust_unit in ["m/s", "ms"]:
+            gust_ms = sensor_data.get("wind_gust")
+            if gust_ms is not None:
+                forecast_data["wind_gust"] = round(gust_ms / 0.44704, 1)
+
+        return forecast_data
