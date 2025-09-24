@@ -662,3 +662,450 @@ class TestWeatherDetector:
         assert "condition" in result2
         assert isinstance(result1["condition"], str)
         assert isinstance(result2["condition"], str)
+
+    def test_convert_temperature_celsius(self, mock_hass, mock_options):
+        """Test temperature conversion with Celsius input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test various Celsius inputs
+        assert detector._convert_temperature(25.0, "°C") == 25.0
+        assert detector._convert_temperature(0.0, "C") == 0.0
+        assert detector._convert_temperature(-10.5, "celsius") == -10.5
+        assert detector._convert_temperature(100.0, "°C") == 100.0
+
+    def test_convert_temperature_fahrenheit(self, mock_hass, mock_options):
+        """Test temperature conversion with Fahrenheit input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test Fahrenheit to Celsius conversions
+        assert detector._convert_temperature(77.0, "°F") == 25.0  # 77°F = 25°C
+        assert detector._convert_temperature(32.0, "F") == 0.0  # 32°F = 0°C
+        assert (
+            detector._convert_temperature(212.0, "fahrenheit") == 100.0
+        )  # 212°F = 100°C
+        assert detector._convert_temperature(-40.0, "°F") == -40.0  # -40°F = -40°C
+
+    def test_convert_temperature_unknown_unit(self, mock_hass, mock_options):
+        """Test temperature conversion with unknown or missing units."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test unknown units (should assume Celsius)
+        assert detector._convert_temperature(25.0, "kelvin") == 25.0
+        assert detector._convert_temperature(25.0, "K") == 25.0
+        assert detector._convert_temperature(25.0, None) == 25.0
+        assert detector._convert_temperature(25.0, "") == 25.0
+
+    def test_convert_temperature_none_value(self, mock_hass, mock_options):
+        """Test temperature conversion with None input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test None input
+        assert detector._convert_temperature(None, "°C") is None
+        assert detector._convert_temperature(None, "°F") is None
+        assert detector._convert_temperature(None, None) is None
+
+    def test_convert_pressure_hpa(self, mock_hass, mock_options):
+        """Test pressure conversion with hPa input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test various hPa inputs
+        assert detector._convert_pressure(1013.25, "hPa") == 1013.2
+        assert detector._convert_pressure(1000.0, "mbar") == 1000.0
+        assert detector._convert_pressure(1013.0, "mb") == 1013.0
+
+    def test_convert_pressure_inhg(self, mock_hass, mock_options):
+        """Test pressure conversion with inHg input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test inHg to hPa conversions
+        assert (
+            detector._convert_pressure(29.92, "inHg") == 1013.2
+        )  # Standard atmospheric pressure
+        assert detector._convert_pressure(30.0, "inhg") == 1015.9
+        assert detector._convert_pressure(28.0, '"Hg') == 948.2
+
+    def test_convert_pressure_unknown_unit(self, mock_hass, mock_options):
+        """Test pressure conversion with unknown or missing units."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test unknown units (should assume hPa)
+        assert detector._convert_pressure(1013.0, "psi") == 1013.0
+        assert detector._convert_pressure(1013.0, "bar") == 1013.0
+        assert detector._convert_pressure(1013.0, None) == 1013.0
+        assert detector._convert_pressure(1013.0, "") == 1013.0
+
+    def test_convert_pressure_none_value(self, mock_hass, mock_options):
+        """Test pressure conversion with None input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test None input
+        assert detector._convert_pressure(None, "hPa") is None
+        assert detector._convert_pressure(None, "inHg") is None
+        assert detector._convert_pressure(None, None) is None
+
+    def test_convert_wind_speed_kmh(self, mock_hass, mock_options):
+        """Test wind speed conversion with km/h input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test various km/h inputs
+        assert detector._convert_wind_speed(10.0, "km/h") == 10.0
+        assert detector._convert_wind_speed(25.5, "kmh") == 25.5
+        assert detector._convert_wind_speed(0.0, "kph") == 0.0
+
+    def test_convert_wind_speed_mph(self, mock_hass, mock_options):
+        """Test wind speed conversion with mph input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test mph to km/h conversions
+        assert (
+            detector._convert_wind_speed(10.0, "mph") == 16.1
+        )  # 10 mph = 16.0934 km/h
+        assert detector._convert_wind_speed(1.0, "mi/h") == 1.6  # 1 mph = 1.60934 km/h
+        assert detector._convert_wind_speed(0.0, "mph") == 0.0
+
+    def test_convert_wind_speed_ms(self, mock_hass, mock_options):
+        """Test wind speed conversion with m/s input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test m/s to km/h conversions
+        assert detector._convert_wind_speed(10.0, "m/s") == 36.0  # 10 m/s = 36 km/h
+        assert detector._convert_wind_speed(2.5, "ms") == 9.0  # 2.5 m/s = 9 km/h
+        assert detector._convert_wind_speed(0.0, "m/s") == 0.0
+
+    def test_convert_wind_speed_unknown_unit(self, mock_hass, mock_options):
+        """Test wind speed conversion with unknown or missing units."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test unknown units (should assume km/h)
+        assert detector._convert_wind_speed(10.0, "knots") == 10.0
+        assert detector._convert_wind_speed(10.0, "beaufort") == 10.0
+        assert detector._convert_wind_speed(10.0, None) == 10.0
+        assert detector._convert_wind_speed(10.0, "") == 10.0
+
+    def test_convert_wind_speed_none_value(self, mock_hass, mock_options):
+        """Test wind speed conversion with None input."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test None input
+        assert detector._convert_wind_speed(None, "km/h") is None
+        assert detector._convert_wind_speed(None, "mph") is None
+        assert detector._convert_wind_speed(None, "m/s") is None
+        assert detector._convert_wind_speed(None, None) is None
+
+    def test_unit_conversion_accuracy(self, mock_hass, mock_options):
+        """Test conversion accuracy with precise values."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test precise temperature conversions
+        assert abs(detector._convert_temperature(77.0, "°F") - 25.0) < 0.1
+        assert abs(detector._convert_temperature(32.0, "°F") - 0.0) < 0.1
+
+        # Test precise pressure conversions
+        assert abs(detector._convert_pressure(29.92, "inHg") - 1013.25) < 0.1
+        assert abs(detector._convert_pressure(30.0, "inHg") - 1015.92) < 0.1
+
+        # Test precise wind speed conversions
+        assert abs(detector._convert_wind_speed(10.0, "mph") - 16.0934) < 0.1
+        assert abs(detector._convert_wind_speed(10.0, "m/s") - 36.0) < 0.1
+
+    def test_get_sensor_values_with_units(self, mock_hass, mock_options):
+        """Test that sensor values and units are captured correctly."""
+        # Set up mock states with unit_of_measurement attributes
+        mock_states = {
+            "sensor.outdoor_temperature": Mock(
+                state="25.0", attributes={"unit_of_measurement": "°C"}
+            ),
+            "sensor.pressure": Mock(
+                state="1013.25", attributes={"unit_of_measurement": "hPa"}
+            ),
+            "sensor.wind_speed": Mock(
+                state="10.0", attributes={"unit_of_measurement": "km/h"}
+            ),
+            "sensor.humidity": Mock(
+                state="65.0", attributes={"unit_of_measurement": "%"}
+            ),
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        sensor_data = detector._get_sensor_values()
+
+        # Check that values are captured
+        assert sensor_data["outdoor_temp"] == 25.0
+        assert sensor_data["pressure"] == 1013.25
+        assert sensor_data["wind_speed"] == 10.0
+        assert sensor_data["humidity"] == 65.0
+
+        # Check that units are captured
+        assert sensor_data["outdoor_temp_unit"] == "°C"
+        assert sensor_data["pressure_unit"] == "hPa"
+        assert sensor_data["wind_speed_unit"] == "km/h"
+        assert sensor_data["humidity_unit"] == "%"
+
+    def test_get_weather_data_with_metric_units(self, mock_hass, mock_options):
+        """Test weather data conversion with metric sensor units."""
+        # Set up mock states with metric units (like Tempest weather station)
+        mock_states = {
+            "sensor.outdoor_temperature": Mock(
+                state="25.0", attributes={"unit_of_measurement": "°C"}
+            ),
+            "sensor.pressure": Mock(
+                state="1013.25", attributes={"unit_of_measurement": "hPa"}
+            ),
+            "sensor.wind_speed": Mock(
+                state="10.0", attributes={"unit_of_measurement": "km/h"}
+            ),
+            "sensor.humidity": Mock(
+                state="65.0", attributes={"unit_of_measurement": "%"}
+            ),
+            "sensor.wind_direction": Mock(
+                state="180.0", attributes={"unit_of_measurement": "°"}
+            ),
+            "sensor.wind_gust": Mock(
+                state="15.0", attributes={"unit_of_measurement": "km/h"}
+            ),
+            "sensor.rain_rate": Mock(
+                state="0.0", attributes={"unit_of_measurement": "mm/h"}
+            ),
+            "sensor.rain_state": Mock(state="Dry", attributes={}),
+            "sensor.solar_radiation": Mock(
+                state="250.0", attributes={"unit_of_measurement": "W/m²"}
+            ),
+            "sensor.solar_lux": Mock(
+                state="25000.0", attributes={"unit_of_measurement": "lx"}
+            ),
+            "sensor.uv_index": Mock(
+                state="3.0", attributes={"unit_of_measurement": "UV index"}
+            ),
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+
+        # Values should remain in metric (no conversion needed)
+        assert result["temperature"] == 25.0  # Already in Celsius
+        assert result["pressure"] == 1013.2  # Already in hPa (rounded)
+        assert result["wind_speed"] == 10.0  # Already in km/h
+
+    def test_get_weather_data_with_imperial_units(self, mock_hass, mock_options):
+        """Test weather data conversion with imperial sensor units."""
+        # Set up mock states with imperial units
+        mock_states = {
+            "sensor.outdoor_temperature": Mock(
+                state="77.0", attributes={"unit_of_measurement": "°F"}
+            ),
+            "sensor.pressure": Mock(
+                state="29.92", attributes={"unit_of_measurement": "inHg"}
+            ),
+            "sensor.wind_speed": Mock(
+                state="10.0", attributes={"unit_of_measurement": "mph"}
+            ),
+            "sensor.humidity": Mock(
+                state="65.0", attributes={"unit_of_measurement": "%"}
+            ),
+            "sensor.wind_direction": Mock(
+                state="180.0", attributes={"unit_of_measurement": "°"}
+            ),
+            "sensor.wind_gust": Mock(
+                state="15.0", attributes={"unit_of_measurement": "mph"}
+            ),
+            "sensor.rain_rate": Mock(
+                state="0.0", attributes={"unit_of_measurement": "in/h"}
+            ),
+            "sensor.rain_state": Mock(state="Dry", attributes={}),
+            "sensor.solar_radiation": Mock(
+                state="250.0", attributes={"unit_of_measurement": "W/m²"}
+            ),
+            "sensor.solar_lux": Mock(
+                state="25000.0", attributes={"unit_of_measurement": "lx"}
+            ),
+            "sensor.uv_index": Mock(
+                state="3.0", attributes={"unit_of_measurement": "UV index"}
+            ),
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+
+        # Values should be converted to metric
+        assert result["temperature"] == 25.0  # 77°F -> 25°C
+        assert result["pressure"] == 1013.2  # 29.92 inHg -> 1013.25 hPa (rounded)
+        assert result["wind_speed"] == 16.1  # 10 mph -> 16.0934 km/h (rounded)
+
+    def test_get_weather_data_with_mixed_units(self, mock_hass, mock_options):
+        """Test weather data conversion with mixed sensor units."""
+        # Set up mock states with mixed units
+        mock_states = {
+            "sensor.outdoor_temperature": Mock(
+                state="25.0", attributes={"unit_of_measurement": "°C"}  # Metric
+            ),
+            "sensor.pressure": Mock(
+                state="29.92", attributes={"unit_of_measurement": "inHg"}  # Imperial
+            ),
+            "sensor.wind_speed": Mock(
+                state="10.0", attributes={"unit_of_measurement": "m/s"}  # SI
+            ),
+            "sensor.humidity": Mock(
+                state="65.0", attributes={"unit_of_measurement": "%"}
+            ),
+            "sensor.wind_direction": Mock(
+                state="180.0", attributes={"unit_of_measurement": "°"}
+            ),
+            "sensor.wind_gust": Mock(
+                state="15.0", attributes={"unit_of_measurement": "mph"}
+            ),
+            "sensor.rain_rate": Mock(
+                state="0.0", attributes={"unit_of_measurement": "mm/h"}
+            ),
+            "sensor.rain_state": Mock(state="Dry", attributes={}),
+            "sensor.solar_radiation": Mock(
+                state="250.0", attributes={"unit_of_measurement": "W/m²"}
+            ),
+            "sensor.solar_lux": Mock(
+                state="25000.0", attributes={"unit_of_measurement": "lx"}
+            ),
+            "sensor.uv_index": Mock(
+                state="3.0", attributes={"unit_of_measurement": "UV index"}
+            ),
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+
+        # Check mixed conversions
+        assert result["temperature"] == 25.0  # No conversion (already °C)
+        assert result["pressure"] == 1013.2  # inHg -> hPa
+        assert result["wind_speed"] == 36.0  # m/s -> km/h
+
+    def test_prepare_forecast_sensor_data(self, mock_hass, mock_options):
+        """Test that forecast sensor data preparation converts units correctly."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test data with metric units (like Tempest weather station)
+        metric_sensor_data = {
+            "outdoor_temp": 25.0,
+            "outdoor_temp_unit": "°C",
+            "pressure": 1013.25,
+            "pressure_unit": "hPa",
+            "wind_speed": 10.0,
+            "wind_speed_unit": "km/h",
+            "wind_gust": 15.0,
+            "wind_gust_unit": "km/h",
+            "humidity": 65.0,
+            "rain_rate": 0.0,
+        }
+
+        forecast_data = detector._prepare_forecast_sensor_data(metric_sensor_data)
+
+        # Temperature: 25°C -> 77°F
+        assert forecast_data["outdoor_temp"] == 77.0
+
+        # Pressure: 1013.25 hPa -> ~29.92 inHg
+        assert abs(forecast_data["pressure"] - 29.92) < 0.01
+
+        # Wind speed: 10 km/h -> ~6.21 mph
+        assert abs(forecast_data["wind_speed"] - 6.21) < 0.01
+
+        # Wind gust: 15 km/h -> ~9.3 mph
+        assert abs(forecast_data["wind_gust"] - 9.3) < 0.01
+
+        # Other data should remain unchanged
+        assert forecast_data["humidity"] == 65.0
+        assert forecast_data["rain_rate"] == 0.0
+
+    def test_prepare_forecast_sensor_data_imperial(self, mock_hass, mock_options):
+        """Test that imperial sensor data passes through unchanged."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test data with imperial units
+        imperial_sensor_data = {
+            "outdoor_temp": 77.0,
+            "outdoor_temp_unit": "°F",
+            "pressure": 29.92,
+            "pressure_unit": "inHg",
+            "wind_speed": 10.0,
+            "wind_speed_unit": "mph",
+            "humidity": 65.0,
+        }
+
+        forecast_data = detector._prepare_forecast_sensor_data(imperial_sensor_data)
+
+        # Imperial data should pass through unchanged
+        assert forecast_data["outdoor_temp"] == 77.0
+        assert forecast_data["pressure"] == 29.92
+        assert forecast_data["wind_speed"] == 10.0
+        assert forecast_data["humidity"] == 65.0
+
+    def test_prepare_analysis_sensor_data(self, mock_hass, mock_options):
+        """Test that analysis sensor data preparation converts units correctly."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test data with metric units (like Tempest weather station)
+        metric_sensor_data = {
+            "outdoor_temp": 25.0,
+            "outdoor_temp_unit": "°C",
+            "pressure": 1013.25,
+            "pressure_unit": "hPa",
+            "wind_speed": 10.0,
+            "wind_speed_unit": "km/h",
+            "wind_gust": 15.0,
+            "wind_gust_unit": "km/h",
+            "dewpoint": 20.0,
+            "dewpoint_unit": "°C",
+            "humidity": 65.0,
+            "rain_rate": 0.0,
+        }
+
+        analysis_data = detector._prepare_analysis_sensor_data(metric_sensor_data)
+
+        # Temperature: 25°C -> 77°F
+        assert analysis_data["outdoor_temp"] == 77.0
+
+        # Pressure: 1013.25 hPa -> ~29.92 inHg
+        assert abs(analysis_data["pressure"] - 29.92) < 0.01
+
+        # Wind speed: 10 km/h -> ~6.21 mph
+        assert abs(analysis_data["wind_speed"] - 6.21) < 0.01
+
+        # Wind gust: 15 km/h -> ~9.3 mph
+        assert abs(analysis_data["wind_gust"] - 9.3) < 0.01
+
+        # Dewpoint: 20°C -> 68°F
+        assert analysis_data["dewpoint"] == 68.0
+
+        # Other data should remain unchanged
+        assert analysis_data["humidity"] == 65.0
+        assert analysis_data["rain_rate"] == 0.0
+
+    def test_prepare_analysis_sensor_data_imperial(self, mock_hass, mock_options):
+        """Test that imperial analysis sensor data passes through unchanged."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test data with imperial units
+        imperial_sensor_data = {
+            "outdoor_temp": 77.0,
+            "outdoor_temp_unit": "°F",
+            "pressure": 29.92,
+            "pressure_unit": "inHg",
+            "wind_speed": 10.0,
+            "wind_speed_unit": "mph",
+            "dewpoint": 68.0,
+            "dewpoint_unit": "°F",
+            "humidity": 65.0,
+        }
+
+        analysis_data = detector._prepare_analysis_sensor_data(imperial_sensor_data)
+
+        # Imperial data should pass through unchanged
+        assert analysis_data["outdoor_temp"] == 77.0
+        assert analysis_data["pressure"] == 29.92
+        assert analysis_data["wind_speed"] == 10.0
+        assert analysis_data["dewpoint"] == 68.0
+        assert analysis_data["humidity"] == 65.0
