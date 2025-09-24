@@ -19,6 +19,7 @@ Weather station data can be unreliable or not reflect your specific microclimate
 - **💨 Wind Conditions**: Detect actual wind conditions affected by your local terrain and structures
 - **☀️ Solar Analysis**: Use your solar radiation sensors to accurately detect cloud cover
 - **🏠 Hyperlocal Weather**: Get weather conditions specific to your property and environment
+- **🌍 Multi-Unit Support**: Works seamlessly with both metric and imperial sensor units
 
 This integration analyzes your real sensor data to provide weather conditions that truly represent what's happening at your exact location.
 
@@ -33,6 +34,7 @@ This integration analyzes your real sensor data to provide weather conditions th
 - 🔄 **Real-time Analysis**: Updates based on actual sensor readings
 - 📱 **Easy Configuration**: Simple setup through Home Assistant UI with sensor selection
 - 🌍 **Multilingual Support**: Available in English, Italian, German, Spanish, and French
+- 🔄 **Multi-Unit Support**: Automatic detection and conversion between metric and imperial units
 
 ## Installation
 
@@ -76,8 +78,8 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.3.3.zip
-   unzip v1.3.3.zip
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.4.0.zip
+   unzip v1.4.0.zip
 
    # Option B: Clone repository
    git clone https://github.com/caplaz/micro-weather-station.git
@@ -201,6 +203,23 @@ Configure additional sensors for enhanced weather detection:
 | Solar Lux           | `sensor.light_sensor`    | Day/night and cloud detection           |
 | UV Index            | `sensor.uv_index`        | Clear sky and sun intensity             |
 | Sun Sensor          | `sensor.sun_elevation`   | Solar elevation for precise cloud cover |
+
+### Unit Conversion Support
+
+The integration automatically detects and converts between different sensor units:
+
+- **Temperature**: °C ↔ °F (Celsius/Fahrenheit)
+- **Pressure**: hPa/mbar ↔ inHg (hectopascals/inches of mercury)
+- **Wind Speed**: km/h, mph, m/s (kilometers/hour, miles/hour, meters/second)
+
+**Supported Sensors:**
+
+- ✅ **Metric Weather Stations**: Full metric unit support (°C, hPa, km/h)
+- ✅ **Imperial Weather Stations**: Imperial units (°F, inHg, mph)
+- ✅ **Mixed Environments**: Any combination of metric and imperial sensors
+- ✅ **SI Units**: Support for m/s wind speed sensors
+
+The integration intelligently converts all sensor data to consistent internal units for accurate weather analysis, ensuring compatibility with both modern metric sensors and legacy imperial equipment.
 
 ### Step 3: Testing Your Configuration
 
@@ -781,6 +800,25 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### v1.4.0
+
+- **Complete Unit Conversion Support**: Full support for both metric and imperial sensor units
+  - Automatic detection and conversion of temperature (°C/°F), pressure (hPa/inHg), and wind speed (km/h/mph/m/s)
+  - Smart unit-aware conversion methods that preserve accuracy across different sensor types
+  - Backward compatibility with existing imperial sensor setups
+- **Enhanced Analysis Methods**: All meteorological analysis functions now receive consistent imperial units
+  - Added `_prepare_analysis_sensor_data()` method for converting metric sensor data to imperial units
+  - Updated historical data storage to use imperial units for consistent trend analysis
+  - Improved accuracy of weather condition detection with mixed sensor units
+- **Intelligent Forecast Wind Calculation**: Fixed forecast wind speeds to use actual sensor readings
+  - Replaced condition-based fixed wind values with current wind speed as base
+  - Applied realistic condition-based adjustments as multipliers (not absolute values)
+  - Provides accurate forecast wind speeds that reflect real sensor data
+- **Comprehensive Test Coverage**: Added extensive unit conversion tests (40+ new tests)
+  - Tests for all unit conversion scenarios (metric, imperial, mixed)
+  - Forecast preparation and analysis preparation validation
+  - Integration tests ensuring end-to-end functionality with different sensor units
+
 ### v1.3.3
 
 - **Nighttime Weather Detection**: Fixed false cloudy detection on clear nights with low pressure
@@ -839,11 +877,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.3
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.4.0
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.3.3
+[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.4.0
 [releases]: https://github.com/caplaz/micro-weather-station/releases
 [logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png

@@ -1,3 +1,39 @@
+## 1.4.0 (2025-09-24)
+
+### Features
+
+- **Complete Unit Conversion Support**: Full support for both metric and imperial sensor units
+  - Automatic detection and conversion of temperature (°C/°F), pressure (hPa/inHg), and wind speed (km/h/mph/m/s)
+  - Smart unit-aware conversion methods that preserve accuracy across different sensor types
+  - Backward compatibility with existing imperial sensor setups
+
+### Technical Improvements
+
+- **Enhanced Analysis Methods**: All meteorological analysis functions now receive consistent imperial units
+  - Added `_prepare_analysis_sensor_data()` method for converting metric sensor data to imperial units
+  - Updated historical data storage to use imperial units for consistent trend analysis
+  - Improved accuracy of weather condition detection with mixed sensor units
+- **Intelligent Forecast Wind Calculation**: Fixed forecast wind speeds to use actual sensor readings
+  - Replaced condition-based fixed wind values with current wind speed as base
+  - Applied realistic condition-based adjustments as multipliers (not absolute values)
+  - Provides accurate forecast wind speeds that reflect real sensor data
+- **Comprehensive Test Coverage**: Added extensive unit conversion tests (40+ new tests)
+  - Tests for all unit conversion scenarios (metric, imperial, mixed)
+  - Forecast preparation and analysis preparation validation
+  - Integration tests ensuring end-to-end functionality with different sensor units
+
+### Bug Fixes
+
+- **Forecast Wind Speed Accuracy**: Fixed unrealistic forecast wind speeds that didn't reflect actual sensor readings
+- **Unit Conversion Consistency**: Ensured all analysis methods receive correct imperial units regardless of sensor input units
+- **Historical Data Accuracy**: Fixed trend analysis to use consistent units for accurate meteorological predictions
+
+### Changes
+
+- Enhanced meteorological algorithms to work seamlessly with both metric and imperial sensor data
+- Improved forecast accuracy by using real wind speed data instead of condition-based estimates
+- Better handling of mixed sensor environments
+
 ## 1.3.3 (2025-09-23)
 
 ### Bug Fixes
