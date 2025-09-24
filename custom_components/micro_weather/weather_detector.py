@@ -145,7 +145,9 @@ class WeatherDetector:
         sensor_data = self._get_sensor_values()
 
         # Store historical data
-        self.analysis.store_historical_data(sensor_data)
+        self.analysis.store_historical_data(
+            self._prepare_analysis_sensor_data(sensor_data)
+        )
 
         # Determine weather condition
         condition = self._determine_weather_condition(sensor_data)
@@ -201,7 +203,9 @@ class WeatherDetector:
                 sensor_data.get("wind_speed"), sensor_data.get("wind_speed_unit")
             ),
             "wind_direction": sensor_data.get("wind_direction"),
-            "visibility": self.analysis.estimate_visibility(condition, sensor_data),
+            "visibility": self.analysis.estimate_visibility(
+                condition, self._prepare_analysis_sensor_data(sensor_data)
+            ),
             "condition": condition,
             "forecast": self.forecast.generate_enhanced_forecast(
                 condition, self._prepare_forecast_sensor_data(sensor_data)
@@ -301,22 +305,24 @@ class WeatherDetector:
         - Temperature/humidity for fog and frost conditions
         - Dewpoint analysis for precipitation potential
         """
+        # Prepare sensor data in imperial units for analysis
+        analysis_data = self._prepare_analysis_sensor_data(sensor_data)
 
         # Extract sensor values with better defaults
-        rain_rate: float = sensor_data.get("rain_rate", 0.0)
-        rain_state: str = sensor_data.get("rain_state", "dry").lower()
-        wind_speed: float = sensor_data.get("wind_speed", 0.0)
-        wind_gust: float = sensor_data.get("wind_gust", 0.0)
-        solar_radiation: float = sensor_data.get("solar_radiation", 0.0)
-        solar_lux: float = sensor_data.get("solar_lux", 0.0)
-        uv_index: float = sensor_data.get("uv_index", 0.0)
-        outdoor_temp: float = sensor_data.get("outdoor_temp", 70.0)
-        humidity: float = sensor_data.get("humidity", 50.0)
-        pressure: float = sensor_data.get("pressure", 29.92)
+        rain_rate: float = analysis_data.get("rain_rate", 0.0)
+        rain_state: str = analysis_data.get("rain_state", "dry").lower()
+        wind_speed: float = analysis_data.get("wind_speed", 0.0)
+        wind_gust: float = analysis_data.get("wind_gust", 0.0)
+        solar_radiation: float = analysis_data.get("solar_radiation", 0.0)
+        solar_lux: float = analysis_data.get("solar_lux", 0.0)
+        uv_index: float = analysis_data.get("uv_index", 0.0)
+        outdoor_temp: float = analysis_data.get("outdoor_temp", 70.0)
+        humidity: float = analysis_data.get("humidity", 50.0)
+        pressure: float = analysis_data.get("pressure", 29.92)
 
         # Calculate derived meteorological parameters
         # Use dewpoint sensor if available, otherwise calculate from temp/humidity
-        dewpoint_raw = sensor_data.get("dewpoint")
+        dewpoint_raw = analysis_data.get("dewpoint")
         if dewpoint_raw is not None:
             dewpoint: float = float(dewpoint_raw)
         else:
@@ -462,7 +468,7 @@ class WeatherDetector:
 
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
         if is_daytime:
-            solar_elevation: float = sensor_data.get(
+            solar_elevation: float = analysis_data.get(
                 "solar_elevation", 45.0
             )  # Default to 45° if not available
             cloud_cover: float = self.analysis.analyze_cloud_cover(
@@ -675,3 +681,64 @@ class WeatherDetector:
                 forecast_data["wind_gust"] = round(gust_ms / 0.44704, 1)
 
         return forecast_data
+
+    def _prepare_analysis_sensor_data(
+        self, sensor_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Prepare sensor data for analysis module by converting to imperial units.
+
+        The analysis module expects imperial units (Fahrenheit, mph, inHg) for its
+        calculations, so we need to convert metric sensor data to imperial.
+
+        Args:
+            sensor_data: Raw sensor data with units stored in {key}_unit fields
+
+        Returns:
+            dict: Sensor data converted to imperial units for analysis compatibility
+        """
+        analysis_data = sensor_data.copy()
+
+        # Convert temperature to Fahrenheit if it was in Celsius
+        temp_unit = sensor_data.get("outdoor_temp_unit")
+        if temp_unit in ["°C", "C", "celsius"]:
+            temp_c = sensor_data.get("outdoor_temp")
+            if temp_c is not None:
+                analysis_data["outdoor_temp"] = round(temp_c * 9 / 5 + 32, 1)
+
+        # Convert wind speed to mph if it was in km/h or m/s
+        wind_unit = sensor_data.get("wind_speed_unit")
+        if wind_unit in ["km/h", "kmh", "kph"]:
+            wind_kmh = sensor_data.get("wind_speed")
+            if wind_kmh is not None:
+                analysis_data["wind_speed"] = round(wind_kmh / 1.60934, 1)
+        elif wind_unit in ["m/s", "ms"]:
+            wind_ms = sensor_data.get("wind_speed")
+            if wind_ms is not None:
+                analysis_data["wind_speed"] = round(wind_ms / 0.44704, 1)  # m/s to mph
+
+        # Convert pressure to inHg if it was in hPa
+        pressure_unit = sensor_data.get("pressure_unit")
+        if pressure_unit in ["hPa", "mbar", "mb"]:
+            pressure_hpa = sensor_data.get("pressure")
+            if pressure_hpa is not None:
+                analysis_data["pressure"] = round(pressure_hpa / 33.8639, 2)
+
+        # Wind gust also needs conversion if present
+        gust_unit = sensor_data.get("wind_gust_unit")
+        if gust_unit in ["km/h", "kmh", "kph"]:
+            gust_kmh = sensor_data.get("wind_gust")
+            if gust_kmh is not None:
+                analysis_data["wind_gust"] = round(gust_kmh / 1.60934, 1)
+        elif gust_unit in ["m/s", "ms"]:
+            gust_ms = sensor_data.get("wind_gust")
+            if gust_ms is not None:
+                analysis_data["wind_gust"] = round(gust_ms / 0.44704, 1)
+
+        # Convert dewpoint to Fahrenheit if it was in Celsius
+        dewpoint_unit = sensor_data.get("dewpoint_unit")
+        if dewpoint_unit in ["°C", "C", "celsius"]:
+            dewpoint_c = sensor_data.get("dewpoint")
+            if dewpoint_c is not None:
+                analysis_data["dewpoint"] = round(dewpoint_c * 9 / 5 + 32, 1)
+
+        return analysis_data

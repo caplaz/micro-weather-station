@@ -1042,3 +1042,70 @@ class TestWeatherDetector:
         assert forecast_data["pressure"] == 29.92
         assert forecast_data["wind_speed"] == 10.0
         assert forecast_data["humidity"] == 65.0
+
+    def test_prepare_analysis_sensor_data(self, mock_hass, mock_options):
+        """Test that analysis sensor data preparation converts units correctly."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test data with metric units (like Tempest weather station)
+        metric_sensor_data = {
+            "outdoor_temp": 25.0,
+            "outdoor_temp_unit": "°C",
+            "pressure": 1013.25,
+            "pressure_unit": "hPa",
+            "wind_speed": 10.0,
+            "wind_speed_unit": "km/h",
+            "wind_gust": 15.0,
+            "wind_gust_unit": "km/h",
+            "dewpoint": 20.0,
+            "dewpoint_unit": "°C",
+            "humidity": 65.0,
+            "rain_rate": 0.0,
+        }
+
+        analysis_data = detector._prepare_analysis_sensor_data(metric_sensor_data)
+
+        # Temperature: 25°C -> 77°F
+        assert analysis_data["outdoor_temp"] == 77.0
+
+        # Pressure: 1013.25 hPa -> ~29.92 inHg
+        assert abs(analysis_data["pressure"] - 29.92) < 0.01
+
+        # Wind speed: 10 km/h -> ~6.21 mph
+        assert abs(analysis_data["wind_speed"] - 6.21) < 0.01
+
+        # Wind gust: 15 km/h -> ~9.3 mph
+        assert abs(analysis_data["wind_gust"] - 9.3) < 0.01
+
+        # Dewpoint: 20°C -> 68°F
+        assert analysis_data["dewpoint"] == 68.0
+
+        # Other data should remain unchanged
+        assert analysis_data["humidity"] == 65.0
+        assert analysis_data["rain_rate"] == 0.0
+
+    def test_prepare_analysis_sensor_data_imperial(self, mock_hass, mock_options):
+        """Test that imperial analysis sensor data passes through unchanged."""
+        detector = WeatherDetector(mock_hass, mock_options)
+
+        # Test data with imperial units
+        imperial_sensor_data = {
+            "outdoor_temp": 77.0,
+            "outdoor_temp_unit": "°F",
+            "pressure": 29.92,
+            "pressure_unit": "inHg",
+            "wind_speed": 10.0,
+            "wind_speed_unit": "mph",
+            "dewpoint": 68.0,
+            "dewpoint_unit": "°F",
+            "humidity": 65.0,
+        }
+
+        analysis_data = detector._prepare_analysis_sensor_data(imperial_sensor_data)
+
+        # Imperial data should pass through unchanged
+        assert analysis_data["outdoor_temp"] == 77.0
+        assert analysis_data["pressure"] == 29.92
+        assert analysis_data["wind_speed"] == 10.0
+        assert analysis_data["dewpoint"] == 68.0
+        assert analysis_data["humidity"] == 65.0

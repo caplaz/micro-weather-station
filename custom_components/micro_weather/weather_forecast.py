@@ -299,17 +299,21 @@ class WeatherForecast:
         # Convert current wind to km/h for consistency
         current_wind_kmh = convert_to_kmh(current_wind) or 10
 
-        # Base wind by condition
-        condition_wind = {
-            "stormy": 30.0,  # Strong winds with storms
-            "rainy": 15.0,  # Moderate winds with rain
-            "cloudy": 10.0,  # Light winds
-            "partly_cloudy": 8.0,
-            "sunny": 5.0,  # Light winds on clear days
-            "foggy": 3.0,  # Very light winds with fog
-            "snowy": 12.0,  # Moderate winds with snow
+        # Start with current wind speed as base
+        forecast_wind = current_wind_kmh
+
+        # Apply condition-based adjustments (not absolute values)
+        condition_wind_adjustment = {
+            "stormy": 1.5,  # 50% increase for storms
+            "rainy": 1.2,  # 20% increase for rain
+            "cloudy": 0.9,  # 10% decrease for clouds
+            "partly_cloudy": 0.95,  # 5% decrease
+            "sunny": 0.8,  # 20% decrease on clear days
+            "foggy": 0.6,  # 40% decrease with fog
+            "snowy": 1.1,  # 10% increase with snow
         }
-        forecast_wind = condition_wind.get(condition, current_wind_kmh)
+        adjustment = condition_wind_adjustment.get(condition, 1.0)
+        forecast_wind *= adjustment
 
         # Apply pressure system influence
         pressure_system = pressure_analysis.get("pressure_system", "normal")
