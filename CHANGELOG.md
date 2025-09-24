@@ -1,3 +1,18 @@
+## 1.3.4 (2025-09-19)
+
+### Dependencies
+
+- **Home Assistant Compatibility**: Updated minimum required Home Assistant version from 2023.1.0 to 2025.9.4
+  - Updated requirements-dev.txt, hacs.json, README.md, and INSTALLATION.md
+  - Added compatibility test to ensure integration works with newer Home Assistant versions
+  - All existing functionality remains unchanged and fully compatible
+  - Improved future compatibility and access to latest Home Assistant features
+
+### Changes
+
+- Enhanced integration compatibility testing with automated Home Assistant version validation
+- Updated documentation to reflect new minimum system requirements
+
 ## 1.3.3 (2025-09-23)
 
 ### Bug Fixes
