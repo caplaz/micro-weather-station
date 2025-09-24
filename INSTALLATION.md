@@ -6,7 +6,7 @@ This guide provides detailed step-by-step instructions for installing and config
 
 Before starting, ensure you have:
 
-- Home Assistant 2023.1.0 or higher
+- Home Assistant 2025.9.4 or higher
 - Admin access to Home Assistant
 - At least one outdoor temperature sensor configured
 - Basic understanding of Home Assistant entities

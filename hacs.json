@@ -2,6 +2,6 @@
   "name": "Micro Weather Station",
   "render_readme": true,
   "filename": "micro_weather.zip",
-  "homeassistant": "2023.1.0",
+  "homeassistant": "2025.9.4",
   "country": ["US", "CA", "GB", "AU", "NZ"]
 }
