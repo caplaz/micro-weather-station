@@ -180,27 +180,45 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 if not user_input.get(CONF_OUTDOOR_TEMP_SENSOR):
                     errors["base"] = "missing_outdoor_temp"
                 else:
-                    # Update options
+                    # Update options - convert empty strings to None
                     options = {
                         CONF_OUTDOOR_TEMP_SENSOR: user_input.get(
                             CONF_OUTDOOR_TEMP_SENSOR
                         ),
-                        CONF_DEWPOINT_SENSOR: user_input.get(CONF_DEWPOINT_SENSOR),
-                        CONF_HUMIDITY_SENSOR: user_input.get(CONF_HUMIDITY_SENSOR),
-                        CONF_PRESSURE_SENSOR: user_input.get(CONF_PRESSURE_SENSOR),
-                        CONF_WIND_SPEED_SENSOR: user_input.get(CONF_WIND_SPEED_SENSOR),
-                        CONF_WIND_DIRECTION_SENSOR: user_input.get(
-                            CONF_WIND_DIRECTION_SENSOR
+                        CONF_DEWPOINT_SENSOR: (
+                            user_input.get(CONF_DEWPOINT_SENSOR) or None
                         ),
-                        CONF_WIND_GUST_SENSOR: user_input.get(CONF_WIND_GUST_SENSOR),
-                        CONF_RAIN_RATE_SENSOR: user_input.get(CONF_RAIN_RATE_SENSOR),
-                        CONF_RAIN_STATE_SENSOR: user_input.get(CONF_RAIN_STATE_SENSOR),
-                        CONF_SOLAR_RADIATION_SENSOR: user_input.get(
-                            CONF_SOLAR_RADIATION_SENSOR
+                        CONF_HUMIDITY_SENSOR: (
+                            user_input.get(CONF_HUMIDITY_SENSOR) or None
                         ),
-                        CONF_SOLAR_LUX_SENSOR: user_input.get(CONF_SOLAR_LUX_SENSOR),
-                        CONF_UV_INDEX_SENSOR: user_input.get(CONF_UV_INDEX_SENSOR),
-                        CONF_SUN_SENSOR: user_input.get(CONF_SUN_SENSOR),
+                        CONF_PRESSURE_SENSOR: (
+                            user_input.get(CONF_PRESSURE_SENSOR) or None
+                        ),
+                        CONF_WIND_SPEED_SENSOR: (
+                            user_input.get(CONF_WIND_SPEED_SENSOR) or None
+                        ),
+                        CONF_WIND_DIRECTION_SENSOR: (
+                            user_input.get(CONF_WIND_DIRECTION_SENSOR) or None
+                        ),
+                        CONF_WIND_GUST_SENSOR: (
+                            user_input.get(CONF_WIND_GUST_SENSOR) or None
+                        ),
+                        CONF_RAIN_RATE_SENSOR: (
+                            user_input.get(CONF_RAIN_RATE_SENSOR) or None
+                        ),
+                        CONF_RAIN_STATE_SENSOR: (
+                            user_input.get(CONF_RAIN_STATE_SENSOR) or None
+                        ),
+                        CONF_SOLAR_RADIATION_SENSOR: (
+                            user_input.get(CONF_SOLAR_RADIATION_SENSOR) or None
+                        ),
+                        CONF_SOLAR_LUX_SENSOR: (
+                            user_input.get(CONF_SOLAR_LUX_SENSOR) or None
+                        ),
+                        CONF_UV_INDEX_SENSOR: (
+                            user_input.get(CONF_UV_INDEX_SENSOR) or None
+                        ),
+                        CONF_SUN_SENSOR: user_input.get(CONF_SUN_SENSOR) or None,
                         CONF_UPDATE_INTERVAL: user_input.get(
                             CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
                         ),
@@ -212,28 +230,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 _LOGGER.error("Options validation error: %s", err)
                 errors["base"] = "unknown"
 
-        # Get current options
-        current_options = self.config_entry.options
-
         # Build schema with current values as defaults (only for non-None values)
         schema_dict: dict[vol.Required | vol.Optional, Any] = {
-            vol.Required(
-                CONF_OUTDOOR_TEMP_SENSOR,
-                default=current_options.get(CONF_OUTDOOR_TEMP_SENSOR),
-            ): selector.EntitySelector(
+            vol.Required(CONF_OUTDOOR_TEMP_SENSOR): selector.EntitySelector(
                 selector.EntitySelectorConfig(
                     domain="sensor", device_class="temperature"
                 )
             ),
             vol.Required(
-                CONF_UPDATE_INTERVAL,
-                default=current_options.get(
-                    CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
-                ),
+                CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL
             ): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
         }
 
-        # Add optional fields with defaults only if they have values
+        # Add optional fields without defaults (users can clear them)
         optional_fields = [
             (
                 CONF_DEWPOINT_SENSOR,
@@ -313,13 +322,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         ]
 
         for field_name, field_selector in optional_fields:
-            current_value = current_options.get(field_name)
-            if current_value is not None:
-                schema_dict[vol.Optional(field_name, default=current_value)] = (
-                    field_selector
-                )
-            else:
-                schema_dict[vol.Optional(field_name)] = field_selector
+            schema_dict[vol.Optional(field_name)] = field_selector
 
         data_schema = vol.Schema(schema_dict)
 

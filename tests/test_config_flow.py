@@ -147,3 +147,32 @@ class TestOptionsFlow:
 
         assert result["type"] == "create_entry"
         assert result["data"]["sun_sensor"] == "sun.sun"
+
+    async def test_options_flow_remove_sensor(self, hass: HomeAssistant):
+        """Test removing a sensor by clearing the field."""
+        # Create a mock config entry with a sensor configured
+        config_entry = MagicMock(spec=config_entries.ConfigEntry)
+        config_entry.options = {
+            "outdoor_temp_sensor": "sensor.outdoor_temperature",
+            "humidity_sensor": "sensor.humidity",  # Initially configured
+            "sun_sensor": "sun.sun",  # Initially configured
+            "update_interval": 30,
+        }
+
+        # Create options flow
+        flow = OptionsFlowHandler(config_entry)
+        flow.hass = hass
+
+        # Submit form with humidity sensor removed (cleared)
+        result = await flow.async_step_init(
+            {
+                "outdoor_temp_sensor": "sensor.outdoor_temperature",
+                "humidity_sensor": "",  # Cleared field - should result in None
+                "sun_sensor": "sun.sun",  # Keep sun sensor
+                "update_interval": 30,
+            }
+        )
+
+        assert result["type"] == "create_entry"
+        assert result["data"]["humidity_sensor"] is None  # Should be None when cleared
+        assert result["data"]["sun_sensor"] == "sun.sun"  # Should remain configured
