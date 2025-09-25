@@ -1,3 +1,29 @@
+## 1.4.1 (2025-09-25)
+
+### Bug Fixes
+
+- **Sun Sensor State Conversion**: Fixed ValueError when using sun.sun sensor with string states like "above_horizon"
+  - Skip sun sensor in main sensor processing loop since it only provides elevation data from attributes
+  - Sun sensor elevation is still properly retrieved for cloud cover calculations
+  - Prevents runtime errors when sun sensor is configured
+- **Options Flow Configuration Editing**: Fixed "Entity None is neither a valid entity ID nor a valid UUID" error when editing configuration
+  - Only set defaults for optional EntitySelector fields when they have actual values (not None)
+  - Allow users to add sensors like Sun Sensor after initial configuration setup
+  - Empty optional fields now display correctly in the options form without validation errors
+
+### Technical Improvements
+
+- **Enhanced Test Coverage**: Added comprehensive tests for options flow with None values
+  - Tests for configuration editing scenarios with unconfigured sensors
+  - Validation of proper handling of optional sensor fields
+  - Improved test reliability with proper mocking of ConfigEntry objects
+
+### Changes
+
+- Improved configuration flexibility for post-setup sensor additions
+- Better error handling for optional sensor configurations
+- Enhanced user experience when modifying integration settings
+
 ## 1.4.0 (2025-09-24)
 
 ### Features

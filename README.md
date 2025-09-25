@@ -78,8 +78,8 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.4.0.zip
-   unzip v1.4.0.zip
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v1.4.1.zip
+   unzip v1.4.1.zip
 
    # Option B: Clone repository
    git clone https://github.com/caplaz/micro-weather-station.git
@@ -800,6 +800,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### v1.4.1
+
+- **Sun Sensor State Conversion**: Fixed ValueError when using sun.sun sensor with string states like "above_horizon"
+  - Skip sun sensor in main sensor processing loop since it only provides elevation data from attributes
+  - Sun sensor elevation is still retrieved for cloud cover calculations
+  - Prevents runtime errors when sun sensor is configured
+- **Options Flow Configuration Editing**: Fixed "Entity None is neither a valid entity ID nor a valid UUID" error when editing configuration
+  - Only set defaults for optional EntitySelector fields when they have actual values (not None)
+  - Allow users to add sensors like Sun Sensor after initial configuration setup
+  - Empty optional fields now display correctly in the options form without validation errors
+
 ### v1.4.0
 
 - **Complete Unit Conversion Support**: Full support for both metric and imperial sensor units
@@ -877,11 +888,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.4.0
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.4.1
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.4.0
+[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=1.4.1
 [releases]: https://github.com/caplaz/micro-weather-station/releases
 [logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png

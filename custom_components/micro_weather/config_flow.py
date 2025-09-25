@@ -216,7 +216,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         current_options = self.config_entry.options
 
         # Build schema with current values as defaults (only for non-None values)
-        schema_dict = {
+        schema_dict: dict[vol.Required | vol.Optional, Any] = {
             vol.Required(
                 CONF_OUTDOOR_TEMP_SENSOR,
                 default=current_options.get(CONF_OUTDOOR_TEMP_SENSOR),
