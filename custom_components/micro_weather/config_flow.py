@@ -104,7 +104,8 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Optional(CONF_PRESSURE_SENSOR): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain="sensor", device_class="pressure"
+                        domain="sensor",
+                        device_class=["pressure", "atmospheric_pressure"],
                     )
                 ),
                 vol.Optional(CONF_WIND_SPEED_SENSOR): selector.EntitySelector(
@@ -245,7 +246,8 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     default=current_options.get(CONF_PRESSURE_SENSOR),
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain="sensor", device_class="pressure"
+                        domain="sensor",
+                        device_class=["pressure", "atmospheric_pressure"],
                     )
                 ),
                 vol.Optional(
