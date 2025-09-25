@@ -1,3 +1,20 @@
+## 1.4.2 (2025-09-25)
+
+### Bug Fixes
+
+- **Sensor Removal in Options Flow**: Fixed inability to remove sensors when editing configuration
+  - Users can now clear sensor fields to remove them from the configuration
+  - Removed defaults from optional sensor fields to allow proper clearing
+  - Convert empty strings to None when processing user input
+  - Form is pre-populated with current values automatically
+
+### Technical Improvements
+
+- **Enhanced Options Flow**: Improved schema handling for optional sensor fields
+  - Better separation between required and optional field handling
+  - More robust user input processing for configuration changes
+  - Added comprehensive test for sensor removal functionality
+
 ## 1.4.1 (2025-09-25)
 
 ### Bug Fixes
@@ -23,6 +40,7 @@
 - Improved configuration flexibility for post-setup sensor additions
 - Better error handling for optional sensor configurations
 - Enhanced user experience when modifying integration settings
+- **Atmospheric Pressure Support**: Added support for both `pressure` and `atmospheric_pressure` device classes for pressure sensors
 
 ## 1.4.0 (2025-09-24)
 
