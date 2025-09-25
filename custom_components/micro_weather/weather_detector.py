@@ -235,6 +235,10 @@ class WeatherDetector:
             if not entity_id:
                 continue
 
+            # Skip sun sensor - it's handled separately below
+            if sensor_key == "sun":
+                continue
+
             state = self.hass.states.get(entity_id)
             if state and state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
                 # Additional validation: check if state is not None and not empty
