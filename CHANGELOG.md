@@ -1,3 +1,29 @@
+## 1.4.3 (2025-09-25)
+
+### Bug Fixes
+
+- **Options Flow Sensor Management**: Major improvements to sensor configuration handling
+  - Fixed ability to remove sensors by clearing fields in options flow
+  - Removed problematic defaults from optional sensor fields to enable proper clearing
+  - Convert empty strings to None when processing user input for better data integrity
+  - Form now pre-populates with current configuration values automatically
+
+### Technical Improvements
+
+- **Enhanced Options Flow Architecture**: Complete refactor of options flow logic
+  - Improved schema handling with proper separation between required and optional fields
+  - More robust user input processing and validation
+  - Better sensor field management with automatic None handling for missing fields
+  - Enhanced type safety with corrected OptionsFlowHandler instantiation
+  - Added comprehensive test coverage for all options flow scenarios
+  - Fixed mypy type checking errors for better code quality
+
+### Changes
+
+- Improved user experience when configuring and reconfiguring sensors
+- Better error handling and validation in configuration flows
+- Enhanced code maintainability and type safety
+
 ## 1.4.2 (2025-09-25)
 
 ### Bug Fixes
