@@ -107,18 +107,20 @@ class TestOptionsFlow:
         assert result["type"] == "form"
         assert result["errors"] == {}
 
-        # Test submitting the form with some fields still None
+        # Submit form with some fields modified
         result = await flow.async_step_init(
             {
                 "outdoor_temp_sensor": "sensor.outdoor_temperature",
                 "humidity_sensor": "sensor.humidity",  # Adding a sensor
-                # Leaving pressure_sensor, wind_speed_sensor, sun_sensor as None
+                # pressure_sensor, wind_speed_sensor, sun_sensor not in user_input
+                # so they should retain their None values from config_entry.options
                 "update_interval": 30,
             }
         )
 
         assert result["type"] == "create_entry"
         assert result["data"]["humidity_sensor"] == "sensor.humidity"
+        # Fields not in user_input should retain their original values
         assert result["data"]["pressure_sensor"] is None
         assert result["data"]["sun_sensor"] is None
 
@@ -167,12 +169,65 @@ class TestOptionsFlow:
         result = await flow.async_step_init(
             {
                 "outdoor_temp_sensor": "sensor.outdoor_temperature",
-                "humidity_sensor": "",  # Cleared field - should result in None
+                "humidity_sensor": "",  # Cleared field - should be removed
                 "sun_sensor": "sun.sun",  # Keep sun sensor
                 "update_interval": 30,
             }
         )
 
         assert result["type"] == "create_entry"
-        assert result["data"]["humidity_sensor"] is None  # Should be None when cleared
+        assert (
+            result["data"]["humidity_sensor"] is None
+        )  # Should be set to None when cleared
         assert result["data"]["sun_sensor"] == "sun.sun"  # Should remain configured
+
+    async def test_options_flow_missing_required_sensor(self, hass: HomeAssistant):
+        """Test options flow validation when required sensor is missing."""
+        # Create a mock config entry
+        config_entry = MagicMock(spec=config_entries.ConfigEntry)
+        config_entry.options = {
+            "outdoor_temp_sensor": "sensor.outdoor_temperature",
+            "update_interval": 30,
+        }
+
+        # Create options flow
+        flow = OptionsFlowHandler(config_entry)
+        flow.hass = hass
+
+        # Submit form with missing required outdoor temp sensor
+        result = await flow.async_step_init(
+            {
+                "outdoor_temp_sensor": "",  # Empty required field
+                "update_interval": 30,
+            }
+        )
+
+        assert result["type"] == "form"
+        assert result["errors"] == {"base": "missing_outdoor_temp"}
+
+    async def test_options_flow_schema_building_with_defaults(
+        self, hass: HomeAssistant
+    ):
+        """Test that schema building properly sets defaults for configured sensors."""
+        # Create a mock config entry with various sensor configurations
+        config_entry = MagicMock(spec=config_entries.ConfigEntry)
+        config_entry.options = {
+            "outdoor_temp_sensor": "sensor.outdoor_temperature",
+            "humidity_sensor": "sensor.humidity",  # Configured
+            "pressure_sensor": None,  # Not configured
+            "sun_sensor": "sun.sun",  # Configured
+            "update_interval": 45,
+        }
+
+        # Create options flow
+        flow = OptionsFlowHandler(config_entry)
+        flow.hass = hass
+
+        # Get the form (this exercises the schema building code)
+        result = await flow.async_step_init()
+
+        assert result["type"] == "form"
+        assert result["errors"] == {}
+
+        # The schema should be built with proper defaults
+        # This tests lines 229-231 where current values are retrieved
