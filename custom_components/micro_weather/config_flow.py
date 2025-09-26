@@ -26,13 +26,12 @@ from .const import (
     CONF_WIND_GUST_SENSOR,
     CONF_WIND_SPEED_SENSOR,
     DEFAULT_UPDATE_INTERVAL,
-    DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
+class ConfigFlowHandler(ConfigFlow):
     """Handle a config flow for Micro Weather Station."""
 
     VERSION = 1
@@ -40,7 +39,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     def __init__(self, *args, **kwargs):
         """Initialize the config flow."""
         super().__init__(*args, **kwargs)
-        self._user_input = {}
+        self._user_input: dict[str, Any] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -397,7 +396,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         self.config_entry = config_entry
-        self._user_input = {}
+        self._user_input: dict[str, Any] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None

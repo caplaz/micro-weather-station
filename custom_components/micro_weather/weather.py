@@ -97,7 +97,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         """Return the current condition."""
         if self.coordinator.data:
             condition = self.coordinator.data.get("condition")
-            return CONDITION_MAP.get(condition, condition)  # type: ignore[arg-type]
+            return CONDITION_MAP.get(condition, condition)
         # Return None until we have data - don't show default partly cloudy
         return None
 
@@ -161,7 +161,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         "humidity": day_data.get("humidity", 50),
                     }
                 )
-            return forecast_data  # type: ignore[return-value]
+            return forecast_data
         return None
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
@@ -208,4 +208,4 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 }
             )
 
-        return hourly_data  # type: ignore[return-value]
+        return hourly_data
