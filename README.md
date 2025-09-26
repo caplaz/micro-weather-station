@@ -52,17 +52,11 @@ HACS (Home Assistant Community Store) is the easiest way to install and manage c
 
 1. **Open HACS**: Go to HACS in your Home Assistant sidebar
 2. **Navigate to Integrations**: Click on "Integrations"
-3. **Add Custom Repository**:
-   - Click the three dots menu (⋮) in the top right
-   - Select "Custom repositories"
-   - Add repository URL: `https://github.com/caplaz/micro-weather-station`
-   - Set category to "Integration"
-   - Click "Add"
-4. **Install Integration**:
+3. **Search and Install**:
    - Search for "Micro Weather Station" in HACS
    - Click on it and select "Download"
    - Choose the latest version
-5. **Restart Home Assistant**: Required for the integration to load
+4. **Restart Home Assistant**: Required for the integration to load
 
 ### Method 2: Manual Installation
 
