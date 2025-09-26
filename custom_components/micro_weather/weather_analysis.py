@@ -23,7 +23,9 @@ class WeatherAnalysis:
         """
         self._sensor_history = sensor_history or {}
 
-    def determine_weather_condition(self, sensor_data: Dict[str, Any]) -> str:
+    def determine_weather_condition(
+        self, sensor_data: Dict[str, Any], altitude: float = 0.0
+    ) -> str:
         """
         Advanced meteorological weather condition detection.
 
@@ -65,12 +67,24 @@ class WeatherAnalysis:
         )
 
         # Pressure analysis (meteorologically accurate thresholds)
-        pressure_very_high = pressure > 30.20  # High pressure system
-        pressure_high = pressure > 30.00  # Above normal
-        pressure_normal = 29.80 <= pressure <= 30.20  # Normal range
-        pressure_low = pressure < 29.80  # Low pressure system
-        pressure_very_low = pressure < 29.50  # Storm system
-        pressure_extremely_low = pressure < 29.20  # Severe storm
+        # Adjust pressure for altitude and pressure type
+        adjusted_pressure = self.adjust_pressure_for_altitude(
+            pressure, altitude, "relative"
+        )
+        pressure_thresholds = self.get_altitude_adjusted_pressure_thresholds(altitude)
+
+        pressure_very_high = adjusted_pressure > pressure_thresholds["very_high"]
+        pressure_high = adjusted_pressure > pressure_thresholds["high"]
+        pressure_normal = (
+            pressure_thresholds["normal_low"]
+            <= adjusted_pressure
+            <= pressure_thresholds["normal_high"]
+        )
+        pressure_low = adjusted_pressure < pressure_thresholds["low"]
+        pressure_very_low = adjusted_pressure < pressure_thresholds["very_low"]
+        pressure_extremely_low = (
+            adjusted_pressure < pressure_thresholds["extremely_low"]
+        )
 
         # Wind analysis (Beaufort scale adapted)
         wind_calm = wind_speed < 1  # 0-1 mph: Calm
@@ -207,6 +221,112 @@ class WeatherAnalysis:
 
         # FALLBACK: Should rarely be reached
         return "partly_cloudy"
+
+    def adjust_pressure_for_altitude(
+        self, pressure_inhg: float, altitude_m: float, pressure_type: str
+    ) -> float:
+        """Adjust pressure thresholds based on altitude and pressure type.
+
+        This method corrects pressure readings for altitude effects:
+        - If pressure_type is "atmospheric", assumes the sensor already
+          provides sea-level pressure
+        - If pressure_type is "relative", converts station pressure to sea-level equivalent
+
+        Uses the barometric formula for accurate altitude correction.
+
+        Args:
+            pressure_inhg: Pressure reading in inches of mercury
+            altitude_m: Altitude in meters above sea level
+            pressure_type: "relative" (station pressure) or
+            "atmospheric" (sea-level pressure)
+
+        Returns:
+            float: Pressure adjusted to sea-level equivalent in inches
+            of mercury
+        """
+        if pressure_type == "atmospheric" or altitude_m == 0:
+            # Already sea-level pressure or at sea level
+            return pressure_inhg
+
+        # Convert station pressure to sea-level pressure using barometric formula
+        # P0 = P * (1 - (L * h) / T0)^(g * M / (R * L))
+        # Where:
+        # P0 = sea level pressure
+        # P = station pressure
+        # h = altitude in meters
+        # L = temperature lapse rate (0.0065 K/m)
+        # T0 = standard temperature at sea level (288.15 K)
+        # g = gravitational acceleration (9.80665 m/s²)
+        # M = molar mass of air (0.0289644 kg/mol)
+        # R = universal gas constant (8.31432 J/(mol·K))
+
+        # Convert pressure from inHg to hPa for calculation
+        pressure_hpa = pressure_inhg * 33.8639
+
+        # Standard atmospheric constants
+        L = 0.0065  # Temperature lapse rate (K/m)
+        T0 = 288.15  # Standard temperature at sea level (K)
+        g = 9.80665  # Gravitational acceleration (m/s²)
+        M = 0.0289644  # Molar mass of air (kg/mol)
+        R = 8.31432  # Universal gas constant (J/(mol·K))
+
+        # Calculate exponent
+        exponent = (g * M) / (R * L)
+
+        # Calculate sea-level pressure
+        if altitude_m > 0:
+            sea_level_pressure_hpa = (
+                pressure_hpa * (1 - (L * altitude_m) / T0) ** exponent
+            )
+        else:
+            sea_level_pressure_hpa = pressure_hpa
+
+        # Convert back to inHg
+        sea_level_pressure_inhg = sea_level_pressure_hpa / 33.8639
+
+        return sea_level_pressure_inhg
+
+    def get_altitude_adjusted_pressure_thresholds(
+        self, altitude_m: float
+    ) -> Dict[str, float]:
+        """Get pressure thresholds adjusted for altitude.
+
+        Pressure systems behave differently at various altitudes. This method
+        adjusts the standard sea-level pressure thresholds to account for
+        the thinner atmosphere at higher elevations.
+
+        Args:
+            altitude_m: Altitude in meters above sea level
+
+        Returns:
+            dict: Altitude-adjusted pressure thresholds in inches of mercury
+        """
+        # Base thresholds at sea level (inHg)
+        base_thresholds = {
+            "very_high": 30.20,  # High pressure system
+            "high": 30.00,  # Above normal
+            "normal_high": 30.20,  # Upper normal range
+            "normal_low": 29.80,  # Lower normal range
+            "low": 29.80,  # Low pressure system
+            "very_low": 29.50,  # Storm system
+            "extremely_low": 29.20,  # Severe storm
+        }
+
+        if altitude_m == 0:
+            return base_thresholds
+
+        # Adjust thresholds based on altitude
+        # At higher altitudes, pressure is naturally lower, so thresholds need adjustment
+        # Using approximate barometric formula: pressure decreases by ~1 hPa per 8 meters
+        altitude_adjustment_hpa = altitude_m / 8.0  # Approximate hPa reduction
+        altitude_adjustment_inhg = altitude_adjustment_hpa / 33.8639  # Convert to inHg
+
+        # Apply altitude adjustment (reduce thresholds at higher altitudes)
+        adjusted_thresholds = {}
+        for key, threshold_inhg in base_thresholds.items():
+            adjusted_thresholds[key] = threshold_inhg - altitude_adjustment_inhg
+
+        return adjusted_thresholds
 
     def calculate_dewpoint(self, temp_f: float, humidity: float) -> float:
         """Calculate dewpoint using Magnus formula (meteorologically accurate).
@@ -692,8 +812,11 @@ class WeatherAnalysis:
         slope = (n * sum_xy - sum_x * sum_y) / denominator
         return slope
 
-    def analyze_pressure_trends(self) -> Dict[str, Any]:
+    def analyze_pressure_trends(self, altitude: float = 0.0) -> Dict[str, Any]:
         """Analyze pressure trends for weather prediction.
+
+        Args:
+            altitude: Altitude in meters above sea level for threshold adjustment
 
         Returns:
             dict: Pressure trend analysis including:
@@ -713,10 +836,13 @@ class WeatherAnalysis:
         short_term_change = short_trend["trend"] * 3  # 3-hour change
         long_term_change = long_trend["trend"] * 24  # 24-hour change
 
-        # Classify pressure system
-        if current_pressure > 1020:
+        # Get altitude-adjusted pressure thresholds
+        pressure_thresholds = self.get_altitude_adjusted_pressure_thresholds(altitude)
+
+        # Classify pressure system using altitude-adjusted thresholds
+        if current_pressure > pressure_thresholds["very_high"]:
             pressure_system = "high_pressure"
-        elif current_pressure < 1000:
+        elif current_pressure < pressure_thresholds["low"]:
             pressure_system = "low_pressure"
         else:
             pressure_system = "normal"
@@ -732,8 +858,8 @@ class WeatherAnalysis:
         if long_term_change < -5:  # Falling >5 hPa in 24 hours
             storm_probability += 30
 
-        # Very low pressure indicates storm
-        if current_pressure < 990:
+        # Very low pressure indicates storm (using altitude-adjusted threshold)
+        if current_pressure < pressure_thresholds["very_low"]:
             storm_probability += 30
 
         # Incorporate wind direction analysis for enhanced storm prediction

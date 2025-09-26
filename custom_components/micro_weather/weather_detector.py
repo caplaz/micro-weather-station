@@ -29,6 +29,7 @@ from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    CONF_ALTITUDE,
     CONF_DEWPOINT_SENSOR,
     CONF_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
@@ -152,6 +153,9 @@ class WeatherDetector:
         # Determine weather condition
         condition = self._determine_weather_condition(sensor_data)
 
+        # Get altitude for forecast generation
+        altitude = self.options.get(CONF_ALTITUDE, 0.0)
+
         # Add hysteresis to prevent rapid oscillation between states
         # Only change condition if it's been stable for at least 2 updates
         # or is significantly different
@@ -208,7 +212,7 @@ class WeatherDetector:
             ),
             "condition": condition,
             "forecast": self.forecast.generate_enhanced_forecast(
-                condition, self._prepare_forecast_sensor_data(sensor_data)
+                condition, self._prepare_forecast_sensor_data(sensor_data), altitude
             ),
             "last_updated": datetime.now().isoformat(),
         }
@@ -309,271 +313,14 @@ class WeatherDetector:
         - Temperature/humidity for fog and frost conditions
         - Dewpoint analysis for precipitation potential
         """
+        # Get altitude from configuration options
+        altitude = self.options.get(CONF_ALTITUDE, 0.0)
+
         # Prepare sensor data in imperial units for analysis
         analysis_data = self._prepare_analysis_sensor_data(sensor_data)
 
-        # Extract sensor values with better defaults
-        rain_rate: float = analysis_data.get("rain_rate", 0.0)
-        rain_state: str = analysis_data.get("rain_state", "dry").lower()
-        wind_speed: float = analysis_data.get("wind_speed", 0.0)
-        wind_gust: float = analysis_data.get("wind_gust", 0.0)
-        solar_radiation: float = analysis_data.get("solar_radiation", 0.0)
-        solar_lux: float = analysis_data.get("solar_lux", 0.0)
-        uv_index: float = analysis_data.get("uv_index", 0.0)
-        outdoor_temp: float = analysis_data.get("outdoor_temp", 70.0)
-        humidity: float = analysis_data.get("humidity", 50.0)
-        pressure: float = analysis_data.get("pressure", 29.92)
-
-        # Calculate derived meteorological parameters
-        # Use dewpoint sensor if available, otherwise calculate from temp/humidity
-        dewpoint_raw = analysis_data.get("dewpoint")
-        if dewpoint_raw is not None:
-            dewpoint: float = float(dewpoint_raw)
-        else:
-            dewpoint = self.analysis.calculate_dewpoint(outdoor_temp, humidity)
-        temp_dewpoint_spread: float = outdoor_temp - dewpoint
-        is_freezing: bool = outdoor_temp <= 32.0
-
-        # Advanced daytime detection (solar elevation proxy)
-        is_daytime: bool = solar_radiation > 5 or solar_lux > 50 or uv_index > 0.1
-        is_twilight: bool = (solar_lux > 10 and solar_lux < 100) or (
-            solar_radiation > 1 and solar_radiation < 50
-        )
-
-        # Pressure analysis (meteorologically accurate thresholds)
-        pressure_very_high: bool = pressure > 30.20  # High pressure system
-        pressure_high: bool = pressure > 30.00  # Above normal
-        pressure_normal: bool = 29.80 <= pressure <= 30.20  # Normal range
-        pressure_low: bool = pressure < 29.80  # Low pressure system
-        pressure_very_low: bool = pressure < 29.50  # Storm system
-        pressure_extremely_low: bool = pressure < 29.20  # Severe storm
-
-        # Wind analysis (Beaufort scale adapted)
-        wind_calm: bool = wind_speed < 1  # 0-1 mph: Calm
-        wind_light: bool = 1 <= wind_speed < 8  # 1-7 mph: Light air to light breeze
-        wind_strong: bool = (
-            19 <= wind_speed < 32
-        )  # 19-31 mph: Strong breeze to near gale
-        wind_gale: bool = wind_speed >= 32  # 32+ mph: Gale force
-
-        gust_factor: float = wind_gust / max(wind_speed, 1)  # Gust ratio for turbulence
-        is_gusty: bool = gust_factor > 1.5 and wind_gust > 10
-        is_very_gusty: bool = gust_factor > 2.0 and wind_gust > 15
-
-        _LOGGER.info(
-            "Weather Analysis - Rain: %.2f in/h (%s), "
-            "Wind: %.1f mph (gust: %.1f, ratio: %.1f), "
-            "Pressure: %.2f inHg, Solar: %d W/m² (%d lx), "
-            "Temp: %.1f°F, Humidity: %d%%, "
-            "Dewpoint: %.1f°F (spread: %.1f°F)",
-            rain_rate,
-            rain_state,
-            wind_speed,
-            wind_gust,
-            gust_factor,
-            pressure,
-            solar_radiation,
-            solar_lux,
-            outdoor_temp,
-            humidity,
-            dewpoint,
-            temp_dewpoint_spread,
-        )
-
-        # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
-        # Use more conservative thresholds to avoid false positives from dew/moisture
-        significant_rain: bool = (
-            rain_rate > 0.05
-        )  # Increased from 0.01 to avoid dew detection
-
-        # If rain_state is "wet" but no significant rain_rate, check if
-        # it might be fog first
-        if rain_state == "wet" and not significant_rain:
-            # Check for fog conditions before assuming precipitation
-            fog_conditions: str = self.analysis.analyze_fog_conditions(
-                outdoor_temp,
-                humidity,
-                dewpoint,
-                temp_dewpoint_spread,
-                wind_speed,
-                solar_radiation,
-                is_daytime,
-            )
-            if fog_conditions != "none":
-                _LOGGER.info(
-                    "Fog conditions detected with wet sensor: %s",
-                    fog_conditions,
-                )
-                return fog_conditions
-
-        # Now check for precipitation (either significant rain_rate OR wet
-        # sensor without fog conditions)
-        active_precipitation: bool = rain_state == "wet"
-        # Consider "wet" as active precipitation when moisture sensor detects wetness
-        # The moisture sensor (binary sensor) only reports "wet" or "dry"
-
-        if significant_rain or active_precipitation:
-            _LOGGER.info(
-                "Precipitation detected: rain_rate=%.2f (>0.05), rain_state='%s'",
-                rain_rate,
-                rain_state,
-            )
-            precipitation_intensity: str = (
-                self.analysis.classify_precipitation_intensity(rain_rate)
-            )
-
-            # Determine precipitation type based on temperature
-            if is_freezing:
-                if rain_rate > 0.1:
-                    return "snowy"  # Heavy snow
-                else:
-                    return "snowy"  # Light snow/flurries
-
-            # Rain with storm conditions
-            if (
-                pressure_extremely_low
-                or wind_gale
-                or (pressure_very_low and wind_strong)
-                or (is_very_gusty and wind_gust > 25)
-            ):
-                return "stormy"  # Thunderstorm/severe weather
-
-            # Regular rain classification
-            if precipitation_intensity == "heavy" or rain_rate > 0.25:
-                return "rainy"  # Heavy rain
-            elif precipitation_intensity == "moderate" or rain_rate > 0.1:
-                return "rainy"  # Moderate rain
-            else:
-                return "rainy"  # Light rain/drizzle
-
-        # PRIORITY 2: SEVERE WEATHER CONDITIONS
-        # (No precipitation but extreme conditions)
-        if pressure_extremely_low and (wind_strong or is_very_gusty):
-            return "stormy"  # Severe weather system approaching
-
-        if wind_gale:  # Gale force winds
-            return "stormy"  # Windstorm
-
-        # PRIORITY 3: FOG CONDITIONS (Critical for safety)
-        # Check for fog in dry conditions (wet conditions already checked above)
-        if rain_state != "wet":
-            dry_fog_conditions: str = self.analysis.analyze_fog_conditions(
-                outdoor_temp,
-                humidity,
-                dewpoint,
-                temp_dewpoint_spread,
-                wind_speed,
-                solar_radiation,
-                is_daytime,
-            )
-            if dry_fog_conditions != "none":
-                _LOGGER.info("Fog conditions detected: %s", dry_fog_conditions)
-                return dry_fog_conditions
-
-        # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
-        if is_daytime:
-            solar_elevation: float = analysis_data.get(
-                "solar_elevation", 45.0
-            )  # Default to 45° if not available
-            cloud_cover: float = self.analysis.analyze_cloud_cover(
-                solar_radiation, solar_lux, uv_index, solar_elevation
-            )
-
-            # Clear conditions
-            if cloud_cover <= 10 and pressure_high:
-                return "sunny"
-            elif cloud_cover <= 25:
-                return "sunny"
-            elif cloud_cover <= 50:
-                return "partly_cloudy"
-            elif cloud_cover <= 75:
-                return "cloudy"
-            else:
-                # Overcast with potential for development
-                if pressure_low and humidity > 80:
-                    return "cloudy"  # Threatening overcast
-                else:
-                    return "cloudy"
-
-        # PRIORITY 5: TWILIGHT CONDITIONS
-        elif is_twilight:
-            if solar_lux > 50 and pressure_normal:
-                return "partly_cloudy"
-            else:
-                return "cloudy"
-
-        # PRIORITY 6: NIGHTTIME CONDITIONS
-        else:
-            # Night analysis based on atmospheric conditions
-            if pressure_very_high and wind_calm and humidity < 70:
-                return "clear-night"  # Perfect clear night
-            elif pressure_high and not is_gusty and humidity < 80:
-                return "clear-night"  # Clear night
-            elif pressure_normal and wind_light:
-                return "partly_cloudy"  # Partly cloudy night
-            elif humidity > 85:
-                return "cloudy"  # High humidity = likely cloudy/overcast night
-            elif pressure_low and humidity > 75 and wind_speed < 3:
-                return "cloudy"  # Low pressure + high humidity + calm = cloudy
-            elif pressure_low and humidity < 65:
-                return (
-                    "clear-night"  # Low pressure but low humidity = can still be clear
-                )
-            elif pressure_low:
-                return "partly_cloudy"  # Low pressure with moderate conditions
-            else:
-                return "partly_cloudy"  # Default night condition
-
-        # FALLBACK: Should rarely be reached
-        return "partly_cloudy"
-
-    def _classify_precipitation_intensity(self, rain_rate: float) -> str:
-        """Classify precipitation intensity (meteorological standards)."""
-        if rain_rate >= 0.5:
-            return "heavy"  # Heavy rain
-        elif rain_rate >= 0.1:
-            return "moderate"  # Moderate rain
-        elif rain_rate >= 0.01:
-            return "light"  # Light rain/drizzle
-        else:
-            return "trace"  # Trace amounts
-
-    def _analyze_cloud_cover(
-        self, solar_radiation: float, solar_lux: float, uv_index: float
-    ) -> float:
-        """
-        Estimate cloud cover percentage using solar radiation analysis.
-
-        Based on theoretical clear-sky solar radiation models and
-        actual measured values to determine cloud opacity.
-        """
-
-        # Rough clear-sky solar radiation estimates (varies by season/location)
-        # These would ideally be calculated based on solar position
-        max_solar_radiation = 1000  # W/m² theoretical maximum
-        max_solar_lux = 100000  # lx theoretical maximum
-        max_uv_index = 11  # UV Index maximum
-
-        # Calculate cloud cover from each measurement
-        solar_cloud_cover = max(
-            0, min(100, 100 - (solar_radiation / max_solar_radiation * 100))
-        )
-        lux_cloud_cover = max(0, min(100, 100 - (solar_lux / max_solar_lux * 100)))
-        uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
-
-        # Weight the measurements (solar radiation is most reliable for cloud cover)
-        if solar_radiation > 0:
-            cloud_cover = (
-                solar_cloud_cover * 0.6 + lux_cloud_cover * 0.3 + uv_cloud_cover * 0.1
-            )
-        elif solar_lux > 0:
-            cloud_cover = lux_cloud_cover * 0.8 + uv_cloud_cover * 0.2
-        elif uv_index > 0:
-            cloud_cover = uv_cloud_cover
-        else:
-            cloud_cover = 100  # No solar input = complete overcast or night
-
-        return cloud_cover
+        # Use the weather analysis module for condition determination
+        return self.analysis.determine_weather_condition(analysis_data, altitude)
 
     def _convert_temperature(
         self, temp: Optional[float], unit: Optional[str]

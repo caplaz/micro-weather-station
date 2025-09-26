@@ -20,7 +20,7 @@ class TestConfigFlow:
         flow = ConfigFlowHandler()
         flow.hass = hass
 
-        result = await flow.async_step_user()
+        result = await flow.async_step_init()
         assert result["type"] == "form"
         assert result["errors"] == {}
 
@@ -30,7 +30,13 @@ class TestConfigFlow:
         flow = ConfigFlowHandler()
         flow.hass = hass
 
-        result = await flow.async_step_user(
+        # First go to basic step
+        result = await flow.async_step_init({"next_step": "basic"})
+        assert result["type"] == "form"
+        assert result["step_id"] == "basic"
+
+        # Then submit with missing required sensor
+        result = await flow.async_step_basic(
             {
                 # Missing outdoor_temp_sensor
                 "update_interval": 30,
@@ -49,13 +55,24 @@ class TestConfigFlow:
             "custom_components.micro_weather.async_setup_entry",
             return_value=True,
         ):
-            result = await flow.async_step_user(
+            # First go to basic step
+            result = await flow.async_step_init({"next_step": "basic"})
+            assert result["type"] == "form"
+            assert result["step_id"] == "basic"
+
+            # Then submit basic sensor data - this should go to solar step
+            result = await flow.async_step_basic(
                 {
                     "outdoor_temp_sensor": "sensor.outdoor_temperature",
                     "humidity_sensor": "sensor.humidity",
                     "update_interval": 30,
                 }
             )
+            assert result["type"] == "form"
+            assert result["step_id"] == "solar"
+
+            # Then submit solar step to complete
+            result = await flow.async_step_solar({})
             await hass.async_block_till_done()
 
         assert result["type"] == "create_entry"
@@ -102,18 +119,17 @@ class TestOptionsFlow:
         flow = OptionsFlowHandler(config_entry)
         flow.hass = hass
 
-        # Test that the form can be displayed without errors
-        result = await flow.async_step_init()
+        # First go to basic step
+        result = await flow.async_step_init({"next_step_id": "basic"})
         assert result["type"] == "form"
-        assert result["errors"] == {}
+        assert result["step_id"] == "basic"
 
         # Submit form with some fields modified
-        result = await flow.async_step_init(
+        result = await flow.async_step_basic(
             {
                 "outdoor_temp_sensor": "sensor.outdoor_temperature",
                 "humidity_sensor": "sensor.humidity",  # Adding a sensor
-                # pressure_sensor, wind_speed_sensor, sun_sensor not in user_input
-                # so they should retain their None values from config_entry.options
+                # pressure_sensor not in user_input so should retain None
                 "update_interval": 30,
             }
         )
@@ -138,12 +154,16 @@ class TestOptionsFlow:
         flow = OptionsFlowHandler(config_entry)
         flow.hass = hass
 
+        # First go to solar step
+        result = await flow.async_step_init({"next_step_id": "solar"})
+        assert result["type"] == "form"
+        assert result["step_id"] == "solar"
+
         # Submit form with sun sensor added
-        result = await flow.async_step_init(
+        result = await flow.async_step_solar(
             {
-                "outdoor_temp_sensor": "sensor.outdoor_temperature",
+                "outdoor_temp_sensor": "sensor.outdoor_temperature",  # Required
                 "sun_sensor": "sun.sun",  # Adding sun sensor
-                "update_interval": 30,
             }
         )
 
@@ -165,12 +185,16 @@ class TestOptionsFlow:
         flow = OptionsFlowHandler(config_entry)
         flow.hass = hass
 
+        # First go to basic step
+        result = await flow.async_step_init({"next_step_id": "basic"})
+        assert result["type"] == "form"
+        assert result["step_id"] == "basic"
+
         # Submit form with humidity sensor removed (cleared)
-        result = await flow.async_step_init(
+        result = await flow.async_step_basic(
             {
                 "outdoor_temp_sensor": "sensor.outdoor_temperature",
                 "humidity_sensor": "",  # Cleared field - should be removed
-                "sun_sensor": "sun.sun",  # Keep sun sensor
                 "update_interval": 30,
             }
         )
@@ -183,10 +207,9 @@ class TestOptionsFlow:
 
     async def test_options_flow_missing_required_sensor(self, hass: HomeAssistant):
         """Test options flow validation when required sensor is missing."""
-        # Create a mock config entry
+        # Create a mock config entry without outdoor temp sensor
         config_entry = MagicMock(spec=config_entries.ConfigEntry)
         config_entry.options = {
-            "outdoor_temp_sensor": "sensor.outdoor_temperature",
             "update_interval": 30,
         }
 
@@ -194,11 +217,15 @@ class TestOptionsFlow:
         flow = OptionsFlowHandler(config_entry)
         flow.hass = hass
 
-        # Submit form with missing required outdoor temp sensor
-        result = await flow.async_step_init(
+        # First go to solar step (which does the validation)
+        result = await flow.async_step_init({"next_step_id": "solar"})
+        assert result["type"] == "form"
+        assert result["step_id"] == "solar"
+
+        # Submit form with no sensors (outdoor temp is missing)
+        result = await flow.async_step_solar(
             {
-                "outdoor_temp_sensor": "",  # Empty required field
-                "update_interval": 30,
+                # No sensors provided
             }
         )
 
