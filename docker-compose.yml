@@ -1,0 +1,13 @@
+services:
+  homeassistant:
+    image: homeassistant/home-assistant:stable
+    container_name: ha-dev
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./config:/config
+      - ./custom_components:/config/custom_components
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=America/New_York
+    restart: unless-stopped

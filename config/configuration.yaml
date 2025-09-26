@@ -1,0 +1,114 @@
+# Home Assistant Development Configuration
+# This configuration is for testing the Micro Weather Station integration
+
+# Basic Home Assistant configuration
+homeassistant:
+  name: Home Assistant Dev
+  latitude: 40.7128
+  longitude: -74.0060
+  elevation: 350 # Set to 350m to test altitude correction
+  unit_system: metric
+  currency: USD
+  time_zone: America/New_York
+
+# Enable development mode for custom integrations
+logger:
+  default: info
+  logs:
+    custom_components.micro_weather: debug
+
+# Frontend configuration
+frontend:
+
+# HTTP configuration
+http:
+  server_host: 0.0.0.0
+  server_port: 8123
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - ::1
+
+# Sample sensors for testing the Micro Weather Station integration
+sensor:
+  # Outdoor temperature sensor
+  - platform: template
+    sensors:
+      outdoor_temperature:
+        friendly_name: "Outdoor Temperature"
+        unit_of_measurement: "°C"
+        device_class: temperature
+        value_template: "{{ 20 + (now().hour - 12) * 2 }}"
+
+  # Humidity sensor
+  - platform: template
+    sensors:
+      outdoor_humidity:
+        friendly_name: "Outdoor Humidity"
+        unit_of_measurement: "%"
+        device_class: humidity
+        value_template: "{{ 50 + (now().minute % 20) }}"
+
+  # Pressure sensor (station pressure)
+  - platform: template
+    sensors:
+      atmospheric_pressure:
+        friendly_name: "Atmospheric Pressure"
+        unit_of_measurement: "hPa"
+        device_class: pressure
+        value_template: "{{ 1013.25 + (now().minute % 10 - 5) }}"
+
+  # Wind speed sensor
+  - platform: template
+    sensors:
+      wind_speed:
+        friendly_name: "Wind Speed"
+        unit_of_measurement: "km/h"
+        device_class: wind_speed
+        value_template: "{{ 5 + (now().minute % 10) }}"
+
+  # Wind direction sensor
+  - platform: template
+    sensors:
+      wind_direction:
+        friendly_name: "Wind Direction"
+        unit_of_measurement: "°"
+        value_template: "{{ (now().minute * 6) % 360 }}"
+
+  # Rain rate sensor
+  - platform: template
+    sensors:
+      rain_rate:
+        friendly_name: "Rain Rate"
+        unit_of_measurement: "mm/h"
+        value_template: "{{ 0 if (now().minute % 15) < 12 else 2.5 }}"
+
+  # Solar radiation sensor
+  - platform: template
+    sensors:
+      solar_radiation:
+        friendly_name: "Solar Radiation"
+        unit_of_measurement: "W/m²"
+        device_class: irradiance
+        value_template: >
+          {% set hour = now().hour %}
+          {% if 6 <= hour <= 18 %}
+            {% set offset = hour - 12 %}
+            {% if offset < 0 %}
+              {{ 800 + offset * 100 }}
+            {% else %}
+              {{ 800 - offset * 100 }}
+            {% endif %}
+          {% else %}
+            0
+          {% endif %}
+
+# Binary sensor for rain state
+binary_sensor:
+  - platform: template
+    sensors:
+      rain_state:
+        friendly_name: "Rain State"
+        value_template: "{{ (states('sensor.rain_rate') | float(0)) > 0 }}"
+# Note: The Micro Weather Station integration is added through the UI
+# Go to Settings → Devices & Services → Add Integration → Micro Weather Station

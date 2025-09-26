@@ -144,6 +144,56 @@ For developers wanting to test or contribute.
    python -m pytest tests/
    ```
 
+#### Docker Development Environment
+
+For quick testing and development, use the included Docker setup:
+
+1. **Prerequisites**:
+
+   - Docker and Docker Compose installed
+   - Git (for cloning)
+
+2. **Quick Start**:
+
+   ```bash
+   # Clone and setup
+   git clone https://github.com/caplaz/micro-weather-station.git
+   cd micro-weather-station
+
+   # Start development environment
+   ./dev.sh start
+
+   # Access Home Assistant at http://localhost:8123
+   ```
+
+3. **Development Workflow**:
+
+   ```bash
+   # View logs
+   ./dev.sh logs
+
+   # Run tests
+   ./dev.sh test
+
+   # Restart environment
+   ./dev.sh restart
+
+   # Stop environment
+   ./dev.sh stop
+
+   # Clean up (removes containers and volumes)
+   ./dev.sh clean
+   ```
+
+4. **Testing the Integration**:
+
+   - The environment includes simulated weather sensors
+   - Integration is pre-configured with altitude correction (350m)
+   - Template sensors provide realistic weather data variations
+   - Debug logging is enabled for troubleshooting
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions and troubleshooting.
+
 ### Verification
 
 After installation, verify the integration is loaded:

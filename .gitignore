@@ -144,15 +144,9 @@ dmypy.json
 ehthumbs.db
 Thumbs.db
 
-# Home Assistant specific
-*.pyc
-*.pyo
-*.log
-secrets.yaml
-known_devices.yaml
-.HA_VERSION
-.uuid
-.cloud
+# Home Assistant development config
+config/*
+!config/configuration.yaml
 
 # Development and testing
 .coverage
