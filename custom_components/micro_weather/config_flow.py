@@ -82,7 +82,9 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):  # type: ignore[call-arg]
                         device_class=["pressure", "atmospheric_pressure"],
                     )
                 ),
-                vol.Optional(CONF_ALTITUDE): selector.NumberSelector(
+                vol.Optional(
+                    CONF_ALTITUDE, default=self.hass.config.elevation or 0.0
+                ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=0, max=10000, step=1, unit_of_measurement="m"
                     )
@@ -219,7 +221,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = dict(self.config_entry.options)
 
         # Build atmospheric sensors schema
         schema_dict: dict[Any, Any] = {}
@@ -257,11 +259,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             )
         )
 
-        schema_dict[vol.Optional(CONF_ALTITUDE, default=vol.UNDEFINED)] = (
-            selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0, max=10000, step=1, unit_of_measurement="m"
-                )
+        schema_dict[
+            vol.Optional(
+                CONF_ALTITUDE,
+                default=current_options.get(
+                    CONF_ALTITUDE, self.hass.config.elevation or 0.0
+                ),
+            )
+        ] = selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=10000, step=1, unit_of_measurement="m"
             )
         )
 

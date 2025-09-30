@@ -26,7 +26,7 @@
           "dewpoint_sensor": "Optional sensor providing direct dewpoint measurement for maximum accuracy. Used in fog detection (>98% humidity + dewpoint) and comfort calculations. Falls back to calculated dewpoint if not provided.",
           "humidity_sensor": "Optional sensor essential for fog detection (triggers at >98% humidity). Used in comfort index, heat index calculations, and precipitation probability determination.",
           "pressure_sensor": "Optional sensor that enables weather forecasting (5-day and hourly). Detects storms through rapid pressure drops and provides trend analysis for weather pattern prediction.",
-          "altitude": "Optional altitude setting for accurate pressure readings and weather forecasting. Used to adjust atmospheric pressure calculations for your location's elevation above sea level. Improves forecast accuracy, especially for pressure-based weather prediction.",
+          "altitude": "Optional altitude setting for accurate pressure readings and weather forecasting. Used to adjust atmospheric pressure calculations for your location's elevation above sea level. Improves forecast accuracy, especially for pressure-based weather prediction. Defaults to your Home Assistant elevation setting if available, otherwise 0.0 meters.",
           "wind_speed_sensor": "Optional sensor for wind condition detection. Storm detection (>25 km/h + rain = stormy), wind chill calculations, and severe weather alerts.",
           "wind_direction_sensor": "Optional sensor providing wind bearing data for detailed weather reports. Used in storm tracking and enhances forecast accuracy with directional wind data.",
           "wind_gust_sensor": "Optional sensor for severe weather detection and storm intensity measurement. Provides safety alerts for dangerous wind conditions and enhanced storm classification.",
@@ -54,7 +54,7 @@
           "dewpoint_sensor": "Optional sensor providing direct dewpoint measurement for maximum accuracy. Used in fog detection (>98% humidity + dewpoint) and comfort calculations. Falls back to calculated dewpoint if not provided.",
           "humidity_sensor": "Optional sensor essential for fog detection (triggers at >98% humidity). Used in comfort index, heat index calculations, and precipitation probability determination.",
           "pressure_sensor": "Optional sensor that enables weather forecasting (5-day and hourly). Detects storms through rapid pressure drops and provides trend analysis for weather pattern prediction.",
-          "altitude": "Optional altitude setting for accurate pressure readings and weather forecasting. Used to adjust atmospheric pressure calculations for your location's elevation above sea level. Improves forecast accuracy, especially for pressure-based weather prediction."
+          "altitude": "Optional altitude setting for accurate pressure readings and weather forecasting. Used to adjust atmospheric pressure calculations for your location's elevation above sea level. Improves forecast accuracy, especially for pressure-based weather prediction. Defaults to your Home Assistant elevation setting if available, otherwise 0.0 meters."
         }
       },
       "wind": {
@@ -158,7 +158,7 @@
           "solar_lux_sensor": "Optional sensor for light-based day/night detection. Backup cloud cover detection and visibility calculations when solar radiation sensor unavailable.",
           "uv_index_sensor": "Optional sensor for clear sky confirmation (high UV = definitely sunny). Provides sun intensity measurement for safety recommendations and enhanced sunny weather detection.",
           "sun_sensor": "Optional sensor providing solar elevation data for accurate cloud cover calculations. Improves weather detection accuracy by accounting for sun position (higher elevation = more expected solar radiation). Falls back to 45° elevation if not configured.",
-          "altitude": "Optional altitude setting for accurate pressure readings and weather forecasting. Used to adjust atmospheric pressure calculations for your location's elevation above sea level. Improves forecast accuracy, especially for pressure-based weather prediction.",
+          "altitude": "Optional altitude setting for accurate pressure readings and weather forecasting. Used to adjust atmospheric pressure calculations for your location's elevation above sea level. Improves forecast accuracy, especially for pressure-based weather prediction. Defaults to your Home Assistant elevation setting if available, otherwise 0.0 meters.",
           "update_interval": "How often the weather data is refreshed and sensors are polled. Range: 1-60 minutes. Lower values provide more responsive updates but may increase system load."
         }
       }
