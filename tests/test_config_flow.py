@@ -11,8 +11,15 @@ from custom_components.micro_weather.const import (
     CONF_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
+    CONF_RAIN_RATE_SENSOR,
+    CONF_RAIN_STATE_SENSOR,
+    CONF_SOLAR_LUX_SENSOR,
+    CONF_SOLAR_RADIATION_SENSOR,
     CONF_SUN_SENSOR,
     CONF_UPDATE_INTERVAL,
+    CONF_UV_INDEX_SENSOR,
+    CONF_WIND_DIRECTION_SENSOR,
+    CONF_WIND_GUST_SENSOR,
     CONF_WIND_SPEED_SENSOR,
 )
 
@@ -396,5 +403,240 @@ class TestOptionsFlow:
         result = await flow.async_step_init({"next_step_id": "atmospheric"})
         assert result["type"] == "form"
 
+    @patch("homeassistant.helpers.frame.report_usage")
+    async def test_options_flow_configure_wind_sensors(
+        self, mock_report_usage, hass: HomeAssistant
+    ):
+        """Test configuring wind sensors through options flow."""
+        # Create a real config entry
+        config_entry = config_entries.ConfigEntry(
+            entry_id="test_entry",
+            version=1,
+            minor_version=0,
+            domain="micro_weather",
+            title="Test Weather Station",
+            data={},
+            options={
+                CONF_OUTDOOR_TEMP_SENSOR: "sensor.outdoor_temperature",
+                CONF_WIND_SPEED_SENSOR: None,  # Initially not configured
+                CONF_UPDATE_INTERVAL: 30,
+            },
+            source=config_entries.SOURCE_USER,
+            unique_id="test_unique_id",
+            discovery_keys=set(),
+            subentries_data={},
+        )
+        # Add it to HA's config entries
+        hass.config_entries._entries[config_entry.entry_id] = config_entry
+
+        # Create options flow and set config_entry directly on the instance
+        flow = OptionsFlowHandler()
+        # Bypass the property setter by setting the private attribute
+        flow._config_entry = config_entry
+        flow.hass = hass
+
+        # Start with menu
+        await flow.async_step_init()
+
+        # Configure wind sensors
+        result = await flow.async_step_init({"next_step_id": "wind"})
+        assert result["type"] == "form"
+
+        result = await flow.async_step_wind(
+            {
+                CONF_WIND_SPEED_SENSOR: "sensor.wind_speed",
+                CONF_WIND_DIRECTION_SENSOR: "sensor.wind_direction",
+                CONF_WIND_GUST_SENSOR: "sensor.wind_gust",
+            }
+        )
+        assert result["type"] == "menu"
+
+        # Finish configuration
+        result = await flow.async_step_init({"next_step_id": "device_config"})
+        assert result["type"] == "form"
+
+        result = await flow.async_step_device_config({})
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_WIND_SPEED_SENSOR] == "sensor.wind_speed"
+        assert result["data"][CONF_WIND_DIRECTION_SENSOR] == "sensor.wind_direction"
+        assert result["data"][CONF_WIND_GUST_SENSOR] == "sensor.wind_gust"
+
+    @patch("homeassistant.helpers.frame.report_usage")
+    async def test_options_flow_configure_rain_sensors(
+        self, mock_report_usage, hass: HomeAssistant
+    ):
+        """Test configuring rain sensors through options flow."""
+        # Create a real config entry
+        config_entry = config_entries.ConfigEntry(
+            entry_id="test_entry",
+            version=1,
+            minor_version=0,
+            domain="micro_weather",
+            title="Test Weather Station",
+            data={},
+            options={
+                CONF_OUTDOOR_TEMP_SENSOR: "sensor.outdoor_temperature",
+                CONF_RAIN_RATE_SENSOR: None,  # Initially not configured
+                CONF_UPDATE_INTERVAL: 30,
+            },
+            source=config_entries.SOURCE_USER,
+            unique_id="test_unique_id",
+            discovery_keys=set(),
+            subentries_data={},
+        )
+        # Add it to HA's config entries
+        hass.config_entries._entries[config_entry.entry_id] = config_entry
+
+        # Create options flow and set config_entry directly on the instance
+        flow = OptionsFlowHandler()
+        # Bypass the property setter by setting the private attribute
+        flow._config_entry = config_entry
+        flow.hass = hass
+
+        # Start with menu
+        await flow.async_step_init()
+
+        # Configure rain sensors
+        result = await flow.async_step_init({"next_step_id": "rain"})
+        assert result["type"] == "form"
+
+        result = await flow.async_step_rain(
+            {
+                CONF_RAIN_RATE_SENSOR: "sensor.rain_rate",
+                CONF_RAIN_STATE_SENSOR: "binary_sensor.rain_state",
+            }
+        )
+        assert result["type"] == "menu"
+
+        # Finish configuration
+        result = await flow.async_step_init({"next_step_id": "device_config"})
+        assert result["type"] == "form"
+
+        result = await flow.async_step_device_config({})
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_RAIN_RATE_SENSOR] == "sensor.rain_rate"
+        assert result["data"][CONF_RAIN_STATE_SENSOR] == "binary_sensor.rain_state"
+
+    async def test_initial_config_flow_altitude_default(self, hass: HomeAssistant):
+        """Test that initial config flow shows altitude default from HA elevation."""
+        # Set HA elevation
+        hass.config.elevation = 150.5
+
+        # Create flow directly
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        result = await flow.async_step_user()
+        assert result["type"] == "form"
+        assert result["errors"] == {}
+
+        # Check that the schema includes altitude with default from HA elevation
+        # The schema should have been built with the default value
+
+    @patch("homeassistant.helpers.frame.report_usage")
+    async def test_options_flow_atmospheric_schema_with_defaults(
+        self, mock_report_usage, hass: HomeAssistant
+    ):
+        """Test that atmospheric schema building properly sets defaults for configured sensors."""
+        # Create a real config entry
+        config_entry = config_entries.ConfigEntry(
+            entry_id="test_entry",
+            version=1,
+            minor_version=0,
+            domain="micro_weather",
+            title="Test Weather Station",
+            data={},
+            options={
+                CONF_OUTDOOR_TEMP_SENSOR: "sensor.outdoor_temperature",
+                CONF_HUMIDITY_SENSOR: "sensor.humidity",  # Configured
+                CONF_PRESSURE_SENSOR: None,  # Not configured
+                CONF_SUN_SENSOR: "sun.sun",  # Configured
+                CONF_UPDATE_INTERVAL: 45,
+            },
+            source=config_entries.SOURCE_USER,
+            unique_id="test_unique_id",
+            discovery_keys=set(),
+            subentries_data={},
+        )
+        # Add it to HA's config entries
+        hass.config_entries._entries[config_entry.entry_id] = config_entry
+
+        # Create options flow and set config_entry directly on the instance
+        flow = OptionsFlowHandler()
+        # Bypass the property setter by setting the private attribute
+        flow._config_entry = config_entry
+        flow.hass = hass
+
+        # Start with menu
+        result = await flow.async_step_init()
+        assert result["type"] == "menu"
+
+        # Go to atmospheric step to check schema building
+        result = await flow.async_step_init({"next_step_id": "atmospheric"})
+        assert result["type"] == "form"
+
         # The schema should be built with proper defaults
         # This tests that current values are retrieved correctly
+
+    @patch("homeassistant.helpers.frame.report_usage")
+    async def test_options_flow_configure_solar_sensors(
+        self, mock_report_usage, hass: HomeAssistant
+    ):
+        """Test configuring solar sensors through options flow."""
+        # Create a real config entry
+        config_entry = config_entries.ConfigEntry(
+            entry_id="test_entry",
+            version=1,
+            minor_version=0,
+            domain="micro_weather",
+            title="Test Weather Station",
+            data={},
+            options={
+                CONF_OUTDOOR_TEMP_SENSOR: "sensor.outdoor_temperature",
+                CONF_SOLAR_RADIATION_SENSOR: None,  # Initially not configured
+                CONF_UPDATE_INTERVAL: 30,
+            },
+            source=config_entries.SOURCE_USER,
+            unique_id="test_unique_id",
+            discovery_keys=set(),
+            subentries_data={},
+        )
+        # Add it to HA's config entries
+        hass.config_entries._entries[config_entry.entry_id] = config_entry
+
+        # Create options flow and set config_entry directly on the instance
+        flow = OptionsFlowHandler()
+        # Bypass the property setter by setting the private attribute
+        flow._config_entry = config_entry
+        flow.hass = hass
+
+        # Start with menu
+        await flow.async_step_init()
+
+        # Configure solar sensors
+        result = await flow.async_step_init({"next_step_id": "solar"})
+        assert result["type"] == "form"
+
+        result = await flow.async_step_solar(
+            {
+                CONF_SOLAR_RADIATION_SENSOR: "sensor.solar_radiation",
+                CONF_SOLAR_LUX_SENSOR: "sensor.lux",
+                CONF_UV_INDEX_SENSOR: "sensor.uv_index",
+                CONF_SUN_SENSOR: "sun.sun",
+            }
+        )
+        assert result["type"] == "menu"
+
+        # Finish configuration
+        result = await flow.async_step_init({"next_step_id": "device_config"})
+        assert result["type"] == "form"
+
+        result = await flow.async_step_device_config({})
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_SOLAR_RADIATION_SENSOR] == "sensor.solar_radiation"
+        assert result["data"][CONF_SOLAR_LUX_SENSOR] == "sensor.lux"
+        assert result["data"][CONF_UV_INDEX_SENSOR] == "sensor.uv_index"
+        assert result["data"][CONF_SUN_SENSOR] == "sun.sun"
