@@ -38,7 +38,7 @@ class WeatherAnalysis:
         self._sensor_history = sensor_history or {}
 
     def determine_weather_condition(
-        self, sensor_data: Dict[str, Any], altitude: float = 0.0
+        self, sensor_data: Dict[str, Any], altitude: float | None = 0.0
     ) -> str:
         """
         Advanced meteorological weather condition detection.
@@ -63,6 +63,9 @@ class WeatherAnalysis:
         outdoor_temp = sensor_data.get("outdoor_temp", 70.0)
         humidity = sensor_data.get("humidity", 50.0)
         pressure = sensor_data.get("pressure", 29.92)
+
+        # Default altitude to 0.0 if None
+        altitude = altitude or 0.0
 
         # Calculate derived meteorological parameters
         # Use dewpoint sensor if available, otherwise calculate from temp/humidity
@@ -246,7 +249,7 @@ class WeatherAnalysis:
         return ATTR_CONDITION_PARTLYCLOUDY
 
     def adjust_pressure_for_altitude(
-        self, pressure_inhg: float, altitude_m: float, pressure_type: str
+        self, pressure_inhg: float, altitude_m: float | None, pressure_type: str
     ) -> float:
         """Adjust pressure thresholds based on altitude and pressure type.
 
@@ -267,6 +270,8 @@ class WeatherAnalysis:
             float: Pressure adjusted to sea-level equivalent in inches
             of mercury
         """
+        altitude_m = altitude_m or 0.0  # Default to 0.0 if None
+
         if pressure_type == "atmospheric" or altitude_m == 0:
             # Already sea-level pressure or at sea level
             return pressure_inhg
@@ -310,7 +315,7 @@ class WeatherAnalysis:
         return sea_level_pressure_inhg
 
     def get_altitude_adjusted_pressure_thresholds(
-        self, altitude_m: float
+        self, altitude_m: float | None
     ) -> Dict[str, float]:
         """Get pressure thresholds adjusted for altitude.
 
@@ -324,6 +329,8 @@ class WeatherAnalysis:
         Returns:
             dict: Altitude-adjusted pressure thresholds in inches of mercury
         """
+        altitude_m = altitude_m or 0.0  # Default to 0.0 if None
+
         # Base thresholds at sea level (inHg)
         base_thresholds = {
             "very_high": 30.20,  # High pressure system
@@ -835,7 +842,7 @@ class WeatherAnalysis:
         slope = (n * sum_xy - sum_x * sum_y) / denominator
         return slope
 
-    def analyze_pressure_trends(self, altitude: float = 0.0) -> Dict[str, Any]:
+    def analyze_pressure_trends(self, altitude: float | None = 0.0) -> Dict[str, Any]:
         """Analyze pressure trends for weather prediction.
 
         Args:
@@ -848,6 +855,7 @@ class WeatherAnalysis:
                 - pressure_system: Type of pressure system
                 - storm_probability: Probability of storm development
         """
+        altitude = altitude or 0.0  # Default to 0.0 if None
         # Get pressure trends over different time periods
         short_trend = self.get_historical_trends("pressure", hours=3)  # 3-hour trend
         long_trend = self.get_historical_trends("pressure", hours=24)  # 24-hour trend

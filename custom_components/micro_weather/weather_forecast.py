@@ -31,7 +31,10 @@ class WeatherForecast:
         self.analysis = weather_analysis
 
     def generate_enhanced_forecast(
-        self, current_condition: str, sensor_data: Dict[str, Any], altitude: float = 0.0
+        self,
+        current_condition: str,
+        sensor_data: Dict[str, Any],
+        altitude: float | None = 0.0,
     ) -> List[Dict[str, Any]]:
         """Generate an intelligent 5-day forecast using historical trends and patterns.
 

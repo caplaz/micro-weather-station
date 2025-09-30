@@ -362,10 +362,13 @@ class WeatherDetector:
         - Dewpoint analysis for precipitation potential
         """
         # Get altitude from configuration options (converted to meters)
-        altitude = convert_altitude_to_meters(
-            self.options.get(CONF_ALTITUDE, 0.0),
-            self.hass.config.units is US_CUSTOMARY_SYSTEM,
-        )
+        altitude = float(
+            convert_altitude_to_meters(
+                self.options.get(CONF_ALTITUDE, 0.0),
+                self.hass.config.units is US_CUSTOMARY_SYSTEM,
+            )
+            or 0.0
+        )  # Ensure altitude is always a float
 
         # Prepare sensor data in imperial units for analysis
         analysis_data = self._prepare_analysis_sensor_data(sensor_data)
