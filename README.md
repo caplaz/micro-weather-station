@@ -425,26 +425,7 @@ The integration now supports direct dewpoint sensors for improved accuracy:
 
 ## Weather Detection Logic
 
-The integration intelligently detects weather conditions using your real sensor data with the following priority system:
-
-| Condition        | Detection Criteria                                   | Priority    |
-| ---------------- | ---------------------------------------------------- | ----------- |
-| ⛈️ Stormy        | Rain + High Wind (>25 km/h)                          | 1 (Highest) |
-| 🌧️ Rainy         | Active precipitation detected                        | 2           |
-| ❄️ Snowy         | Rain + Low temperature (<2°C)                        | 3           |
-| 🌫️ Foggy         | High humidity (>98%) + Dewpoint analysis + Low solar | 4           |
-| ☀️ Sunny         | High solar radiation (>400 W/m²) or High UV index    | 5           |
-| ⛅ Partly Cloudy | Medium solar radiation (100-400 W/m²)                | 6           |
-| ☁️ Cloudy        | Low solar radiation (<100 W/m²) or Default condition | 7 (Default) |
-
-The algorithm analyzes your sensor readings in real-time to provide accurate weather condition detection:
-
-**Enhanced Detection Features:**
-
-- **Dewpoint Integration**: Uses direct dewpoint sensors when available, calculates from temperature/humidity as fallback
-- **Scientific Fog Detection**: Combines humidity thresholds with dewpoint analysis and solar radiation for accurate fog detection
-- **Multi-sensor Validation**: Cross-references multiple sensors for improved accuracy
-- **Intelligent Fallbacks**: Seamlessly switches between sensor types when data unavailable
+For detailed information about the sophisticated meteorological algorithms used for weather condition detection, see [WEATHER_DETECTION_ALGORITHM.md](WEATHER_DETECTION_ALGORITHM.md).
 
 ## Intelligent Forecasting
 

@@ -6,39 +6,13 @@ This document explains how the Micro Weather Station determines weather conditio
 
 The weather detection system uses a sophisticated priority-based algorithm with meteorological principles to analyze sensor data and determine accurate weather conditions.
 
-### Key Improvements (v1.2.0)
-
-- **Enhanced Rain Detection**: Fixed rain_state logic to properly handle binary moisture sensors ("wet"/"dry" only)
-- **Smart Fog Detection**: Distinguishes between fog moisture and precipitation when sensor shows "wet"
-- **Advanced Pressure Analysis**: Uses meteorologically accurate pressure thresholds
-- **Improved Daytime Detection**: Multi-sensor approach for accurate day/night/twilight detection
-
-### Key Improvements (v1.3.3)
-
-- **Nighttime Weather Detection**: Fixed false cloudy detection on clear nights with low pressure
-  - Improved nighttime condition logic to consider humidity levels alongside pressure
-  - Low pressure (< 29.80 inHg) no longer automatically triggers cloudy conditions
-  - Added nuanced conditions: clear-night for low pressure + low humidity (< 65%), cloudy for high humidity (> 85%)
-  - Fixes issue where clear nights were incorrectly reported as cloudy due to atmospheric pressure alone
-
-### Key Improvements (v1.3.2)
-
-- **Bug Fixes**: Fixed logging syntax errors showing literal `{entity_id}` instead of actual values
-- **Sensor Validation**: Added validation for None/empty sensor states to prevent conversion warnings
-- **Improved Error Handling**: Enhanced sensor state validation in weather detection logic
-
-### Key Improvements (v1.3.1)
-
-- **Solar Radiation Averaging**: Implemented 15-minute moving average for solar radiation readings to prevent rapid weather condition changes
-- **Stable Cloud Detection**: Reduces false weather transitions caused by temporary cloud shadows or sensor noise
-- **Enhanced Weather Stability**: Provides more reliable and consistent weather condition reporting
-- **Solar Elevation Integration**: Added sun sensor support for precise cloud cover calculations based on solar position
+_For version-specific improvements and changes, see the [CHANGELOG.md](CHANGELOG.md)._
 
 ## Weather Condition Detection Logic
 
 ### Priority-Based Detection System
 
-The algorithm uses a comprehensive 6-priority system:
+The algorithm uses a comprehensive 7-priority system with meteorological principles to analyze sensor data and determine accurate weather conditions. Each priority level has specific scientific criteria and thresholds to ensure accurate weather detection.
 
 #### Priority 1: Active Precipitation (Highest Priority)
 
@@ -71,23 +45,32 @@ ELIF rain_state = "wet" AND rain_rate ≤ threshold:
 ```
 IF outdoor_temp ≤ 32°F:
     → "snowy" (any precipitation at freezing temps)
-ELIF pressure < 29.20 inHg OR wind_gust ≥ 32mph:
-    → "stormy" (severe weather conditions)
+ELIF pressure < 29.20 inHg OR (pressure < 29.50 inHg AND wind_speed ≥19mph AND rain_rate > 0.1) OR (pressure < 29.50 inHg AND is_very_gusty AND rain_rate > 0.25):
+    → "lightning-rainy" (thunderstorm/severe weather with precipitation)
 ELIF rain_rate ≥ 0.25 in/h:
-    → "rainy" (heavy rain)
+    → "pouring" (heavy rain)
 ELIF rain_rate ≥ 0.1 in/h:
     → "rainy" (moderate rain)
 ELSE:
     → "rainy" (light rain/drizzle)
 ```
 
-#### Priority 2: Severe Weather Conditions
+#### Priority 2: Severe Weather Conditions (No Precipitation)
 
 ```
 IF pressure < 29.20 inHg AND (wind_speed ≥19mph OR wind_gust >15mph with gust_factor >2.0):
-    → "stormy" (severe weather system)
+    → "lightning" (severe weather system approaching)
 IF wind_speed ≥ 32mph:
-    → "stormy" (gale force winds)
+    → "windy" (gale force winds)
+```
+
+#### Priority 2.5: Windy Conditions (Gusty/Strong Winds Without Precipitation)
+
+```
+IF wind_gust ≥ 30 AND gust_factor > 2.0 AND rain_rate ≤ 0.02:
+    → "windy" (very gusty winds with minimal precipitation)
+ELIF wind_speed ≥ 19mph AND wind_speed < 32mph:
+    → "windy" (strong winds without precipitation)
 ```
 
 #### Priority 3: Fog Conditions (Critical for Safety)
@@ -166,6 +149,49 @@ ELSE:
 - **Low Pressure**: <29.80 inHg (low pressure system)
 - **Very Low Pressure**: <29.50 inHg (storm system)
 - **Extremely Low Pressure**: <29.20 inHg (severe storm)
+
+## Altitude Correction System
+
+The system automatically corrects pressure readings and thresholds based on your geographical elevation above sea level. This ensures accurate weather detection regardless of whether you're at sea level, in the mountains, or anywhere in between.
+
+**Why Altitude Correction Matters:**
+
+Atmospheric pressure naturally decreases with elevation due to the thinner air mass above higher locations. A pressure reading of 30.00 inHg at 5,000 feet elevation is equivalent to approximately 29.50 inHg at sea level. Without correction, the algorithm would misclassify pressure systems and weather conditions.
+
+**How Altitude Correction Works:**
+
+1. **Pressure Reading Adjustment**: Station pressure (measured at your location) is converted to sea-level equivalent pressure using the barometric formula
+2. **Threshold Adjustment**: All pressure thresholds are adjusted based on your elevation to maintain meteorological accuracy
+3. **Automatic Configuration**: Altitude is automatically detected from Home Assistant's location settings or can be manually configured
+
+**Barometric Formula Implementation:**
+
+```
+P₀ = P × (1 - (L × h) / T₀)^{(g × M) / (R × L)}
+```
+
+Where:
+
+- P₀ = Sea-level pressure
+- P = Station pressure
+- h = Altitude in meters
+- L = Temperature lapse rate (0.0065 K/m)
+- T₀ = Standard temperature (288.15 K)
+- g = Gravitational acceleration (9.80665 m/s²)
+- M = Molar mass of air (0.0289644 kg/mol)
+- R = Universal gas constant (8.31432 J/(mol·K))
+
+**Threshold Adjustment:**
+
+Pressure thresholds are reduced by approximately 1 hPa (0.0295 inHg) per 8 meters of elevation to account for the thinner atmosphere at higher altitudes.
+
+**Configuration:**
+
+- **Automatic**: Uses Home Assistant's elevation setting (`hass.config.elevation`)
+- **Manual**: Can be configured in the integration options
+- **Default**: 0 meters (sea level) if not configured
+
+This correction ensures that weather detection accuracy remains consistent across all elevations, from coastal areas to mountain tops.
 
 ## Wind Analysis (Beaufort Scale Adapted)
 
@@ -290,6 +316,15 @@ This provides more accurate cloud cover percentages throughout the day, accounti
 - Invalid states: "rain", "drizzle", "precipitation"
 - Examples: Rain sensors, leaf wetness sensors, moisture detectors
 
+**Altitude Configuration:**
+
+- **Purpose**: Corrects pressure readings and thresholds for accurate weather detection
+- **Automatic Detection**: Uses Home Assistant's elevation setting when available
+- **Manual Configuration**: Can be set in integration options if auto-detection is incorrect
+- **Units**: Meters above sea level
+- **Default**: 0 meters (sea level)
+- **Impact**: Ensures consistent accuracy from sea level to mountain elevations
+
 ## Unit Conversions
 
 The integration automatically handles unit conversions:
@@ -307,20 +342,18 @@ The system maintains historical data for:
 - **Temperature Patterns**: Long-term trending
 - **Storm Probability**: Based on pressure drops and wind shifts
 
-## Weather Condition Mapping
-
-Home Assistant weather entity mappings:
-
-- `sunny` → Clear (day)
-- `clear-night` → Clear (night)
-- `cloudy` → Cloudy
-- `partly_cloudy` → Partly Cloudy
-- `rainy` → Rainy
-- `snowy` → Snowy
-- `stormy` → Lightning Rainy / Severe Weather
-- `foggy` → Fog
-
 ## Algorithm Accuracy
+
+This advanced algorithm provides highly accurate weather detection by:
+
+1. **Using Real Sensor Data**: No simulated or estimated values
+2. **Meteorological Principles**: Based on scientific weather analysis
+3. **Priority System**: Handles conflicting sensor readings intelligently
+4. **Fog vs Rain Logic**: Distinguishes moisture sources accurately
+5. **Pressure Analysis**: Incorporates atmospheric pressure systems
+6. **Multi-Sensor Validation**: Cross-references multiple data sources
+
+The result is weather detection that matches or exceeds professional weather stations while using your existing Home Assistant sensor infrastructure.
 
 This advanced algorithm provides highly accurate weather detection by:
 

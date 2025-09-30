@@ -116,19 +116,19 @@ class TestWeatherAnalysis:
         result = analysis.analyze_fog_conditions(
             70.0, 50.0, 50.0, 20.0, 5.0, 200.0, True
         )
-        assert result == "none"
+        assert result is None
 
         # Test dense fog conditions
         result_fog = analysis.analyze_fog_conditions(
             70.0, 99.0, 69.0, 1.0, 2.0, 5.0, True
         )
-        assert result_fog == "foggy"
+        assert result_fog == "fog"
 
         # Test radiation fog
         result_rad = analysis.analyze_fog_conditions(
             70.0, 98.0, 68.0, 2.0, 2.0, 5.0, False
         )
-        assert result_rad == "foggy"
+        assert result_rad == "fog"
 
     def test_analyze_cloud_cover(self, analysis):
         """Test cloud cover analysis."""
@@ -494,13 +494,17 @@ class TestWeatherAnalysis:
         result_extreme = analysis.analyze_fog_conditions(
             150.0, 110.0, 150.0, -10.0, 200.0, -100.0, True
         )
-        assert isinstance(result_extreme, str)  # Should return a valid condition
+        assert isinstance(
+            result_extreme, (str, type(None))
+        )  # Should return a valid condition or None
 
         # Test with invalid temperature differences
         result_invalid = analysis.analyze_fog_conditions(
             50.0, 80.0, 30.0, 20.0, 10.0, 100.0, True  # Dewpoint > temperature
         )
-        assert isinstance(result_invalid, str)  # Should handle invalid dewpoint
+        assert isinstance(
+            result_invalid, (str, type(None))
+        )  # Should handle invalid dewpoint
 
     def test_estimate_visibility_error_handling(self, analysis):
         """Test visibility estimation with invalid inputs."""

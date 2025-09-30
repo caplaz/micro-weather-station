@@ -129,7 +129,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "rainy"
+        assert result["condition"] == "pouring"
 
     def test_detect_stormy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of stormy conditions."""
@@ -157,7 +157,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "stormy"
+        assert result["condition"] == "pouring"
 
     def test_detect_snowy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of snowy conditions."""
@@ -214,7 +214,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "partly_cloudy"
+        assert result["condition"] == "partlycloudy"
 
     def test_detect_clear_night_condition(self, mock_hass, mock_options):
         """Test detection of clear night conditions."""
@@ -268,7 +268,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "foggy"
+        assert result["condition"] == "fog"
 
     def test_detect_snowy_condition_edge_cases(
         self, mock_hass, mock_options, mock_sensor_data
@@ -323,7 +323,7 @@ class TestWeatherDetector:
 
         # With the improved algorithm, this should detect partly cloudy
         # (not cloudy as it would have before the fix)
-        assert result["condition"] == "partly_cloudy"
+        assert result["condition"] == "partlycloudy"
 
         # Verify cloud cover is around 40% (the fallback value)
         # Note: We can't directly test cloud cover here since it's internal to analysis

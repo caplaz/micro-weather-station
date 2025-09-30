@@ -158,10 +158,11 @@ class TestWeatherForecast:
         assert condition_day1 in [
             "sunny",
             "partly_cloudy",
+            "partlycloudy",
             "cloudy",
             "rainy",
-            "stormy",
-            "foggy",
+            "lightning-rainy",
+            "fog",
             "snowy",
             "clear-night",
         ]
@@ -172,7 +173,7 @@ class TestWeatherForecast:
         condition_storm = forecast.forecast_condition_enhanced(
             0, "partly_cloudy", pressure_storm, sensor_data
         )
-        assert condition_storm in ["stormy", "rainy"]
+        assert condition_storm in ["lightning-rainy", "rainy"]
 
         # Test high pressure (should favor clear conditions)
         pressure_high = pressure_analysis.copy()
@@ -202,7 +203,7 @@ class TestWeatherForecast:
 
         # Test stormy conditions
         precip_storm = forecast.forecast_precipitation_enhanced(
-            0, "stormy", pressure_analysis, humidity_trend
+            0, "lightning-rainy", pressure_analysis, humidity_trend
         )
         assert precip_storm > precip_normal  # Should be more precipitation
 
@@ -239,7 +240,7 @@ class TestWeatherForecast:
 
         # Test stormy conditions (should have higher wind)
         wind_storm = forecast.forecast_wind_enhanced(
-            0, 5.0, "stormy", wind_trend, pressure_analysis
+            0, 5.0, "lightning-rainy", wind_trend, pressure_analysis
         )
         assert wind_storm > wind_normal
 
@@ -273,7 +274,7 @@ class TestWeatherForecast:
         assert 10 <= humidity_normal <= 100
 
         # Test foggy conditions (should have high humidity)
-        humidity_fog = forecast.forecast_humidity(0, 60.0, humidity_trend, "foggy")
+        humidity_fog = forecast.forecast_humidity(0, 60.0, humidity_trend, "fog")
         assert humidity_fog > humidity_normal
 
         # Test sunny conditions (should have lower humidity)

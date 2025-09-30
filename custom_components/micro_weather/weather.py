@@ -4,12 +4,9 @@ import logging
 
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLOUDY,
-    ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_RAINY,
-    ATTR_CONDITION_SNOWY,
-    ATTR_CONDITION_SUNNY,
     Forecast,
     WeatherEntity,
 )
@@ -28,18 +25,6 @@ from .const import DOMAIN
 from .version import __version__
 
 _LOGGER = logging.getLogger(__name__)
-
-# Map our conditions to HA weather conditions
-CONDITION_MAP = {
-    "sunny": ATTR_CONDITION_SUNNY,
-    "cloudy": ATTR_CONDITION_CLOUDY,
-    "partly_cloudy": ATTR_CONDITION_PARTLYCLOUDY,
-    "rainy": ATTR_CONDITION_RAINY,
-    "snowy": ATTR_CONDITION_SNOWY,
-    "stormy": ATTR_CONDITION_LIGHTNING_RAINY,
-    "foggy": ATTR_CONDITION_FOG,
-    "clear-night": ATTR_CONDITION_SUNNY,  # Clear night maps to sunny
-}
 
 
 async def async_setup_entry(
@@ -97,8 +82,6 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         """Return the current condition."""
         if self.coordinator.data:
             condition = self.coordinator.data.get("condition")
-            if isinstance(condition, str):
-                return CONDITION_MAP.get(condition, condition)
             return condition
         # Return None until we have data - don't show default partly cloudy
         return None
@@ -155,9 +138,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         datetime=day_data["datetime"],
                         native_temperature=day_data["temperature"],
                         native_templow=day_data["templow"],
-                        condition=CONDITION_MAP.get(
-                            day_data["condition"], day_data["condition"]
-                        ),
+                        condition=day_data["condition"],
                         native_precipitation=day_data.get("precipitation", 0),
                         native_wind_speed=day_data.get("wind_speed", 0),
                         humidity=day_data.get("humidity", 50),
@@ -193,17 +174,26 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             if i < 6:  # Next 6 hours - current condition persists
                 hour_condition = current_condition
             elif i < 12:  # 6-12 hours - slight variation
-                hour_condition = current_condition if i % 3 != 0 else "partly_cloudy"
+                hour_condition = (
+                    current_condition if i % 3 != 0 else ATTR_CONDITION_PARTLYCLOUDY
+                )
             else:  # 12-24 hours - more variation
-                hour_condition = ["partly_cloudy", "cloudy", current_condition][i % 3]
+                hour_condition = [
+                    ATTR_CONDITION_PARTLYCLOUDY,
+                    ATTR_CONDITION_CLOUDY,
+                    current_condition,
+                ][i % 3]
 
             hourly_data.append(
                 Forecast(
                     datetime=hour_time.isoformat(),
                     native_temperature=round(current_temp + temp_variation, 1),
-                    condition=CONDITION_MAP.get(hour_condition, hour_condition),
+                    condition=hour_condition,
                     native_precipitation=(
-                        2.0 if hour_condition in ["rainy", "stormy"] else 0.0
+                        2.0
+                        if hour_condition
+                        in [ATTR_CONDITION_RAINY, ATTR_CONDITION_LIGHTNING_RAINY]
+                        else 0.0
                     ),
                     native_wind_speed=max(1, current_wind + (i * 0.1)),
                     humidity=max(30, min(90, current_humidity + (i * 0.5))),

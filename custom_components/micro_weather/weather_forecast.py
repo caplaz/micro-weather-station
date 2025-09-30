@@ -3,6 +3,18 @@
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
+from homeassistant.components.weather import (
+    ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_FOG,
+    ATTR_CONDITION_LIGHTNING_RAINY,
+    ATTR_CONDITION_PARTLYCLOUDY,
+    ATTR_CONDITION_POURING,
+    ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SNOWY,
+    ATTR_CONDITION_SUNNY,
+    ATTR_CONDITION_WINDY,
+)
+
 from .weather_analysis import WeatherAnalysis
 from .weather_utils import convert_to_celsius, convert_to_kmh
 
@@ -174,53 +186,109 @@ class WeatherForecast:
 
         # High confidence predictions for near-term
         if day == 0:
-            if storm_probability > 60:
-                return "stormy"
+            if storm_probability > 80:
+                return ATTR_CONDITION_POURING
+            elif storm_probability > 60:
+                return ATTR_CONDITION_LIGHTNING_RAINY
             elif storm_probability > 30:
-                return "rainy"
+                return ATTR_CONDITION_RAINY
+            elif sensor_data.get("wind_speed", 5) >= 25:  # mph threshold for windy
+                return ATTR_CONDITION_WINDY
             elif pressure_system == "high_pressure" and direction_stability > 0.7:
                 # Stable high pressure with consistent winds = clear weather
-                return "sunny"
+                return ATTR_CONDITION_SUNNY
             elif significant_shift and storm_probability > 20:
                 # Wind direction change with some storm probability = approaching change
-                return "cloudy"
+                return ATTR_CONDITION_CLOUDY
             else:
                 return current_condition
 
         # Medium-term predictions (1-2 days)
         elif day <= 2:
-            if storm_probability > 40:
-                return "rainy" if storm_probability < 70 else "stormy"
+            if storm_probability > 70:
+                return ATTR_CONDITION_POURING
+            elif storm_probability > 40:
+                return (
+                    ATTR_CONDITION_RAINY
+                    if storm_probability < 70
+                    else ATTR_CONDITION_LIGHTNING_RAINY
+                )
+            elif (
+                sensor_data.get("wind_speed", 5) >= 25 and day == 1
+            ):  # Check wind for day 1
+                return ATTR_CONDITION_WINDY
             elif pressure_system == "high_pressure":
                 if direction_stability > 0.8:
                     # Very stable winds with high pressure = excellent conditions
-                    return "sunny" if day == 1 else "sunny"
+                    return ATTR_CONDITION_SUNNY if day == 1 else ATTR_CONDITION_SUNNY
                 else:
-                    return "partly_cloudy" if day == 1 else "sunny"
+                    return (
+                        ATTR_CONDITION_PARTLYCLOUDY
+                        if day == 1
+                        else ATTR_CONDITION_SUNNY
+                    )
             elif pressure_system == "low_pressure":
                 if significant_shift:
                     # Wind shifting with low pressure = unsettled weather
-                    return "rainy" if day == 1 else "cloudy"
+                    return ATTR_CONDITION_RAINY if day == 1 else ATTR_CONDITION_CLOUDY
                 else:
-                    return "cloudy" if day == 1 else "rainy"
+                    return ATTR_CONDITION_CLOUDY if day == 1 else ATTR_CONDITION_RAINY
             else:
                 # Default to improving conditions, but consider wind stability
                 if direction_stability < 0.3:
                     # Unstable winds = variable conditions
-                    return "partly_cloudy"
+                    return ATTR_CONDITION_PARTLYCLOUDY
                 else:
                     # Default progression
                     condition_progression = {
-                        "stormy": ["rainy", "cloudy", "partly_cloudy"],
-                        "rainy": ["cloudy", "partly_cloudy", "sunny"],
-                        "cloudy": ["partly_cloudy", "sunny", "sunny"],
-                        "partly_cloudy": ["sunny", "sunny", "partly_cloudy"],
-                        "sunny": ["sunny", "partly_cloudy", "sunny"],
-                        "foggy": ["cloudy", "partly_cloudy", "sunny"],
-                        "snowy": ["cloudy", "partly_cloudy", "sunny"],
+                        ATTR_CONDITION_LIGHTNING_RAINY: [
+                            ATTR_CONDITION_RAINY,
+                            ATTR_CONDITION_CLOUDY,
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                        ],
+                        ATTR_CONDITION_RAINY: [
+                            ATTR_CONDITION_CLOUDY,
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                            ATTR_CONDITION_SUNNY,
+                        ],
+                        ATTR_CONDITION_POURING: [
+                            ATTR_CONDITION_RAINY,
+                            ATTR_CONDITION_CLOUDY,
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                        ],
+                        ATTR_CONDITION_WINDY: [
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                            ATTR_CONDITION_SUNNY,
+                            ATTR_CONDITION_SUNNY,
+                        ],
+                        ATTR_CONDITION_CLOUDY: [
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                            ATTR_CONDITION_SUNNY,
+                            ATTR_CONDITION_SUNNY,
+                        ],
+                        ATTR_CONDITION_PARTLYCLOUDY: [
+                            ATTR_CONDITION_SUNNY,
+                            ATTR_CONDITION_SUNNY,
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                        ],
+                        ATTR_CONDITION_SUNNY: [
+                            ATTR_CONDITION_SUNNY,
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                            ATTR_CONDITION_SUNNY,
+                        ],
+                        ATTR_CONDITION_FOG: [
+                            ATTR_CONDITION_CLOUDY,
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                            ATTR_CONDITION_SUNNY,
+                        ],
+                        ATTR_CONDITION_SNOWY: [
+                            ATTR_CONDITION_CLOUDY,
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                            ATTR_CONDITION_SUNNY,
+                        ],
                     }
                     progression = condition_progression.get(
-                        current_condition, ["partly_cloudy"]
+                        current_condition, [ATTR_CONDITION_PARTLYCLOUDY]
                     )
                     return progression[min(day, len(progression) - 1)]
 
@@ -228,11 +296,11 @@ class WeatherForecast:
         # - return to average conditions
         else:
             if pressure_system == "high_pressure" and direction_stability > 0.6:
-                return "sunny"
+                return ATTR_CONDITION_SUNNY
             elif pressure_system == "low_pressure" or significant_shift:
-                return "cloudy"
+                return ATTR_CONDITION_CLOUDY
             else:
-                return "partly_cloudy"
+                return ATTR_CONDITION_PARTLYCLOUDY
 
     def forecast_precipitation_enhanced(
         self,
@@ -257,11 +325,12 @@ class WeatherForecast:
 
         # Base precipitation by condition
         condition_precip = {
-            "stormy": 15.0,
-            "rainy": 5.0,
-            "snowy": 3.0,
-            "cloudy": 0.5,
-            "foggy": 0.1,
+            ATTR_CONDITION_LIGHTNING_RAINY: 15.0,
+            ATTR_CONDITION_POURING: 20.0,
+            ATTR_CONDITION_RAINY: 5.0,
+            ATTR_CONDITION_SNOWY: 3.0,
+            ATTR_CONDITION_CLOUDY: 0.5,
+            ATTR_CONDITION_FOG: 0.1,
         }
         base_precipitation = condition_precip.get(condition, 0.0)
 
@@ -309,13 +378,15 @@ class WeatherForecast:
 
         # Apply condition-based adjustments (not absolute values)
         condition_wind_adjustment = {
-            "stormy": 1.5,  # 50% increase for storms
-            "rainy": 1.2,  # 20% increase for rain
-            "cloudy": 0.9,  # 10% decrease for clouds
-            "partly_cloudy": 0.95,  # 5% decrease
-            "sunny": 0.8,  # 20% decrease on clear days
-            "foggy": 0.6,  # 40% decrease with fog
-            "snowy": 1.1,  # 10% increase with snow
+            ATTR_CONDITION_LIGHTNING_RAINY: 1.5,  # 50% increase for storms
+            ATTR_CONDITION_POURING: 1.3,  # 30% increase for pouring rain
+            ATTR_CONDITION_RAINY: 1.2,  # 20% increase for rain
+            ATTR_CONDITION_WINDY: 2.0,  # 100% increase for windy
+            ATTR_CONDITION_CLOUDY: 0.9,  # 10% decrease for clouds
+            ATTR_CONDITION_PARTLYCLOUDY: 0.95,  # 5% decrease
+            ATTR_CONDITION_SUNNY: 0.8,  # 20% decrease on clear days
+            ATTR_CONDITION_FOG: 0.6,  # 40% decrease with fog
+            ATTR_CONDITION_SNOWY: 1.1,  # 10% increase with snow
         }
         adjustment = condition_wind_adjustment.get(condition, 1.0)
         forecast_wind *= adjustment
@@ -360,13 +431,15 @@ class WeatherForecast:
 
         # Base humidity by condition
         condition_humidity = {
-            "stormy": 85,
-            "rainy": 80,
-            "snowy": 75,
-            "cloudy": 70,
-            "partly_cloudy": 60,
-            "sunny": 50,
-            "foggy": 95,
+            ATTR_CONDITION_LIGHTNING_RAINY: 85,
+            ATTR_CONDITION_POURING: 90,
+            ATTR_CONDITION_RAINY: 80,
+            ATTR_CONDITION_SNOWY: 75,
+            ATTR_CONDITION_CLOUDY: 70,
+            ATTR_CONDITION_PARTLYCLOUDY: 60,
+            ATTR_CONDITION_SUNNY: 50,
+            ATTR_CONDITION_WINDY: 55,  # Lower humidity with windy
+            ATTR_CONDITION_FOG: 95,
         }
         target_humidity = condition_humidity.get(condition, current_humidity)
 

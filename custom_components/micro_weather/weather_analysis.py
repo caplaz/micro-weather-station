@@ -7,6 +7,20 @@ import math
 import statistics
 from typing import Any, Dict, List, Optional
 
+from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
+    ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_FOG,
+    ATTR_CONDITION_LIGHTNING,
+    ATTR_CONDITION_LIGHTNING_RAINY,
+    ATTR_CONDITION_PARTLYCLOUDY,
+    ATTR_CONDITION_POURING,
+    ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SNOWY,
+    ATTR_CONDITION_SUNNY,
+    ATTR_CONDITION_WINDY,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -113,7 +127,7 @@ class WeatherAnalysis:
                 solar_radiation,
                 is_daytime,
             )
-            if fog_conditions != "none":
+            if fog_conditions is not None:
                 # PRIORITY 1A: FOG CONDITIONS (when moisture sensor shows
                 # wet but it's fog)
                 return fog_conditions
@@ -126,34 +140,43 @@ class WeatherAnalysis:
             # Determine precipitation type based on temperature
             if is_freezing:
                 if rain_rate > 0.1:
-                    return "snowy"  # Heavy snow
+                    return ATTR_CONDITION_SNOWY  # Heavy snow
                 else:
-                    return "snowy"  # Light snow/flurries
+                    return ATTR_CONDITION_SNOWY  # Light snow/flurries
 
-            # Rain with storm conditions
+            # Rain with storm conditions (thunderstorm)
+            # Only trigger for significant storm conditions with meaningful precipitation
             if (
-                pressure_extremely_low
-                or wind_gale
-                or (pressure_very_low and wind_strong)
-                or (is_very_gusty and wind_gust > 25)
+                pressure_extremely_low  # Severe storm pressure (< 29.20 inHg)
+                or (
+                    pressure_very_low and wind_strong and rain_rate > 0.1
+                )  # Storm pressure + strong winds + moderate+ rain
+                or (
+                    pressure_very_low and is_very_gusty and rain_rate > 0.25
+                )  # Storm pressure + very gusty + heavy rain
             ):
-                return "stormy"  # Thunderstorm/severe weather
+                return ATTR_CONDITION_LIGHTNING_RAINY  # Thunderstorm/severe weather
 
             # Regular rain classification
             if precipitation_intensity == "heavy" or rain_rate > 0.25:
-                return "rainy"  # Heavy rain
+                return ATTR_CONDITION_POURING  # Heavy rain
             elif precipitation_intensity == "moderate" or rain_rate > 0.1:
-                return "rainy"  # Moderate rain
+                return ATTR_CONDITION_RAINY  # Moderate rain
             else:
-                return "rainy"  # Light rain/drizzle
+                return ATTR_CONDITION_RAINY  # Light rain/drizzle
 
         # PRIORITY 2: SEVERE WEATHER CONDITIONS
         # (No precipitation but extreme conditions)
         if pressure_extremely_low and (wind_strong or is_very_gusty):
-            return "stormy"  # Severe weather system approaching
+            return ATTR_CONDITION_LIGHTNING  # Severe weather system approaching
 
         if wind_gale:  # Gale force winds
-            return "stormy"  # Windstorm
+            return ATTR_CONDITION_WINDY  # Windstorm
+
+        # PRIORITY 2.5: WINDY CONDITIONS
+        # (Gusty or strong winds without precipitation)
+        if is_very_gusty or wind_strong:
+            return ATTR_CONDITION_WINDY  # Windy conditions
 
         # PRIORITY 3: FOG CONDITIONS (Critical for safety)
         # Check for fog in dry conditions (wet conditions already checked above)
@@ -167,7 +190,7 @@ class WeatherAnalysis:
                 solar_radiation,
                 is_daytime,
             )
-            if fog_conditions != "none":
+            if fog_conditions is not None:
                 return fog_conditions
 
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
@@ -176,51 +199,51 @@ class WeatherAnalysis:
 
             # Clear conditions
             if cloud_cover <= 10 and pressure_high:
-                return "sunny"
+                return ATTR_CONDITION_SUNNY
             elif cloud_cover <= 25:
-                return "sunny"
+                return ATTR_CONDITION_SUNNY
             elif cloud_cover <= 50:
-                return "partly_cloudy"
+                return ATTR_CONDITION_PARTLYCLOUDY
             elif cloud_cover <= 75:
-                return "cloudy"
+                return ATTR_CONDITION_CLOUDY
             else:
                 # Overcast with potential for development
                 if pressure_low and humidity > 80:
-                    return "cloudy"  # Threatening overcast
+                    return ATTR_CONDITION_CLOUDY  # Threatening overcast
                 else:
-                    return "cloudy"
+                    return ATTR_CONDITION_CLOUDY
 
         # PRIORITY 5: TWILIGHT CONDITIONS
         elif is_twilight:
             if solar_lux > 50 and pressure_normal:
-                return "partly_cloudy"
+                return ATTR_CONDITION_PARTLYCLOUDY
             else:
-                return "cloudy"
+                return ATTR_CONDITION_CLOUDY
 
         # PRIORITY 6: NIGHTTIME CONDITIONS
         else:
             # Night analysis based on atmospheric conditions
             if pressure_very_high and wind_calm and humidity < 70:
-                return "clear-night"  # Perfect clear night
+                return ATTR_CONDITION_CLEAR_NIGHT  # Perfect clear night
             elif pressure_high and not is_gusty and humidity < 80:
-                return "clear-night"  # Clear night
+                return ATTR_CONDITION_CLEAR_NIGHT  # Clear night
             elif pressure_normal and wind_light:
-                return "partly_cloudy"  # Partly cloudy night
+                return ATTR_CONDITION_PARTLYCLOUDY  # Partly cloudy night
             elif humidity > 85:
-                return "cloudy"  # High humidity = likely cloudy/overcast night
+                return ATTR_CONDITION_CLOUDY  # High humidity = likely cloudy/overcast night
             elif pressure_low and humidity > 75 and wind_speed < 3:
-                return "cloudy"  # Low pressure + high humidity + calm = cloudy
+                return ATTR_CONDITION_CLOUDY  # Low pressure + high humidity + calm = cloudy
             elif pressure_low and humidity < 65:
-                return (
-                    "clear-night"  # Low pressure but low humidity = can still be clear
-                )
+                return ATTR_CONDITION_CLEAR_NIGHT  # Low pressure, low humidity
             elif pressure_low:
-                return "partly_cloudy"  # Low pressure with moderate conditions
+                return (
+                    ATTR_CONDITION_PARTLYCLOUDY  # Low pressure with moderate conditions
+                )
             else:
-                return "partly_cloudy"  # Default night condition
+                return ATTR_CONDITION_PARTLYCLOUDY  # Default night condition
 
         # FALLBACK: Should rarely be reached
-        return "partly_cloudy"
+        return ATTR_CONDITION_PARTLYCLOUDY
 
     def adjust_pressure_for_altitude(
         self, pressure_inhg: float, altitude_m: float, pressure_type: str
@@ -382,7 +405,7 @@ class WeatherAnalysis:
         wind_speed: float,
         solar_rad: float,
         is_daytime: bool,
-    ) -> str:
+    ) -> Optional[str]:
         """Advanced fog analysis using meteorological principles.
 
         Analyzes atmospheric conditions to determine fog likelihood using
@@ -419,7 +442,7 @@ class WeatherAnalysis:
         # Dense fog conditions
         # (very restrictive - must be extremely close to saturation)
         if humidity >= 99 and spread <= 1 and wind_speed <= 2:
-            return "foggy"
+            return ATTR_CONDITION_FOG
 
         # Radiation fog (more restrictive than before to reduce false positives)
         if (
@@ -428,22 +451,22 @@ class WeatherAnalysis:
             and wind_speed <= 3  # Reduced from 5 to 3 - lighter winds required
             and (not is_daytime or solar_rad < 5)  # More restrictive solar condition
         ):
-            return "foggy"
+            return ATTR_CONDITION_FOG
 
         # Advection fog (moist air over cooler surface) - kept similar
         if (
             humidity >= 95 and spread <= 3 and 3 <= wind_speed <= 12
         ):  # Raised humidity threshold
-            return "foggy"
+            return ATTR_CONDITION_FOG
 
         # Evaporation fog (after rain, warm ground) - more restrictive
         if (
             humidity >= 95 and spread <= 3 and wind_speed <= 6 and temp > 40
         ):  # Raised thresholds
             # Check if conditions suggest recent precipitation
-            return "foggy"
+            return ATTR_CONDITION_FOG
 
-        return "none"
+        return None
 
     def analyze_cloud_cover(
         self,
