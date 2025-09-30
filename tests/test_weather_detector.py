@@ -2,6 +2,15 @@
 
 from unittest.mock import Mock
 
+from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
+    ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_FOG,
+    ATTR_CONDITION_PARTLYCLOUDY,
+    ATTR_CONDITION_POURING,
+    ATTR_CONDITION_SNOWY,
+    ATTR_CONDITION_SUNNY,
+)
 from homeassistant.core import HomeAssistant
 import pytest
 
@@ -104,7 +113,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "sunny"
+        assert result["condition"] == ATTR_CONDITION_SUNNY
 
     def test_detect_rainy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of rainy conditions."""
@@ -133,7 +142,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "pouring"
+        assert result["condition"] == ATTR_CONDITION_POURING
 
     def test_detect_stormy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of stormy conditions."""
@@ -161,7 +170,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "pouring"
+        assert result["condition"] == ATTR_CONDITION_POURING
 
     def test_detect_snowy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of snowy conditions."""
@@ -188,7 +197,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "snowy"
+        assert result["condition"] == ATTR_CONDITION_SNOWY
 
     def test_detect_partly_cloudy_condition(
         self, mock_hass, mock_options, mock_sensor_data
@@ -218,7 +227,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "partlycloudy"
+        assert result["condition"] == ATTR_CONDITION_PARTLYCLOUDY
 
     def test_detect_clear_night_condition(self, mock_hass, mock_options):
         """Test detection of clear night conditions."""
@@ -240,7 +249,7 @@ class TestWeatherDetector:
         mock_hass.states.get.side_effect = lambda entity_id: mock_states.get(entity_id)
 
         result = detector.get_weather_data()
-        assert result["condition"] == "clear-night"
+        assert result["condition"] == ATTR_CONDITION_CLEAR_NIGHT
 
     def test_detect_foggy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of foggy conditions."""
@@ -272,7 +281,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "fog"
+        assert result["condition"] == ATTR_CONDITION_FOG
 
     def test_detect_snowy_condition_edge_cases(
         self, mock_hass, mock_options, mock_sensor_data
@@ -301,7 +310,7 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "snowy"
+        assert result["condition"] == ATTR_CONDITION_SNOWY
 
     def test_weather_condition_with_low_solar_radiation(self, mock_hass, mock_options):
         """Test weather detection with low solar radiation scenario."""
@@ -327,7 +336,7 @@ class TestWeatherDetector:
 
         # With the improved algorithm, this should detect partly cloudy
         # (not cloudy as it would have before the fix)
-        assert result["condition"] == "partlycloudy"
+        assert result["condition"] == ATTR_CONDITION_PARTLYCLOUDY
 
         # Verify cloud cover is around 40% (the fallback value)
         # Note: We can't directly test cloud cover here since it's internal to analysis
@@ -353,7 +362,7 @@ class TestWeatherDetector:
         mock_hass.states.get = lambda entity_id: mock_states_sunny.get(entity_id)
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "sunny"
+        assert result["condition"] == ATTR_CONDITION_SUNNY
 
         # Test boundary between partly cloudy and cloudy
         mock_states_cloudy = {
@@ -373,7 +382,7 @@ class TestWeatherDetector:
         mock_hass.states.get = lambda entity_id: mock_states_cloudy.get(entity_id)
         detector2 = WeatherDetector(mock_hass, mock_options)
         result2 = detector2.get_weather_data()
-        assert result2["condition"] == "cloudy"
+        assert result2["condition"] == ATTR_CONDITION_CLOUDY
 
     def test_weather_detection_with_missing_sensors(self, mock_hass, mock_options):
         """Test weather detection when some sensors are unavailable."""
@@ -420,7 +429,9 @@ class TestWeatherDetector:
         mock_hass.states.get = lambda entity_id: mock_states_hot.get(entity_id)
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == "sunny"  # Should still detect clear conditions
+        assert (
+            result["condition"] == ATTR_CONDITION_SUNNY
+        )  # Should still detect clear conditions
 
         # Test with extreme cold
         mock_states_cold = {
@@ -441,7 +452,11 @@ class TestWeatherDetector:
         detector2 = WeatherDetector(mock_hass, mock_options)
         result2 = detector2.get_weather_data()
         # Should detect some condition (likely cloudy or partly cloudy due to low solar)
-        assert result2["condition"] in ["partly_cloudy", "cloudy", "sunny"]
+        assert result2["condition"] in [
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_SUNNY,
+        ]
 
     def test_forecast_generation(self, mock_hass, mock_options, mock_sensor_data):
         """Test that forecast is generated."""

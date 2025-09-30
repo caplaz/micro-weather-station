@@ -654,7 +654,7 @@ class WeatherAnalysis:
 
         is_daytime = solar_radiation > 5 or solar_lux > 50
 
-        if condition == "foggy":
+        if condition == ATTR_CONDITION_FOG:
             # Fog visibility based on density (dewpoint spread)
             if temp_dewpoint_spread <= 1:
                 return 0.3  # Dense fog: <0.5 km
@@ -665,9 +665,9 @@ class WeatherAnalysis:
             else:
                 return 2.5  # Light fog/mist: 2-3 km
 
-        elif condition in ["rainy", "snowy"]:
+        elif condition in [ATTR_CONDITION_RAINY, ATTR_CONDITION_SNOWY]:
             # Precipitation visibility reduction
-            base_visibility = 15.0 if condition == "rainy" else 8.0
+            base_visibility = 15.0 if condition == ATTR_CONDITION_RAINY else 8.0
 
             # Intensity-based reduction
             if rain_rate > 0.5:  # Heavy precipitation
@@ -685,7 +685,7 @@ class WeatherAnalysis:
             visibility = base_visibility * intensity_factor * wind_factor
             return round(max(0.5, visibility), 1)
 
-        elif condition == "stormy":
+        elif condition == ATTR_CONDITION_LIGHTNING_RAINY:
             # Storm visibility varies greatly
             if rain_rate > 0.1:  # Rain with storm
                 storm_vis = 3.0 - (rain_rate * 2)
@@ -693,7 +693,7 @@ class WeatherAnalysis:
                 storm_vis = 8.0 - (wind_gust / 10)
             return round(max(0.8, storm_vis), 1)
 
-        elif condition == "clear-night":
+        elif condition == ATTR_CONDITION_CLEAR_NIGHT:
             # Excellent night visibility
             if humidity < 50:
                 return 25.0  # Very clear, dry air
@@ -702,7 +702,7 @@ class WeatherAnalysis:
             else:
                 return 15.0  # Slight haze
 
-        elif condition == "sunny":
+        elif condition == ATTR_CONDITION_SUNNY:
             # Daytime clear conditions
             if solar_radiation > 800:  # Very clear atmosphere
                 return 30.0
@@ -713,7 +713,7 @@ class WeatherAnalysis:
             else:  # Hazy
                 return 15.0
 
-        elif condition in ["partly_cloudy", "cloudy"]:
+        elif condition in [ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY]:
             # Cloud-based visibility
             if is_daytime:
                 # Use solar data to estimate atmospheric clarity

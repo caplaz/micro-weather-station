@@ -33,17 +33,6 @@ DEFAULT_PRESSURE_RANGE = (990, 1030)  # hPa
 DEFAULT_WIND_SPEED_RANGE = (0, 25)  # km/h
 DEFAULT_UPDATE_INTERVAL = 5  # minutes
 
-# Weather patterns
-WEATHER_PATTERNS = [
-    "sunny",
-    "cloudy",
-    "partly_cloudy",
-    "rainy",
-    "snowy",
-    "stormy",
-    "foggy",
-]
-
 # Sensor types
 SENSOR_TYPES = {
     "temperature": {

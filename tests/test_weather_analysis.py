@@ -3,6 +3,11 @@
 from collections import deque
 from datetime import datetime, timedelta
 
+from homeassistant.components.weather import (
+    ATTR_CONDITION_FOG,
+    ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SUNNY,
+)
 import pytest
 
 from custom_components.micro_weather.weather_analysis import WeatherAnalysis
@@ -122,13 +127,13 @@ class TestWeatherAnalysis:
         result_fog = analysis.analyze_fog_conditions(
             70.0, 99.0, 69.0, 1.0, 2.0, 5.0, True
         )
-        assert result_fog == "fog"
+        assert result_fog == ATTR_CONDITION_FOG
 
         # Test radiation fog
         result_rad = analysis.analyze_fog_conditions(
             70.0, 98.0, 68.0, 2.0, 2.0, 5.0, False
         )
-        assert result_rad == "fog"
+        assert result_rad == ATTR_CONDITION_FOG
 
     def test_analyze_cloud_cover(self, analysis):
         """Test cloud cover analysis."""
@@ -325,17 +330,21 @@ class TestWeatherAnalysis:
         }
 
         # Test clear conditions
-        visibility_clear = analysis.estimate_visibility("sunny", sensor_data)
+        visibility_clear = analysis.estimate_visibility(
+            ATTR_CONDITION_SUNNY, sensor_data
+        )
         assert visibility_clear > 20  # Good visibility
 
         # Test foggy conditions
-        visibility_fog = analysis.estimate_visibility("foggy", sensor_data)
+        visibility_fog = analysis.estimate_visibility(ATTR_CONDITION_FOG, sensor_data)
         assert visibility_fog < 10  # Poor visibility
 
         # Test rainy conditions
         sensor_data_rain = sensor_data.copy()
         sensor_data_rain["rain_rate"] = 0.2
-        visibility_rain = analysis.estimate_visibility("rainy", sensor_data_rain)
+        visibility_rain = analysis.estimate_visibility(
+            ATTR_CONDITION_RAINY, sensor_data_rain
+        )
         assert visibility_rain < 20  # Reduced visibility
 
     def test_store_historical_data(self, analysis, mock_sensor_history):
@@ -518,7 +527,9 @@ class TestWeatherAnalysis:
             "humidity": -100.0,
             "outdoor_temp": 150.0,
         }
-        result_extreme = analysis.estimate_visibility("sunny", sensor_data_extreme)
+        result_extreme = analysis.estimate_visibility(
+            ATTR_CONDITION_SUNNY, sensor_data_extreme
+        )
         assert isinstance(
             result_extreme, (int, float)
         )  # Should return a valid visibility
@@ -533,7 +544,9 @@ class TestWeatherAnalysis:
             "humidity": 100.0,
             "outdoor_temp": 50.0,  # Dewpoint > temperature scenario
         }
-        result_invalid = analysis.estimate_visibility("foggy", sensor_data_invalid)
+        result_invalid = analysis.estimate_visibility(
+            ATTR_CONDITION_FOG, sensor_data_invalid
+        )
         assert isinstance(
             result_invalid, (int, float)
         )  # Should handle invalid dewpoint

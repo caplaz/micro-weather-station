@@ -2,6 +2,15 @@
 
 from unittest.mock import Mock
 
+from homeassistant.components.weather import (
+    ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_FOG,
+    ATTR_CONDITION_LIGHTNING_RAINY,
+    ATTR_CONDITION_PARTLYCLOUDY,
+    ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SNOWY,
+    ATTR_CONDITION_SUNNY,
+)
 import pytest
 
 from custom_components.micro_weather.weather_analysis import WeatherAnalysis
@@ -152,37 +161,39 @@ class TestWeatherForecast:
 
         # Test first day (high confidence)
         condition_day1 = forecast.forecast_condition_enhanced(
-            0, "partly_cloudy", pressure_analysis, sensor_data
+            0, ATTR_CONDITION_PARTLYCLOUDY, pressure_analysis, sensor_data
         )
         assert isinstance(condition_day1, str)
         assert condition_day1 in [
-            "sunny",
-            "partly_cloudy",
-            "partlycloudy",
-            "cloudy",
-            "rainy",
-            "lightning-rainy",
-            "fog",
-            "snowy",
-            "clear-night",
+            ATTR_CONDITION_SUNNY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_RAINY,
+            ATTR_CONDITION_LIGHTNING_RAINY,
+            ATTR_CONDITION_FOG,
+            ATTR_CONDITION_SNOWY,
         ]
 
         # Test storm conditions
         pressure_storm = pressure_analysis.copy()
         pressure_storm["storm_probability"] = 70
         condition_storm = forecast.forecast_condition_enhanced(
-            0, "partly_cloudy", pressure_storm, sensor_data
+            0, ATTR_CONDITION_PARTLYCLOUDY, pressure_storm, sensor_data
         )
-        assert condition_storm in ["lightning-rainy", "rainy"]
+        assert condition_storm in [ATTR_CONDITION_LIGHTNING_RAINY, ATTR_CONDITION_RAINY]
 
         # Test high pressure (should favor clear conditions)
         pressure_high = pressure_analysis.copy()
         pressure_high["pressure_system"] = "high_pressure"
         condition_high = forecast.forecast_condition_enhanced(
-            0, "cloudy", pressure_high, sensor_data
+            0, ATTR_CONDITION_CLOUDY, pressure_high, sensor_data
         )
         # Should be more likely to be clear/sunny
-        assert condition_high in ["sunny", "partly_cloudy", "cloudy"]
+        assert condition_high in [
+            ATTR_CONDITION_SUNNY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_CLOUDY,
+        ]
 
     def test_forecast_precipitation_enhanced(self, forecast, mock_analysis):
         """Test enhanced precipitation forecasting."""
@@ -196,14 +207,14 @@ class TestWeatherForecast:
 
         # Test normal conditions
         precip_normal = forecast.forecast_precipitation_enhanced(
-            0, "partly_cloudy", pressure_analysis, humidity_trend
+            0, ATTR_CONDITION_PARTLYCLOUDY, pressure_analysis, humidity_trend
         )
         assert isinstance(precip_normal, float)
         assert precip_normal >= 0
 
         # Test stormy conditions
         precip_storm = forecast.forecast_precipitation_enhanced(
-            0, "lightning-rainy", pressure_analysis, humidity_trend
+            0, ATTR_CONDITION_LIGHTNING_RAINY, pressure_analysis, humidity_trend
         )
         assert precip_storm > precip_normal  # Should be more precipitation
 
@@ -211,13 +222,13 @@ class TestWeatherForecast:
         pressure_high_storm = pressure_analysis.copy()
         pressure_high_storm["storm_probability"] = 80
         precip_high_storm = forecast.forecast_precipitation_enhanced(
-            0, "rainy", pressure_high_storm, humidity_trend
+            0, ATTR_CONDITION_RAINY, pressure_high_storm, humidity_trend
         )
         assert precip_high_storm > precip_normal
 
         # Test distant forecast (should have reduced precipitation)
         precip_distant = forecast.forecast_precipitation_enhanced(
-            4, "partly_cloudy", pressure_analysis, humidity_trend
+            4, ATTR_CONDITION_PARTLYCLOUDY, pressure_analysis, humidity_trend
         )
         assert precip_distant <= precip_normal  # Should be reduced
 
@@ -233,14 +244,14 @@ class TestWeatherForecast:
 
         # Test normal conditions
         wind_normal = forecast.forecast_wind_enhanced(
-            0, 5.0, "partly_cloudy", wind_trend, pressure_analysis
+            0, 5.0, ATTR_CONDITION_PARTLYCLOUDY, wind_trend, pressure_analysis
         )
         assert isinstance(wind_normal, float)
         assert wind_normal > 0  # Should be positive wind speed
 
         # Test stormy conditions (should have higher wind)
         wind_storm = forecast.forecast_wind_enhanced(
-            0, 5.0, "lightning-rainy", wind_trend, pressure_analysis
+            0, 5.0, ATTR_CONDITION_LIGHTNING_RAINY, wind_trend, pressure_analysis
         )
         assert wind_storm > wind_normal
 
@@ -248,7 +259,7 @@ class TestWeatherForecast:
         pressure_low = pressure_analysis.copy()
         pressure_low["pressure_system"] = "low_pressure"
         wind_low_pressure = forecast.forecast_wind_enhanced(
-            0, 5.0, "cloudy", wind_trend, pressure_low
+            0, 5.0, ATTR_CONDITION_CLOUDY, wind_trend, pressure_low
         )
         assert wind_low_pressure > wind_normal
 
@@ -256,7 +267,7 @@ class TestWeatherForecast:
         pressure_high = pressure_analysis.copy()
         pressure_high["pressure_system"] = "high_pressure"
         wind_high_pressure = forecast.forecast_wind_enhanced(
-            0, 5.0, "sunny", wind_trend, pressure_high
+            0, 5.0, ATTR_CONDITION_SUNNY, wind_trend, pressure_high
         )
         assert wind_high_pressure < wind_normal
 
@@ -268,22 +279,26 @@ class TestWeatherForecast:
 
         # Test normal conditions
         humidity_normal = forecast.forecast_humidity(
-            0, 60.0, humidity_trend, "partly_cloudy"
+            0, 60.0, humidity_trend, ATTR_CONDITION_PARTLYCLOUDY
         )
         assert isinstance(humidity_normal, int)
         assert 10 <= humidity_normal <= 100
 
         # Test foggy conditions (should have high humidity)
-        humidity_fog = forecast.forecast_humidity(0, 60.0, humidity_trend, "fog")
+        humidity_fog = forecast.forecast_humidity(
+            0, 60.0, humidity_trend, ATTR_CONDITION_FOG
+        )
         assert humidity_fog > humidity_normal
 
         # Test sunny conditions (should have lower humidity)
-        humidity_sunny = forecast.forecast_humidity(0, 60.0, humidity_trend, "sunny")
+        humidity_sunny = forecast.forecast_humidity(
+            0, 60.0, humidity_trend, ATTR_CONDITION_SUNNY
+        )
         assert humidity_sunny < humidity_normal
 
         # Test distant forecast (should gradually change)
         humidity_distant = forecast.forecast_humidity(
-            3, 60.0, humidity_trend, "partly_cloudy"
+            3, 60.0, humidity_trend, ATTR_CONDITION_PARTLYCLOUDY
         )
         assert isinstance(humidity_distant, int)
         assert 10 <= humidity_distant <= 100

@@ -6,7 +6,7 @@ This document explains how the Micro Weather Station determines weather conditio
 
 The weather detection system uses a sophisticated priority-based algorithm with meteorological principles to analyze sensor data and determine accurate weather conditions.
 
-_For version-specific improvements and changes, see the [CHANGELOG.md](CHANGELOG.md)._
+_For version-specific improvements and changes, see the [CHANGELOG](CHANGELOG.md)._
 
 ## Weather Condition Detection Logic
 
@@ -138,6 +138,55 @@ ELIF pressure <29.80 inHg:
 ELSE:
     → "partly_cloudy" (default night condition)
 ```
+
+## Hysteresis and Condition Stability
+
+The weather detection system implements **hysteresis** to prevent rapid oscillation between weather conditions, ensuring a stable and reliable user experience. Weather conditions can fluctuate rapidly due to sensor noise, brief weather events, or transitional periods, but the hysteresis mechanism filters out these false changes.
+
+### How Hysteresis Works
+
+**Condition Stability Check:**
+
+```
+IF new_condition ≠ previous_condition:
+    → Check recent condition history (last 3 readings)
+    → Count how many times new_condition appeared recently
+
+    IF new_condition appeared ≥1 time recently:
+        → Allow condition change (stable transition)
+    ELIF condition pair is in major_changes list:
+        → Allow immediate change (severe weather transition)
+    ELSE:
+        → Keep previous_condition (prevent oscillation)
+        → Log: "Preventing condition oscillation: keeping X instead of Y"
+```
+
+### Major Changes (Immediate Transitions)
+
+Certain weather condition transitions are considered **major changes** that should occur immediately, regardless of hysteresis, because they represent significant weather events that users need to know about right away:
+
+**Severe Weather Transitions (Immediate):**
+
+- **Thunderstorms**: `sunny ↔ lightning-rainy`, `clear-night ↔ lightning-rainy`, `fog ↔ lightning-rainy`
+- **Heavy Rain**: `sunny ↔ pouring`, `clear-night ↔ pouring`, `fog ↔ pouring`
+- **Snow**: `sunny ↔ snowy`, `clear-night ↔ snowy`, `fog ↔ snowy`
+- **Lightning**: `sunny ↔ lightning`, `clear-night ↔ lightning`, `fog ↔ lightning`
+- **High Winds**: `sunny ↔ windy`, `clear-night ↔ windy`, `fog ↔ windy`
+
+**Why Major Changes Matter:**
+
+Severe weather conditions like thunderstorms, heavy rain, snow, lightning, and high winds can develop or dissipate rapidly. Users need immediate notification of these changes for safety and planning purposes. The hysteresis would normally delay these transitions, but the major_changes mechanism ensures critical weather alerts are delivered promptly.
+
+**Normal Conditions (Require Stability):**
+
+Transitions between normal weather conditions (sunny ↔ partly_cloudy ↔ cloudy, etc.) require the new condition to be observed multiple times before changing, preventing flickering between states due to temporary sensor variations or brief weather fluctuations.
+
+### Benefits of Hysteresis
+
+1. **Stable Display**: Weather cards don't flicker between conditions
+2. **Reliable Alerts**: Important weather changes still trigger immediately
+3. **Noise Reduction**: Filters out sensor noise and brief weather variations
+4. **User Experience**: Provides consistent, trustworthy weather information
 
 ## Pressure Analysis System
 

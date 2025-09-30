@@ -155,7 +155,9 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         # Generate hourly forecast for next 24 hours based on current conditions
         hourly_data = []
         current_temp = self.coordinator.data.get("temperature", 20)
-        current_condition = self.coordinator.data.get("condition", "cloudy")
+        current_condition = self.coordinator.data.get(
+            "condition", ATTR_CONDITION_CLOUDY
+        )
         current_humidity = self.coordinator.data.get("humidity", 50)
         current_wind = self.coordinator.data.get("wind_speed", 5)
 

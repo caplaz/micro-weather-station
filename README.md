@@ -192,7 +192,7 @@ For quick testing and development, use the included Docker setup:
    - Template sensors provide realistic weather data variations
    - Debug logging is enabled for troubleshooting
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions and troubleshooting.
+See [DEVELOPMENT](DEVELOPMENT.md) for detailed setup instructions and troubleshooting.
 
 ### Verification
 
@@ -346,7 +346,7 @@ The integration now supports direct dewpoint sensors for improved accuracy:
 
 ## Weather Detection Logic
 
-For detailed information about the sophisticated meteorological algorithms used for weather condition detection, see [WEATHER_DETECTION_ALGORITHM.md](WEATHER_DETECTION_ALGORITHM.md).
+For detailed information about the sophisticated meteorological algorithms used for weather condition detection, see [WEATHER_DETECTION_ALGORITHM](WEATHER_DETECTION_ALGORITHM.md).
 
 ## Intelligent Forecasting
 

@@ -25,6 +25,16 @@ from datetime import datetime
 import logging
 from typing import Any, Dict, Mapping, Optional
 
+from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
+    ATTR_CONDITION_FOG,
+    ATTR_CONDITION_LIGHTNING,
+    ATTR_CONDITION_LIGHTNING_RAINY,
+    ATTR_CONDITION_POURING,
+    ATTR_CONDITION_SNOWY,
+    ATTR_CONDITION_SUNNY,
+    ATTR_CONDITION_WINDY,
+)
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
@@ -178,12 +188,41 @@ class WeatherDetector:
             # Only change if this condition has been seen at least once recently
             # or if it's a major state change (e.g., clear to stormy)
             major_changes = [
-                ("sunny", "stormy"),
-                ("stormy", "sunny"),
-                ("clear-night", "stormy"),
-                ("stormy", "clear-night"),
-                ("foggy", "stormy"),
-                ("stormy", "foggy"),
+                # Thunderstorm transitions (LIGHTNING_RAINY)
+                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_LIGHTNING_RAINY),
+                (ATTR_CONDITION_LIGHTNING_RAINY, ATTR_CONDITION_SUNNY),
+                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_LIGHTNING_RAINY),
+                (ATTR_CONDITION_LIGHTNING_RAINY, ATTR_CONDITION_CLEAR_NIGHT),
+                (ATTR_CONDITION_FOG, ATTR_CONDITION_LIGHTNING_RAINY),
+                (ATTR_CONDITION_LIGHTNING_RAINY, ATTR_CONDITION_FOG),
+                # Heavy rain transitions (POURING)
+                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_POURING),
+                (ATTR_CONDITION_POURING, ATTR_CONDITION_SUNNY),
+                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_POURING),
+                (ATTR_CONDITION_POURING, ATTR_CONDITION_CLEAR_NIGHT),
+                (ATTR_CONDITION_FOG, ATTR_CONDITION_POURING),
+                (ATTR_CONDITION_POURING, ATTR_CONDITION_FOG),
+                # Snow transitions (SNOWY)
+                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_SNOWY),
+                (ATTR_CONDITION_SNOWY, ATTR_CONDITION_SUNNY),
+                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_SNOWY),
+                (ATTR_CONDITION_SNOWY, ATTR_CONDITION_CLEAR_NIGHT),
+                (ATTR_CONDITION_FOG, ATTR_CONDITION_SNOWY),
+                (ATTR_CONDITION_SNOWY, ATTR_CONDITION_FOG),
+                # Lightning transitions (LIGHTNING)
+                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_LIGHTNING),
+                (ATTR_CONDITION_LIGHTNING, ATTR_CONDITION_SUNNY),
+                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_LIGHTNING),
+                (ATTR_CONDITION_LIGHTNING, ATTR_CONDITION_CLEAR_NIGHT),
+                (ATTR_CONDITION_FOG, ATTR_CONDITION_LIGHTNING),
+                (ATTR_CONDITION_LIGHTNING, ATTR_CONDITION_FOG),
+                # Windy transitions (WINDY)
+                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_WINDY),
+                (ATTR_CONDITION_WINDY, ATTR_CONDITION_SUNNY),
+                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_WINDY),
+                (ATTR_CONDITION_WINDY, ATTR_CONDITION_CLEAR_NIGHT),
+                (ATTR_CONDITION_FOG, ATTR_CONDITION_WINDY),
+                (ATTR_CONDITION_WINDY, ATTR_CONDITION_FOG),
             ]
 
             is_major_change = (self._previous_condition, condition) in major_changes
