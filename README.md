@@ -225,95 +225,60 @@ After installation, verify the integration is loaded:
 
 The configuration flow will guide you through selecting your sensors:
 
-#### Required Configuration
+#### Required Sensors
 
-- **Outdoor Temperature**: Select your outdoor temperature sensor entity
+- **Outdoor Temperature**: Select your outdoor temperature sensor entity (required)
 - **Update Interval**: Set how often to check sensors (default: 5 minutes)
 
-#### Optional Sensor Mapping
+#### Optional Sensors
 
 Configure additional sensors for enhanced weather detection:
 
-| Configuration Field | Example Entity ID        | Purpose                                 |
-| ------------------- | ------------------------ | --------------------------------------- |
-| Dewpoint            | `sensor.dewpoint`        | Direct dewpoint measurement             |
-| Humidity            | `sensor.humidity`        | Humidity readings and fog detection     |
-| Pressure            | `sensor.pressure`        | Storm prediction and forecasting        |
-| Wind Speed          | `sensor.wind_speed`      | Wind condition detection                |
-| Wind Direction      | `sensor.wind_direction`  | Wind data and storm analysis            |
-| Wind Gust           | `sensor.wind_gust`       | Storm and severe weather detection      |
-| Rain Rate           | `sensor.rain_rate`       | Precipitation rate measurement          |
-| Rain State          | `sensor.rain_detector`   | Precipitation state detection           |
-| Solar Radiation     | `sensor.solar_radiation` | Cloud cover and solar analysis          |
-| Solar Lux           | `sensor.light_sensor`    | Day/night and cloud detection           |
-| UV Index            | `sensor.uv_index`        | Clear sky and sun intensity             |
-| Sun Sensor          | `sensor.sun_elevation`   | Solar elevation for precise cloud cover |
+| Sensor Type         | Description                   | Purpose                                                |
+| ------------------- | ----------------------------- | ------------------------------------------------------ |
+| **Dewpoint**        | Dewpoint temperature sensor   | Direct dewpoint measurement for improved accuracy      |
+| **Humidity**        | Humidity percentage sensor    | Humidity readings and fog detection                    |
+| **Pressure**        | Atmospheric pressure sensor   | Storm prediction and weather forecasting               |
+| **Wind Speed**      | Wind speed sensor             | Wind conditions and storm detection                    |
+| **Wind Direction**  | Wind direction sensor         | Wind data and storm tracking                           |
+| **Wind Gust**       | Wind gust sensor              | Severe weather and storm detection                     |
+| **Rain Rate**       | Precipitation rate sensor     | Precipitation intensity measurement                    |
+| **Rain State**      | Rain state sensor (dry/wet)   | Boolean precipitation detection                        |
+| **Solar Radiation** | Solar radiation sensor (W/m²) | Cloud cover detection and solar analysis               |
+| **Solar Lux**       | Light level sensor (lx)       | Day/night and cloud detection (backup)                 |
+| **UV Index**        | UV index sensor               | Clear sky detection and solar intensity                |
+| **Sun Sensor**      | Solar elevation sensor        | Precise cloud cover calculations based on sun position |
 
-### Unit Conversion Support
+#### Unit Conversion Support
 
 The integration automatically detects and converts between different sensor units:
 
-- **Temperature**: °C ↔ °F (Celsius/Fahrenheit)
-- **Pressure**: hPa/mbar ↔ inHg (hectopascals/inches of mercury)
-- **Wind Speed**: km/h, mph, m/s (kilometers/hour, miles/hour, meters/second)
+- **Temperature**: °C ↔ °F
+- **Pressure**: hPa/mbar ↔ inHg
+- **Wind Speed**: km/h, mph, m/s
 
-**Supported Sensors:**
+**Supported Configurations:**
 
-- ✅ **Metric Weather Stations**: Full metric unit support (°C, hPa, km/h)
-- ✅ **Imperial Weather Stations**: Imperial units (°F, inHg, mph)
-- ✅ **Mixed Environments**: Any combination of metric and imperial sensors
-- ✅ **SI Units**: Support for m/s wind speed sensors
+- ✅ Metric weather stations (°C, hPa, km/h)
+- ✅ Imperial weather stations (°F, inHg, mph)
+- ✅ Mixed environments (any combination)
+- ✅ SI units (m/s wind speed)
 
-The integration intelligently converts all sensor data to consistent internal units for accurate weather analysis, ensuring compatibility with both modern metric sensors and legacy imperial equipment.
+#### Example Configuration
+
+```yaml
+# Example sensor mappings:
+Outdoor Temperature: sensor.outdoor_temperature # Required
+Humidity: sensor.outdoor_humidity # Optional - fog detection
+Pressure: sensor.atmospheric_pressure # Optional - storm prediction
+Wind Speed: sensor.wind_speed # Optional - wind conditions
+Rain State: sensor.rain_detector # Optional - precipitation detection
+Solar Radiation: sensor.solar_radiation # Optional - cloud cover analysis
+```
+
+**Note**: The integration focuses on outdoor environmental sensors. Indoor sensors are not used for weather condition detection.
 
 ### Step 3: Testing Your Configuration
-
-#### Initial Verification
-
-1. **Check Integration Status**:
-
-   - Go to Settings → Devices & Services
-   - Find "Micro Weather Station" integration
-   - Should show status "Configured" with no errors
-
-2. **Verify Entities Created**:
-
-   - Go to Developer Tools → States
-   - Search for `micro_weather`
-   - Should see weather entity and sensor entities
-
-3. **Test Weather Entity**:
-   - Find `weather.micro_weather_station`
-   - Check that it has a valid state (e.g., "sunny", "cloudy")
-   - Verify attributes contain sensor data
-
-#### Advanced Testing
-
-1. **Sensor Data Validation**:
-
-   ```yaml
-   # Check in Developer Tools → States
-   weather.micro_weather_station:
-     state: sunny
-     attributes:
-       temperature: 22.5
-       humidity: 65
-       pressure: 1013.2
-       wind_speed: 10.5
-       wind_bearing: 180
-       visibility: 10
-   ```
-
-2. **Weather Condition Testing**:
-
-   - Change sensor values to test different conditions
-   - Verify weather state updates accordingly
-   - Test with different sensor combinations
-
-3. **Forecast Validation**:
-   - Check `forecast` attribute in weather entity
-   - Verify daily and hourly forecasts are present
-   - Test forecast updates over time
 
 ### Step 4: Dashboard Integration
 
@@ -346,7 +311,7 @@ title: Weather Sensors
 
 Create a test automation to verify the integration works:
 
-```yaml
+`````yaml
 # Test automation
 automation:
   - alias: "Test Weather Integration"
@@ -360,52 +325,6 @@ automation:
             Weather changed to: {{ states('weather.micro_weather_station') }}
             Temperature: {{ state_attr('weather.micro_weather_station', 'temperature') }}°C
           title: "Weather Update"
-```
-
-### Required Sensors
-
-| Sensor Type         | Description                   | Required        |
-| ------------------- | ----------------------------- | --------------- |
-| Outdoor Temperature | Temperature sensor (°F or °C) | ✅ **Required** |
-
-### Optional Sensors
-
-| Sensor Type     | Description                   | Used For                                               |
-| --------------- | ----------------------------- | ------------------------------------------------------ |
-| Dewpoint        | Dewpoint temperature sensor   | Direct dewpoint measurement for improved accuracy      |
-| Humidity        | Humidity percentage sensor    | Humidity readings and fog detection                    |
-| Pressure        | Atmospheric pressure sensor   | Storm detection and weather forecasting                |
-| Wind Speed      | Wind speed sensor             | Wind conditions and storm detection                    |
-| Wind Direction  | Wind direction sensor         | Wind data and storm tracking                           |
-| Wind Gust       | Wind gust sensor              | Severe weather and storm detection                     |
-| Rain Rate       | Precipitation rate sensor     | Precipitation intensity measurement                    |
-| Rain State      | Rain state sensor (dry/wet)   | Boolean precipitation detection                        |
-| Solar Radiation | Solar radiation sensor (W/m²) | Cloud cover detection and solar analysis               |
-| Solar Lux       | Light level sensor (lx)       | Day/night and cloud detection (backup)                 |
-| UV Index        | UV index sensor               | Clear sky detection and solar intensity                |
-| Sun Sensor      | Solar elevation sensor        | Precise cloud cover calculations based on sun position |
-
-### Example Sensor Configuration
-
-```yaml
-# Example sensor mappings for weather station:
-Outdoor Temperature: sensor.outdoor_temperature # Required - base temperature readings
-Dewpoint: sensor.dewpoint # Optional - direct dewpoint measurement
-Humidity: sensor.indoor_humidity # Optional - fog detection, comfort calculations
-Pressure: sensor.relative_pressure # Optional - storm prediction, forecasting
-Wind Speed: sensor.wind_speed # Optional - wind conditions, storm detection
-Wind Direction: sensor.wind_direction # Optional - wind patterns, storm tracking
-Wind Gust: sensor.wind_gust # Optional - severe weather detection
-Rain Rate: sensor.rain_rate_piezo # Optional - precipitation intensity
-Rain State: sensor.rain_state_piezo # Optional - binary moisture/precipitation sensor (reports "wet" or "dry")
-Solar Radiation: sensor.solar_radiation # Optional - cloud cover analysis
-Solar Lux: sensor.solar_lux # Optional - day/night detection backup
-UV Index: sensor.uv_index # Optional - clear sky confirmation
-Sun Sensor: sensor.sun_elevation # Optional - solar elevation for precise cloud cover calculations
-```
-
-**Note**: Indoor temperature sensor has been removed. This integration focuses on outdoor weather conditions using only outdoor environmental sensors.
-
 ## Entities Created
 
 ### Weather Entity
@@ -502,7 +421,7 @@ automation:
       - service: switch.turn_on
         target:
           entity_id: switch.garden_sprinklers
-````
+`````
 
 ## Temperature Alerts
 
@@ -826,97 +745,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
-### v1.4.2
-
-- **Sensor Removal in Options Flow**: Fixed inability to remove sensors when editing configuration
-  - Removed defaults from optional EntitySelector fields to allow clearing sensors
-  - Convert empty strings to None in options flow processing
-  - Users can now properly remove sensors (like Sun Sensor) from configuration
-  - Fixed mypy type errors with proper dict type annotations for voluptuous schemas
-
-### v1.4.1
-
-- **Sun Sensor State Conversion**: Fixed ValueError when using sun.sun sensor with string states like "above_horizon"
-  - Skip sun sensor in main sensor processing loop since it only provides elevation data from attributes
-  - Sun sensor elevation is still retrieved for cloud cover calculations
-  - Prevents runtime errors when sun sensor is configured
-- **Options Flow Configuration Editing**: Fixed "Entity None is neither a valid entity ID nor a valid UUID" error when editing configuration
-  - Only set defaults for optional EntitySelector fields when they have actual values (not None)
-  - Allow users to add sensors like Sun Sensor after initial configuration setup
-  - Empty optional fields now display correctly in the options form without validation errors
-
-### v1.4.0
-
-- **Complete Unit Conversion Support**: Full support for both metric and imperial sensor units
-  - Automatic detection and conversion of temperature (°C/°F), pressure (hPa/inHg), and wind speed (km/h/mph/m/s)
-  - Smart unit-aware conversion methods that preserve accuracy across different sensor types
-  - Backward compatibility with existing imperial sensor setups
-- **Enhanced Analysis Methods**: All meteorological analysis functions now receive consistent imperial units
-  - Added `_prepare_analysis_sensor_data()` method for converting metric sensor data to imperial units
-  - Updated historical data storage to use imperial units for consistent trend analysis
-  - Improved accuracy of weather condition detection with mixed sensor units
-- **Intelligent Forecast Wind Calculation**: Fixed forecast wind speeds to use actual sensor readings
-  - Replaced condition-based fixed wind values with current wind speed as base
-  - Applied realistic condition-based adjustments as multipliers (not absolute values)
-  - Provides accurate forecast wind speeds that reflect real sensor data
-- **Comprehensive Test Coverage**: Added extensive unit conversion tests (40+ new tests)
-  - Tests for all unit conversion scenarios (metric, imperial, mixed)
-  - Forecast preparation and analysis preparation validation
-  - Integration tests ensuring end-to-end functionality with different sensor units
-
-### v1.3.3
-
-- **Nighttime Weather Detection**: Fixed false cloudy detection on clear nights with low pressure
-  - Improved nighttime condition logic to consider humidity levels alongside pressure
-  - Low pressure (< 29.80 inHg) no longer automatically triggers cloudy conditions
-  - Added nuanced conditions: clear-night for low pressure + low humidity (< 65%), cloudy for high humidity (> 85%)
-  - Fixes issue where clear nights were incorrectly reported as cloudy due to atmospheric pressure alone
-  - Applied consistent logic to both weather_detector.py and weather_analysis.py
-
-### v1.3.2
-
-- **Bug Fixes**: Fixed logging syntax errors showing literal `{entity_id}` instead of actual values
-- **Sensor Validation**: Added validation for None/empty sensor states to prevent conversion warnings
-- **Improved Error Handling**: Enhanced sensor state validation in weather detection logic
-
-### v1.3.1
-
-- **Solar Radiation Averaging**: Implemented 15-minute moving average for solar radiation readings to prevent rapid weather condition changes
-- Enhanced HACS validation workflow with scheduled runs and manual dispatch
-- Added hassfest integration validation for improved Home Assistant compatibility
-- Updated CI/CD pipeline for better automated testing and validation
-
-### v1.3.0
-
-- **Solar Elevation Integration**: Added sun sensor support for precise cloud cover calculations based on solar position
-
-### v1.2.0
-
-- **Fixed Rain State Logic**: Corrected moisture sensor handling to only recognize "wet" or "dry" states
-- **Enhanced Fog Detection**: Improved fog vs precipitation detection when moisture sensor shows "wet"
-- **Smart Moisture Analysis**: Added intelligent logic to distinguish between precipitation and fog moisture
-- **Improved Accuracy**: Better weather condition detection in ambiguous moisture scenarios
-
-### v1.1.0
-
-- **Major Code Refactoring**: Split monolithic weather_detector.py (~1300 lines) into focused, maintainable modules
-- **Modular Architecture**: Improved code organization with separate concerns:
-  - `weather_utils.py`: Unit conversion functions (Celsius, hPa, km/h)
-  - `weather_analysis.py`: Meteorological algorithms and trend analysis
-  - `weather_forecast.py`: Advanced forecasting with historical patterns
-  - `weather_detector.py`: Core integration and orchestration (refactored)
-- **Enhanced Test Coverage**: Comprehensive test suites for each module (64 total tests)
-- **Improved Maintainability**: Better separation of concerns and code reusability
-- **Future-Ready Architecture**: Easier to extend with new features and algorithms
-
-### v1.0.0
-
-- Initial release
-- Weather entity with intelligent condition detection
-- Individual sensor entities for all weather parameters
-- Configurable sensor mapping and detection thresholds
-- Support for multiple weather condition types
-- HACS compatibility
+See [CHANGELOG](CHANGELOG.md) for the complete changelog.
 
 ---
 
