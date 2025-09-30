@@ -97,7 +97,9 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         """Return the current condition."""
         if self.coordinator.data:
             condition = self.coordinator.data.get("condition")
-            return CONDITION_MAP.get(condition, condition)  # type: ignore[arg-type]
+            if isinstance(condition, str):
+                return CONDITION_MAP.get(condition, condition)
+            return condition
         # Return None until we have data - don't show default partly cloudy
         return None
 
@@ -149,19 +151,19 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             forecast_data = []
             for day_data in self.coordinator.data["forecast"]:
                 forecast_data.append(
-                    {
-                        "datetime": day_data["datetime"],
-                        "native_temperature": day_data["temperature"],
-                        "native_templow": day_data["templow"],
-                        "condition": CONDITION_MAP.get(
+                    Forecast(
+                        datetime=day_data["datetime"],
+                        native_temperature=day_data["temperature"],
+                        native_templow=day_data["templow"],
+                        condition=CONDITION_MAP.get(
                             day_data["condition"], day_data["condition"]
                         ),
-                        "native_precipitation": day_data.get("precipitation", 0),
-                        "native_wind_speed": day_data.get("wind_speed", 0),
-                        "humidity": day_data.get("humidity", 50),
-                    }
+                        native_precipitation=day_data.get("precipitation", 0),
+                        native_wind_speed=day_data.get("wind_speed", 0),
+                        humidity=day_data.get("humidity", 50),
+                    )
                 )
-            return forecast_data  # type: ignore[return-value]
+            return forecast_data
         return None
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
@@ -196,16 +198,16 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 hour_condition = ["partly_cloudy", "cloudy", current_condition][i % 3]
 
             hourly_data.append(
-                {
-                    "datetime": hour_time.isoformat(),
-                    "native_temperature": round(current_temp + temp_variation, 1),
-                    "condition": CONDITION_MAP.get(hour_condition, hour_condition),
-                    "native_precipitation": (
+                Forecast(
+                    datetime=hour_time.isoformat(),
+                    native_temperature=round(current_temp + temp_variation, 1),
+                    condition=CONDITION_MAP.get(hour_condition, hour_condition),
+                    native_precipitation=(
                         2.0 if hour_condition in ["rainy", "stormy"] else 0.0
                     ),
-                    "native_wind_speed": max(1, current_wind + (i * 0.1)),
-                    "humidity": max(30, min(90, current_humidity + (i * 0.5))),
-                }
+                    native_wind_speed=max(1, current_wind + (i * 0.1)),
+                    humidity=max(30, min(90, current_humidity + (i * 0.5))),
+                )
             )
 
-        return hourly_data  # type: ignore[return-value]
+        return hourly_data

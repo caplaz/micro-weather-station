@@ -19,17 +19,22 @@ class WeatherForecast:
         self.analysis = weather_analysis
 
     def generate_enhanced_forecast(
-        self, current_condition: str, sensor_data: Dict[str, Any]
+        self, current_condition: str, sensor_data: Dict[str, Any], altitude: float = 0.0
     ) -> List[Dict[str, Any]]:
         """Generate an intelligent 5-day forecast using historical trends and patterns.
 
         Uses historical data, trend analysis, and meteorological patterns to create
         more accurate forecasts than simple rule-based approaches.
+
+        Args:
+            current_condition: Current weather condition
+            sensor_data: Current sensor data in imperial units
+            altitude: Altitude in meters above sea level for pressure threshold adjustment
         """
         forecast = []
 
-        # Get comprehensive trend analysis
-        pressure_analysis = self.analysis.analyze_pressure_trends()
+        # Get comprehensive trend analysis with altitude correction
+        pressure_analysis = self.analysis.analyze_pressure_trends(altitude)
         temp_patterns = self.analyze_temperature_patterns()
         humidity_trend = self.analysis.get_historical_trends("humidity", hours=24)
         wind_trend = self.analysis.get_historical_trends("wind_speed", hours=24)
@@ -147,8 +152,8 @@ class WeatherForecast:
         pressure_analysis: Dict[str, Any],
         sensor_data: Dict[str, Any],
     ) -> str:
-        """Enhanced condition forecasting using pressure trends, historical patterns,
-        and wind direction analysis.
+        """Enhanced condition forecasting using pressure trends,
+        historical patterns, and wind direction analysis.
 
         Args:
             day: Day ahead to forecast (0-4)
