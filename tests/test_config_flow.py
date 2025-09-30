@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
+from homeassistant.util.unit_system import METRIC_SYSTEM, US_CUSTOMARY_SYSTEM
 
 from custom_components.micro_weather.config_flow import (
     ConfigFlowHandler,
@@ -86,6 +87,46 @@ class TestConfigFlow:
 
         assert result["type"] == "create_entry"
         assert result["title"] == "Micro Weather Station"
+
+    async def test_get_altitude_unit_metric(self, hass: HomeAssistant):
+        """Test _get_altitude_unit returns 'm' for metric system."""
+        # Set metric system
+        hass.config.units = METRIC_SYSTEM
+
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        assert flow._get_altitude_unit() == "m"
+
+    async def test_get_altitude_unit_imperial(self, hass: HomeAssistant):
+        """Test _get_altitude_unit returns 'ft' for imperial system."""
+        # Set imperial system
+        hass.config.units = US_CUSTOMARY_SYSTEM
+
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        assert flow._get_altitude_unit() == "ft"
+
+    async def test_get_altitude_max_metric(self, hass: HomeAssistant):
+        """Test _get_altitude_max returns 10000 for metric system."""
+        # Set metric system
+        hass.config.units = METRIC_SYSTEM
+
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        assert flow._get_altitude_max() == 10000
+
+    async def test_get_altitude_max_imperial(self, hass: HomeAssistant):
+        """Test _get_altitude_max returns 32808 for imperial system."""
+        # Set imperial system
+        hass.config.units = US_CUSTOMARY_SYSTEM
+
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        assert flow._get_altitude_max() == 32808
 
 
 class TestOptionsFlow:
@@ -640,3 +681,43 @@ class TestOptionsFlow:
         assert result["data"][CONF_SOLAR_LUX_SENSOR] == "sensor.lux"
         assert result["data"][CONF_UV_INDEX_SENSOR] == "sensor.uv_index"
         assert result["data"][CONF_SUN_SENSOR] == "sun.sun"
+
+    async def test_options_get_altitude_unit_metric(self, hass: HomeAssistant):
+        """Test OptionsFlowHandler _get_altitude_unit returns 'm' for metric system."""
+        # Set metric system
+        hass.config.units = METRIC_SYSTEM
+
+        flow = OptionsFlowHandler()
+        flow.hass = hass
+
+        assert flow._get_altitude_unit() == "m"
+
+    async def test_options_get_altitude_unit_imperial(self, hass: HomeAssistant):
+        """Test OptionsFlowHandler _get_altitude_unit returns 'ft' for imperial system."""
+        # Set imperial system
+        hass.config.units = US_CUSTOMARY_SYSTEM
+
+        flow = OptionsFlowHandler()
+        flow.hass = hass
+
+        assert flow._get_altitude_unit() == "ft"
+
+    async def test_options_get_altitude_max_metric(self, hass: HomeAssistant):
+        """Test OptionsFlowHandler _get_altitude_max returns 10000 for metric system."""
+        # Set metric system
+        hass.config.units = METRIC_SYSTEM
+
+        flow = OptionsFlowHandler()
+        flow.hass = hass
+
+        assert flow._get_altitude_max() == 10000
+
+    async def test_options_get_altitude_max_imperial(self, hass: HomeAssistant):
+        """Test OptionsFlowHandler _get_altitude_max returns 32808 for imperial system."""
+        # Set imperial system
+        hass.config.units = US_CUSTOMARY_SYSTEM
+
+        flow = OptionsFlowHandler()
+        flow.hass = hass
+
+        assert flow._get_altitude_max() == 32808

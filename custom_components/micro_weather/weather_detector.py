@@ -27,6 +27,7 @@ from typing import Any, Dict, Mapping, Optional
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
+from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
 
 from .const import (
     CONF_ALTITUDE,
@@ -46,7 +47,12 @@ from .const import (
 )
 from .weather_analysis import WeatherAnalysis
 from .weather_forecast import WeatherForecast
-from .weather_utils import convert_to_celsius, convert_to_hpa, convert_to_kmh
+from .weather_utils import (
+    convert_altitude_to_meters,
+    convert_to_celsius,
+    convert_to_hpa,
+    convert_to_kmh,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,8 +159,11 @@ class WeatherDetector:
         # Determine weather condition
         condition = self._determine_weather_condition(sensor_data)
 
-        # Get altitude for forecast generation
-        altitude = self.options.get(CONF_ALTITUDE, 0.0)
+        # Get altitude for forecast generation (converted to meters)
+        altitude = convert_altitude_to_meters(
+            self.options.get(CONF_ALTITUDE, 0.0),
+            self.hass.config.units is US_CUSTOMARY_SYSTEM,
+        )
 
         # Add hysteresis to prevent rapid oscillation between states
         # Only change condition if it's been stable for at least 2 updates
@@ -313,8 +322,11 @@ class WeatherDetector:
         - Temperature/humidity for fog and frost conditions
         - Dewpoint analysis for precipitation potential
         """
-        # Get altitude from configuration options
-        altitude = self.options.get(CONF_ALTITUDE, 0.0)
+        # Get altitude from configuration options (converted to meters)
+        altitude = convert_altitude_to_meters(
+            self.options.get(CONF_ALTITUDE, 0.0),
+            self.hass.config.units is US_CUSTOMARY_SYSTEM,
+        )
 
         # Prepare sensor data in imperial units for analysis
         analysis_data = self._prepare_analysis_sensor_data(sensor_data)

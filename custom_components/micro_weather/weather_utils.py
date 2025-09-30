@@ -22,3 +22,14 @@ def convert_to_kmh(speed_mph: Optional[float]) -> Optional[float]:
     if speed_mph is None:
         return None
     return round(speed_mph * 1.60934, 1)
+
+
+def convert_altitude_to_meters(
+    altitude: Optional[float], is_imperial: bool = False
+) -> Optional[float]:
+    """Convert altitude to meters if it's in feet."""
+    if altitude is None:
+        return None
+    if is_imperial:
+        return round(altitude * 0.3048, 1)  # 1 foot = 0.3048 meters
+    return round(altitude, 1)

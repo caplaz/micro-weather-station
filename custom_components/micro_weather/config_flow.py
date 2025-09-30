@@ -7,6 +7,7 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
+from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
 import voluptuous as vol
 
 from .const import (
@@ -40,6 +41,24 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     def __init__(self):
         """Initialize the config flow."""
         self._data = {}
+
+    def _get_default_altitude(self) -> float:
+        """Get the default altitude in the appropriate unit for the HA system."""
+        elevation = self.hass.config.elevation or 0.0
+        # Return elevation as-is since HA already provides it in the correct unit
+        return elevation
+
+    def _get_altitude_unit(self) -> str:
+        """Get the appropriate unit for altitude based on HA configuration."""
+        if self.hass.config.units is US_CUSTOMARY_SYSTEM:
+            return "ft"  # feet
+        return "m"  # metric
+
+    def _get_altitude_max(self) -> int:
+        """Get the appropriate max value for altitude based on HA configuration."""
+        if self.hass.config.units is US_CUSTOMARY_SYSTEM:
+            return 32808  # ~10000 meters in feet
+        return 10000  # meters
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -83,10 +102,13 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                     )
                 ),
                 vol.Optional(
-                    CONF_ALTITUDE, default=self.hass.config.elevation or 0.0
+                    CONF_ALTITUDE, default=self._get_default_altitude()
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        min=0, max=10000, step=1, unit_of_measurement="m"
+                        min=0,
+                        max=self._get_altitude_max(),
+                        step=1,
+                        unit_of_measurement=self._get_altitude_unit(),
                     )
                 ),
                 vol.Optional(CONF_WIND_SPEED_SENSOR): selector.EntitySelector(
@@ -152,6 +174,24 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self):
         """Initialize the options flow."""
         self._data = {}
+
+    def _get_default_altitude(self) -> float:
+        """Get the default altitude in the appropriate unit for the HA system."""
+        elevation = self.hass.config.elevation or 0.0
+        # Return elevation as-is since HA already provides it in the correct unit
+        return elevation
+
+    def _get_altitude_unit(self) -> str:
+        """Get the appropriate unit for altitude based on HA configuration."""
+        if self.hass.config.units is US_CUSTOMARY_SYSTEM:
+            return "ft"  # feet
+        return "m"  # metric
+
+    def _get_altitude_max(self) -> int:
+        """Get the appropriate max value for altitude based on HA configuration."""
+        if self.hass.config.units is US_CUSTOMARY_SYSTEM:
+            return 32808  # ~10000 meters in feet
+        return 10000  # meters
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -263,12 +303,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             vol.Optional(
                 CONF_ALTITUDE,
                 default=current_options.get(
-                    CONF_ALTITUDE, self.hass.config.elevation or 0.0
+                    CONF_ALTITUDE, self._get_default_altitude()
                 ),
             )
         ] = selector.NumberSelector(
             selector.NumberSelectorConfig(
-                min=0, max=10000, step=1, unit_of_measurement="m"
+                min=0,
+                max=self._get_altitude_max(),
+                step=1,
+                unit_of_measurement=self._get_altitude_unit(),
             )
         )
 

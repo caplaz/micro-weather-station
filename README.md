@@ -256,6 +256,7 @@ The integration automatically detects and converts between different sensor unit
 - **Temperature**: °C ↔ °F
 - **Pressure**: hPa/mbar ↔ inHg
 - **Wind Speed**: km/h, mph, m/s
+- **Altitude**: m ↔ ft (automatically adapts to your Home Assistant unit system)
 
 **Supported Configurations:**
 
@@ -263,6 +264,7 @@ The integration automatically detects and converts between different sensor unit
 - ✅ Imperial weather stations (°F, inHg, mph)
 - ✅ Mixed environments (any combination)
 - ✅ SI units (m/s wind speed)
+- ✅ Dynamic altitude units (meters/feet based on HA system settings)
 
 #### Example Configuration
 

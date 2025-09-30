@@ -14,8 +14,12 @@ class TestWeatherDetector:
     @pytest.fixture
     def mock_hass(self):
         """Create a mock Home Assistant instance."""
+        from homeassistant.util.unit_system import METRIC_SYSTEM
+
         hass = Mock(spec=HomeAssistant)
         hass.states = Mock()
+        hass.config = Mock()
+        hass.config.units = METRIC_SYSTEM  # Default to metric system
         return hass
 
     @pytest.fixture

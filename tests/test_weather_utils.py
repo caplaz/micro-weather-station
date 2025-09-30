@@ -1,6 +1,7 @@
 """Test the weather utility functions."""
 
 from custom_components.micro_weather.weather_utils import (
+    convert_altitude_to_meters,
     convert_to_celsius,
     convert_to_hpa,
     convert_to_kmh,
@@ -84,3 +85,23 @@ class TestWeatherUtils:
         # Convert back (1 km/h ≈ 0.621371 mph)
         speed_mph_back = speed_kmh * 0.621371
         assert abs(speed_mph - speed_mph_back) < 0.1
+
+    def test_convert_altitude_to_meters(self):
+        """Test altitude conversion from feet to meters."""
+        # Test metric system (no conversion)
+        assert convert_altitude_to_meters(100.0, False) == 100.0
+        assert convert_altitude_to_meters(500.0, False) == 500.0
+
+        # Test imperial system (feet to meters conversion)
+        assert (
+            convert_altitude_to_meters(100.0, True) == 30.5
+        )  # 100 ft = 30.48 m, rounded to 30.5
+        assert convert_altitude_to_meters(1000.0, True) == 304.8  # 1000 ft = 304.8 m
+
+        # Test None input
+        assert convert_altitude_to_meters(None, False) is None
+        assert convert_altitude_to_meters(None, True) is None
+
+        # Test zero altitude
+        assert convert_altitude_to_meters(0.0, False) == 0.0
+        assert convert_altitude_to_meters(0.0, True) == 0.0
