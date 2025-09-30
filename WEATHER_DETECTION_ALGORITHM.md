@@ -367,11 +367,13 @@ This provides more accurate cloud cover percentages throughout the day, accounti
 
 **Altitude Configuration:**
 
-- **Purpose**: Corrects pressure readings and thresholds for accurate weather detection
+- **Purpose**: Adjusts pressure readings to sea-level equivalent for accurate weather detection
+- **Setting to 0**: Uses raw sensor pressure readings (no altitude adjustment)
+- **Non-zero values**: Converts station pressure to sea-level equivalent using barometric formula
 - **Automatic Detection**: Uses Home Assistant's elevation setting when available
 - **Manual Configuration**: Can be set in integration options if auto-detection is incorrect
 - **Units**: Meters above sea level
-- **Default**: 0 meters (sea level)
+- **Default**: 0 meters (raw sensor pressure)
 - **Impact**: Ensures consistent accuracy from sea level to mountain elevations
 
 ## Unit Conversions

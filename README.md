@@ -188,7 +188,7 @@ For quick testing and development, use the included Docker setup:
 4. **Testing the Integration**:
 
    - The environment includes simulated weather sensors
-   - Integration is pre-configured with altitude correction (350m)
+   - Integration is pre-configured with altitude correction (350m for testing) - set to 0 for raw sensor pressure
    - Template sensors provide realistic weather data variations
    - Debug logging is enabled for troubleshooting
 
