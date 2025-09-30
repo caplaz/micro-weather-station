@@ -190,6 +190,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             if not user_input.get(CONF_OUTDOOR_TEMP_SENSOR):
                 errors["base"] = "missing_outdoor_temp"
             else:
+                # Ensure optional fields are present in user_input
+                self._optional_entities(
+                    [
+                        CONF_DEWPOINT_SENSOR,
+                        CONF_HUMIDITY_SENSOR,
+                        CONF_PRESSURE_SENSOR,
+                        CONF_ALTITUDE,
+                    ],
+                    user_input,
+                )
+
                 # Store atmospheric sensor data
                 self._data.update(user_input)
 
@@ -197,7 +208,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 options = dict(self.config_entry.options)
                 for field in user_input:
                     value = user_input[field]
-                    if value and value != "":
+                    if value and value not in ("", "None"):
                         options[field] = value
                     else:
                         options[field] = None
@@ -269,6 +280,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     ) -> ConfigFlowResult:
         """Handle wind sensors configuration."""
         if user_input is not None:
+            # Ensure optional fields are present in user_input
+            self._optional_entities(
+                [
+                    CONF_WIND_SPEED_SENSOR,
+                    CONF_WIND_DIRECTION_SENSOR,
+                    CONF_WIND_GUST_SENSOR,
+                ],
+                user_input,
+            )
+
             # Store wind sensor data
             self._data.update(user_input)
 
@@ -276,7 +297,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             options = dict(self.config_entry.options)
             for field in user_input:
                 value = user_input[field]
-                if value and value != "":
+                if value and value not in ("", "None"):
                     options[field] = value
                 else:
                     options[field] = None
@@ -322,6 +343,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     ) -> ConfigFlowResult:
         """Handle rain sensors configuration."""
         if user_input is not None:
+            # Ensure optional fields are present in user_input
+            self._optional_entities(
+                [
+                    CONF_RAIN_RATE_SENSOR,
+                    CONF_RAIN_STATE_SENSOR,
+                ],
+                user_input,
+            )
+
             # Store rain sensor data
             self._data.update(user_input)
 
@@ -329,7 +359,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             options = dict(self.config_entry.options)
             for field in user_input:
                 value = user_input[field]
-                if value and value != "":
+                if value and value not in ("", "None"):
                     options[field] = value
                 else:
                     options[field] = None
@@ -369,6 +399,17 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     ) -> ConfigFlowResult:
         """Handle solar/sun sensors configuration."""
         if user_input is not None:
+            # Ensure optional fields are present in user_input
+            self._optional_entities(
+                [
+                    CONF_SOLAR_RADIATION_SENSOR,
+                    CONF_SOLAR_LUX_SENSOR,
+                    CONF_UV_INDEX_SENSOR,
+                    CONF_SUN_SENSOR,
+                ],
+                user_input,
+            )
+
             # Store solar sensor data
             self._data.update(user_input)
 
@@ -376,7 +417,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             options = dict(self.config_entry.options)
             for field in user_input:
                 value = user_input[field]
-                if value and value != "":
+                if value and value not in ("", "None"):
                     options[field] = value
                 else:
                     options[field] = None
@@ -459,7 +500,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     if field in self._data:
                         value = self._data[field]
                         # Set to None if empty/falsy, otherwise keep value
-                        if value and value != "":
+                        if value and value not in ("", "None"):
                             options[field] = value
                         else:
                             options[field] = None
@@ -503,6 +544,16 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=data_schema,
             errors=errors,
         )
+
+    def _optional_entities(
+        self, keys: list[str], user_input: dict[str, Any] | None = None
+    ) -> None:
+        """Set value to None if key does not exist in user_input."""
+        if user_input is None:
+            return
+        for key in keys:
+            if key not in user_input:
+                user_input[key] = None
 
 
 class CannotConnect(HomeAssistantError):
