@@ -99,10 +99,17 @@ For advanced users or custom setups.
    ├── sensor.py
    ├── strings.json
    ├── version.py
-   ├── weather_detector.py
    ├── weather.py
+   ├── weather_analysis.py
+   ├── weather_detector.py
+   ├── weather_forecast.py
+   ├── weather_utils.py
    └── translations/
-       └── en.json
+       ├── de.json
+       ├── en.json
+       ├── es.json
+       ├── fr.json
+       └── it.json
    ```
 
 4. **Restart Home Assistant**: Go to Settings → System → Restart
