@@ -508,11 +508,16 @@ class WeatherAnalysis:
         # like passing clouds, while still responding to genuine weather changes
         avg_solar_radiation = self._get_solar_radiation_average(solar_radiation)
 
-        # If solar radiation is very low, it may not be reliable for cloud cover
-        # estimation (could be due to time of day, sensor issues, or actual low angle)
-        # In such cases, assume partly cloudy rather than overcast
+        # Handle very low solar radiation cases more intelligently
+        # Very low values during daytime indicate heavy overcast conditions
         if avg_solar_radiation < 200 and solar_lux < 20000 and uv_index < 1:
-            return 40.0  # Assume partly cloudy when solar data is inconclusive
+            # If all solar measurements are extremely low, it indicates heavy clouds
+            if avg_solar_radiation < 50 and solar_lux < 5000 and uv_index == 0:
+                return 85.0  # Heavy overcast conditions
+            elif avg_solar_radiation < 100 and solar_lux < 10000:
+                return 70.0  # Mostly cloudy conditions
+            else:
+                return 40.0  # Partly cloudy when data is inconclusive
 
         # Calculate realistic clear-sky maximums based on solar elevation
         # Solar radiation follows a sine relationship with elevation
