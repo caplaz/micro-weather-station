@@ -31,8 +31,8 @@ This integration analyzes your real sensor data to provide weather conditions th
 - 🌦️ **Weather Entity**: Complete weather entity with current conditions and intelligent forecasts
 - 📈 **Intelligent Forecasting**: 5-day daily and 24-hour hourly forecasts based on pressure trends
 - ⚙️ **Flexible Configuration**: Works with any combination of available sensors
-- � **Dynamic Sensor Management**: Add or remove sensors anytime through the options flow
-- �🔄 **Real-time Analysis**: Updates based on actual sensor readings
+- 🔧 **Dynamic Sensor Management**: Add or remove sensors anytime through the options flow
+- 🔄 **Real-time Analysis**: Updates based on actual sensor readings
 - 📱 **Easy Configuration**: Simple setup through Home Assistant UI with sensor selection
 - 🌍 **Multilingual Support**: Available in English, Italian, German, Spanish, and French
 - 🔄 **Multi-Unit Support**: Automatic detection and conversion between metric and imperial units
@@ -482,8 +482,8 @@ This integration is perfect for:
 
 - 🌡️ **Smart Weather Detection**: Use your existing sensors to get intelligent weather condition detection
 - 🏠 **Enhanced Automations**: Create more accurate weather-based automations using real sensor data
-- � **Data Analysis**: Understand weather patterns based on your actual sensor readings
-- � **Accurate Forecasting**: Get weather conditions that match your local environment
+- 📊 **Data Analysis**: Understand weather patterns based on your actual sensor readings
+- 📈 **Accurate Forecasting**: Get weather conditions that match your local environment
 - 🔧 **Sensor Integration**: Make better use of your weather station investment
 
 ## Troubleshooting
