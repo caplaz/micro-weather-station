@@ -2,52 +2,130 @@
   "config": {
     "step": {
       "user": {
-        "title": "Micro Wetterstation Einrichtung",
-        "description": "Verbinden Sie Ihre Wettersensoren, um eine intelligente Wetterentität zu erstellen.\n\n**Erforderlich:** Nur die Außentemperatur ist erforderlich.\n\n**Wie jeder Sensor verwendet wird:**\n\n🌡️ **Taupunkt-Sensor** (optional)\n• Direkte Taupunktmessung für maximale Genauigkeit\n• Verwendet in Nebelerkennungsalgorithmus (>98% Luftfeuchtigkeit + Taupunkt)\n• Verbessert Komfortindexberechnungen\n• Fallback: Berechnet aus Temperatur + Luftfeuchtigkeit falls nicht verfügbar\n\n💧 **Luftfeuchtigkeits-Sensor** (optional)\n• Wesentlich für Nebelerkennung (auslöst bei >98% Luftfeuchtigkeit)\n• Verwendet in Komfortindex- und Hitzeindexberechnungen\n• Hilft bei der Bestimmung der Niederschlagswahrscheinlichkeit\n• Kombiniert mit Sonnenstrahlung für Wolkendeckenanalyse\n\n📊 **Luftdruck-Sensor** (optional)\n• Kernkomponente für Wettervorhersage (5-Tage und stündlich)\n• Sturmerkennung (schnelle Druckabfälle zeigen Stürme an)\n• Trendanalyse für Wettermustervorhersage\n• Verwendet zur Berechnung von Wetterstabilität und Änderungswahrscheinlichkeit\n\n💨 **Windgeschwindigkeits-Sensor** (optional)\n• Bestimmt Windbedingungen im Wetterzustand\n• Sturmerkennung (>25 km/h + Regen = stürmische Bedingungen)\n• Windchill-Berechnungen für gefühlte Temperatur\n• Unwetterwarnungen und windbezogene Vorhersagen\n\n🧭 **Windrichtungs-Sensor** (optional)\n• Liefert Windrichtungsdaten für detaillierte Wetterberichte\n• Verwendet in Sturmverfolgung und Wettermusteranalyse\n• Verbessert Vorhersagegenauigkeit mit Windrichtungsdaten\n\n🌪️ **Windböen-Sensor** (optional)\n• Unwettererkennung und Sturmintensitätsmessung\n• Sicherheitswarnungen für gefährliche Windbedingungen\n• Verbesserte Sturmklassifizierung (böig vs. stetige Winde)\n\n🌧️ **Niederschlagsraten-Sensor** (optional)\n• Direkte Niederschlagsintensitätsmessung\n• Löst regnerische/stürmische Wetterbedingungen aus\n• Verwendet für Niederschlagsvorhersage\n• Überschreibt andere Bedingungen wenn Regen erkannt wird\n\n🌦️ **Regenstatus-Sensor** (optional)\n• Boolesche Regenerkennung (trocken/nass Zustände)\n• Sofortige Wetterbedingungs-Überschreibung wenn nass\n• Backup-Niederschlagserkennung wenn Ratensensor nicht verfügbar\n\n☀️ **Sonnenstrahlung-Sensor** (optional)\n• Primäre Wolkendeckenerkennung (>400 W/m² = sonnig, <100 = bewölkt)\n• Tag/Nacht-Klassifizierung und Sonnenintensität\n• Verwendet in Nebelerkennung (niedrige Strahlung + hohe Luftfeuchtigkeit)\n• Überschreibt andere Bedingungen für klaren Himmel\n\n💡 **Solar-Lux-Sensor** (optional)\n• Lichtbasierte Tag/Nacht-Erkennung\n• Backup-Wolkendeckenerkennung wenn Strahlungssensor nicht verfügbar\n• Sichtbarkeitsberechnungen und Dämmerungserkennung\n\n🛡️ **UV-Index-Sensor** (optional)\n• Klarer Himmel Bestätigung (hoher UV = definitiv sonnig)\n• Sonnenintensitätsmessung für Sicherheitsempfehlungen\n• Verbesserte sonnige Wettererkennungsgenauigkeit\n\n☀️ **Sonnen-Sensor** (optional)\n• Solarhöhen-Daten für genaue Wolkendeckenberechnungen\n• Verbessert Wettererkennung durch Berücksichtigung der Sonnenposition\n• Höhere Höhe = mehr erwartete Solarstrahlung\n• Fallback: 45° Höhe falls nicht konfiguriert\n\n**Konfigurationstipps:**\n• Verwenden Sie Entwicklertools → Zustände um Sensor-Entitäts-IDs zu finden\n• Temperatursensoren sollten device_class='temperature' haben\n• Drucksensoren sollten relativen/barometrischen Druck verwenden\n• Aktualisierungsintervall: 1-60 Minuten (wie oft Wetterdaten aktualisiert werden)\n• Mehr Sensoren = genauere Wettererkennung!",
+        "title": "Mikro-Wetterstation Einrichtung",
+        "description": "Verbinden Sie Ihre Wettersensoren, um eine intelligente Wetterentität zu erstellen.",
         "data": {
           "outdoor_temp_sensor": "Außentemperatur-Sensor",
           "dewpoint_sensor": "Taupunkt-Sensor",
           "humidity_sensor": "Luftfeuchtigkeits-Sensor",
           "pressure_sensor": "Luftdruck-Sensor",
+          "altitude": "Stationshöhe",
           "wind_speed_sensor": "Windgeschwindigkeits-Sensor",
           "wind_direction_sensor": "Windrichtungs-Sensor",
           "wind_gust_sensor": "Windböen-Sensor",
-          "rain_rate_sensor": "Niederschlagsraten-Sensor",
+          "rain_rate_sensor": "Regenraten-Sensor",
           "rain_state_sensor": "Regenstatus-Sensor",
           "solar_radiation_sensor": "Sonnenstrahlung-Sensor",
-          "solar_lux_sensor": "Solar-Lux-Sensor",
+          "solar_lux_sensor": "Solar Lux-Sensor",
           "uv_index_sensor": "UV-Index-Sensor",
           "sun_sensor": "Sonnen-Sensor",
           "update_interval": "Aktualisierungsintervall (Minuten)"
         },
         "data_description": {
-          "outdoor_temp_sensor": "Erforderlicher Sensor für grundlegende Wettererkennung. Liefert Temperaturmessungen die in allen Wetterberechnungen und Zustandserkennung verwendet werden.",
-          "dewpoint_sensor": "Optionaler Sensor der direkte Taupunktmessung für maximale Genauigkeit liefert. Verwendet in Nebelerkennung (>98% Luftfeuchtigkeit + Taupunkt) und Komfortberechnungen. Fallback zur berechneten Taupunkt falls nicht bereitgestellt.",
-          "humidity_sensor": "Optionaler Sensor wesentlich für Nebelerkennung (auslöst bei >98% Luftfeuchtigkeit). Verwendet in Komfortindex, Hitzeindexberechnungen und Niederschlagswahrscheinlichkeitsbestimmung.",
-          "pressure_sensor": "Optionaler Sensor der Wettervorhersage ermöglicht (5-Tage und stündlich). Erkennt Stürme durch schnelle Druckabfälle und liefert Trendanalyse für Wettermustervorhersage.",
-          "wind_speed_sensor": "Optionaler Sensor für Windbedingungserkennung. Sturmerkennung (>25 km/h + Regen = stürmisch), Windchill-Berechnungen und Unwetterwarnungen.",
-          "wind_direction_sensor": "Optionaler Sensor der Windrichtungsdaten für detaillierte Wetterberichte liefert. Verwendet in Sturmverfolgung und verbessert Vorhersagegenauigkeit mit Windrichtungsdaten.",
-          "wind_gust_sensor": "Optionaler Sensor für Unwettererkennung und Sturmintensitätsmessung. Liefert Sicherheitswarnungen für gefährliche Windbedingungen und verbesserte Sturmklassifizierung.",
-          "rain_rate_sensor": "Optionaler Sensor für direkte Niederschlagsintensitätsmessung. Löst regnerische/stürmische Wetterbedingungen aus und überschreibt andere Bedingungen wenn Regen erkannt wird.",
-          "rain_state_sensor": "Optionaler Sensor für boolesche Regenerkennung (trocken/nass Zustände). Liefert sofortige Wetterbedingungs-Überschreibung wenn nass und Backup-Niederschlagserkennung.",
-          "solar_radiation_sensor": "Optionaler Sensor für primäre Wolkendeckenerkennung (>400 W/m² = sonnig, <100 = bewölkt). Verwendet in Nebelerkennung und überschreibt andere Bedingungen für klaren Himmel.",
-          "solar_lux_sensor": "Optionaler Sensor für lichtbasierte Tag/Nacht-Erkennung. Backup-Wolkendeckenerkennung und Sichtbarkeitsberechnungen wenn Strahlungssensor nicht verfügbar.",
-          "uv_index_sensor": "Optionaler Sensor für klaren Himmel Bestätigung (hoher UV = definitiv sonnig). Liefert Sonnenintensitätsmessung für Sicherheitsempfehlungen und verbesserte sonnige Wettererkennungsgenauigkeit.",
-          "sun_sensor": "Optionaler Sensor der Solarhöhen-Daten für genaue Wolkendeckenberechnungen liefert. Verbessert Wettererkennungsgenauigkeit durch Berücksichtigung der Sonnenposition (höhere Höhe = mehr erwartete Solarstrahlung). Fallback zu 45° Höhe falls nicht konfiguriert.",
-          "update_interval": "Wie oft die Wetterdaten aktualisiert und Sensoren abgefragt werden. Bereich: 1-60 Minuten. Niedrigere Werte liefern reaktionsschnellere Updates können aber die Systemlast erhöhen."
+          "outdoor_temp_sensor": "Erforderlicher Sensor für grundlegende Wettererkennung.",
+          "dewpoint_sensor": "Optionaler Sensor für direkte Taupunktmessung.",
+          "humidity_sensor": "Optionaler Sensor für Nebelerkennung und Komfortberechnungen.",
+          "pressure_sensor": "Optionaler Sensor für Wettervorhersage und Sturmerkennung.",
+          "altitude": "Stationshöhe über dem Meeresspiegel für Druckberechnungen.",
+          "wind_speed_sensor": "Optionaler Sensor für Windgeschwindigkeitsmessungen.",
+          "wind_direction_sensor": "Optionaler Sensor für Windrichtungsdaten.",
+          "wind_gust_sensor": "Optionaler Sensor für Windböenmessungen.",
+          "rain_rate_sensor": "Optionaler Sensor für Niederschlagsintensität.",
+          "rain_state_sensor": "Optionaler Sensor für Regenerkennung.",
+          "solar_radiation_sensor": "Optionaler Sensor für Sonnenstrahlungsmessungen.",
+          "solar_lux_sensor": "Optionaler Sensor für Lichtmessungen.",
+          "uv_index_sensor": "Optionaler Sensor für UV-Index-Messungen.",
+          "sun_sensor": "Optionaler Sensor für Sonnenhöhendaten.",
+          "update_interval": "Wie oft die Wetterdaten aktualisiert werden (1-60 Minuten)."
+        }
+      },
+      "atmospheric": {
+        "title": "Atmosphärische Sensoren",
+        "description": "Konfigurieren Sie Temperatur-, Luftfeuchtigkeits-, Druck- und Höhensensoren.",
+        "data": {
+          "outdoor_temp_sensor": "Außentemperatur-Sensor",
+          "dewpoint_sensor": "Taupunkt-Sensor",
+          "humidity_sensor": "Luftfeuchtigkeits-Sensor",
+          "pressure_sensor": "Luftdruck-Sensor",
+          "altitude": "Stationshöhe"
+        },
+        "data_description": {
+          "outdoor_temp_sensor": "Erforderlicher Sensor für grundlegende Wettererkennung.",
+          "dewpoint_sensor": "Optionaler Sensor für direkte Taupunktmessung.",
+          "humidity_sensor": "Optionaler Sensor für Nebelerkennung und Komfortberechnungen.",
+          "pressure_sensor": "Optionaler Sensor für Wettervorhersage und Sturmerkennung.",
+          "altitude": "Stationshöhe über dem Meeresspiegel für Druckberechnungen."
+        }
+      },
+      "wind": {
+        "title": "Wind-Sensoren",
+        "description": "Konfigurieren Sie Windgeschwindigkeits-, Richtungs- und Böensensoren.",
+        "data": {
+          "wind_speed_sensor": "Windgeschwindigkeits-Sensor",
+          "wind_direction_sensor": "Windrichtungs-Sensor",
+          "wind_gust_sensor": "Windböen-Sensor"
+        },
+        "data_description": {
+          "wind_speed_sensor": "Optionaler Sensor für Windgeschwindigkeitsmessungen.",
+          "wind_direction_sensor": "Optionaler Sensor für Windrichtungsdaten.",
+          "wind_gust_sensor": "Optionaler Sensor für Windböenmessungen."
+        }
+      },
+      "rain": {
+        "title": "Regen-Sensoren",
+        "description": "Konfigurieren Sie Niederschlags-Erkennungssensoren.",
+        "data": {
+          "rain_rate_sensor": "Regenraten-Sensor",
+          "rain_state_sensor": "Regenstatus-Sensor"
+        },
+        "data_description": {
+          "rain_rate_sensor": "Optionaler Sensor für Niederschlagsintensität.",
+          "rain_state_sensor": "Optionaler Sensor für Regenerkennung."
+        }
+      },
+      "solar": {
+        "title": "Solar- und Sonnen-Sensoren",
+        "description": "Konfigurieren Sie Sonnenstrahlung-, Licht-, UV- und Sonnenpositions-Sensoren.",
+        "data": {
+          "solar_radiation_sensor": "Sonnenstrahlung-Sensor",
+          "solar_lux_sensor": "Solar Lux-Sensor",
+          "uv_index_sensor": "UV-Index-Sensor",
+          "sun_sensor": "Sonnen-Sensor"
+        },
+        "data_description": {
+          "solar_radiation_sensor": "Optionaler Sensor für Sonnenstrahlungsmessungen.",
+          "solar_lux_sensor": "Optionaler Sensor für Lichtmessungen.",
+          "uv_index_sensor": "Optionaler Sensor für UV-Index-Messungen.",
+          "sun_sensor": "Optionaler Sensor für Sonnenhöhendaten."
+        }
+      },
+      "final": {
+        "title": "Endkonfiguration",
+        "description": "Legen Sie das Aktualisierungsintervall für Ihre Wetterstation fest.",
+        "data": {
+          "update_interval": "Aktualisierungsintervall (Minuten)"
+        },
+        "data_description": {
+          "update_interval": "Wie oft die Wetterdaten aktualisiert werden (1-60 Minuten)."
         }
       }
     },
     "error": {
-      "missing_outdoor_temp": "❌ Außentemperatur-Sensor ist erforderlich. Bitte wählen Sie einen Temperatursensor, der Außenbedingungen misst.",
-      "unknown": "❌ Ein unerwarteter Fehler ist bei der Konfiguration aufgetreten. Bitte überprüfen Sie Ihre Sensorauswahl und versuchen Sie es erneut."
+      "missing_outdoor_temp": "❌ Außentemperatur-Sensor ist erforderlich. Bitte wählen Sie einen Temperatursensor aus.",
+      "unknown": "❌ Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Wetterstationssensoren aktualisieren",
-        "description": "Ändern Sie die Sensor-Konfiguration Ihrer Wetterstation.\n\n**Änderungen werden sofort wirksam.** Die Wetterentität wird entsprechend dem neuen Intervall und der Sensorkonfiguration aktualisiert.",
+        "title": "Wetterstation-Sensoren Aktualisieren",
+        "menu_options": {
+          "atmospheric": "Atmosphärische Sensoren Konfigurieren",
+          "wind": "Wind-Sensoren Konfigurieren",
+          "rain": "Regen-Sensoren Konfigurieren",
+          "solar": "Solar-Sensoren Konfigurieren",
+          "device_config": "Gerätekonfiguration"
+        },
         "data": {
           "outdoor_temp_sensor": "Außentemperatur-Sensor",
           "dewpoint_sensor": "Taupunkt-Sensor",
@@ -56,35 +134,60 @@
           "wind_speed_sensor": "Windgeschwindigkeits-Sensor",
           "wind_direction_sensor": "Windrichtungs-Sensor",
           "wind_gust_sensor": "Windböen-Sensor",
-          "rain_rate_sensor": "Niederschlagsraten-Sensor",
+          "rain_rate_sensor": "Regenraten-Sensor",
           "rain_state_sensor": "Regenstatus-Sensor",
           "solar_radiation_sensor": "Sonnenstrahlung-Sensor",
-          "solar_lux_sensor": "Solar-Lux-Sensor",
+          "solar_lux_sensor": "Solar Lux-Sensor",
           "uv_index_sensor": "UV-Index-Sensor",
           "sun_sensor": "Sonnen-Sensor",
+          "altitude": "Stationshöhe",
           "update_interval": "Aktualisierungsintervall (Minuten)"
-        },
-        "data_description": {
-          "outdoor_temp_sensor": "Erforderlicher Sensor für grundlegende Wettererkennung. Liefert Temperaturmessungen die in allen Wetterberechnungen und Zustandserkennung verwendet werden.",
-          "dewpoint_sensor": "Optionaler Sensor der direkte Taupunktmessung für maximale Genauigkeit liefert. Verwendet in Nebelerkennung (>98% Luftfeuchtigkeit + Taupunkt) und Komfortberechnungen. Fallback zur berechneten Taupunkt falls nicht bereitgestellt.",
-          "humidity_sensor": "Optionaler Sensor wesentlich für Nebelerkennung (auslöst bei >98% Luftfeuchtigkeit). Verwendet in Komfortindex, Hitzeindexberechnungen und Niederschlagswahrscheinlichkeitsbestimmung.",
-          "pressure_sensor": "Optionaler Sensor der Wettervorhersage ermöglicht (5-Tage und stündlich). Erkennt Stürme durch schnelle Druckabfälle und liefert Trendanalyse für Wettermustervorhersage.",
-          "wind_speed_sensor": "Optionaler Sensor für Windbedingungserkennung. Sturmerkennung (>25 km/h + Regen = stürmisch), Windchill-Berechnungen und Unwetterwarnungen.",
-          "wind_direction_sensor": "Optionaler Sensor der Windrichtungsdaten für detaillierte Wetterberichte liefert. Verwendet in Sturmverfolgung und verbessert Vorhersagegenauigkeit mit Windrichtungsdaten.",
-          "wind_gust_sensor": "Optionaler Sensor für Unwettererkennung und Sturmintensitätsmessung. Liefert Sicherheitswarnungen für gefährliche Windbedingungen und verbesserte Sturmklassifizierung.",
-          "rain_rate_sensor": "Optionaler Sensor für direkte Niederschlagsintensitätsmessung. Löst regnerische/stürmische Wetterbedingungen aus und überschreibt andere Bedingungen wenn Regen erkannt wird.",
-          "rain_state_sensor": "Optionaler Sensor für boolesche Regenerkennung (trocken/nass Zustände). Liefert sofortige Wetterbedingungs-Überschreibung wenn nass und Backup-Niederschlagserkennung.",
-          "solar_radiation_sensor": "Optionaler Sensor für primäre Wolkendeckenerkennung (>400 W/m² = sonnig, <100 = bewölkt). Verwendet in Nebelerkennung und überschreibt andere Bedingungen für klaren Himmel.",
-          "solar_lux_sensor": "Optionaler Sensor für lichtbasierte Tag/Nacht-Erkennung. Backup-Wolkendeckenerkennung und Sichtbarkeitsberechnungen wenn Strahlungssensor nicht verfügbar.",
-          "uv_index_sensor": "Optionaler Sensor für klaren Himmel Bestätigung (hoher UV = definitiv sonnig). Liefert Sonnenintensitätsmessung für Sicherheitsempfehlungen und verbesserte sonnige Wettererkennungsgenauigkeit.",
-          "sun_sensor": "Optionaler Sensor der Solarhöhen-Daten für genaue Wolkendeckenberechnungen liefert. Verbessert Wettererkennungsgenauigkeit durch Berücksichtigung der Sonnenposition (höhere Höhe = mehr erwartete Solarstrahlung). Fallback zu 45° Höhe falls nicht konfiguriert.",
-          "update_interval": "Wie oft die Wetterdaten aktualisiert und Sensoren abgefragt werden. Bereich: 1-60 Minuten. Niedrigere Werte liefern reaktionsschnellere Updates können aber die Systemlast erhöhen."
+        }
+      },
+      "atmospheric": {
+        "title": "Atmosphärische Sensoren",
+        "data": {
+          "outdoor_temp_sensor": "Außentemperatur-Sensor",
+          "dewpoint_sensor": "Taupunkt-Sensor",
+          "humidity_sensor": "Luftfeuchtigkeits-Sensor",
+          "pressure_sensor": "Luftdruck-Sensor",
+          "altitude": "Stationshöhe"
+        }
+      },
+      "wind": {
+        "title": "Wind-Sensoren",
+        "data": {
+          "wind_speed_sensor": "Windgeschwindigkeits-Sensor",
+          "wind_direction_sensor": "Windrichtungs-Sensor",
+          "wind_gust_sensor": "Windböen-Sensor"
+        }
+      },
+      "rain": {
+        "title": "Regen-Sensoren",
+        "data": {
+          "rain_rate_sensor": "Regenraten-Sensor",
+          "rain_state_sensor": "Regenstatus-Sensor"
+        }
+      },
+      "solar": {
+        "title": "Solar- und Sonnen-Sensoren",
+        "data": {
+          "solar_radiation_sensor": "Sonnenstrahlung-Sensor",
+          "solar_lux_sensor": "Solar Lux-Sensor",
+          "uv_index_sensor": "UV-Index-Sensor",
+          "sun_sensor": "Sonnen-Sensor"
+        }
+      },
+      "device_config": {
+        "title": "Gerätekonfiguration",
+        "data": {
+          "update_interval": "Aktualisierungsintervall (Minuten)"
         }
       }
     },
     "error": {
-      "missing_outdoor_temp": "❌ Außentemperatur-Sensor ist erforderlich. Bitte wählen Sie einen Temperatursensor, der Außenbedingungen misst.",
-      "unknown": "❌ Bei der Konfiguration ist ein unerwarteter Fehler aufgetreten. Bitte überprüfen Sie Ihre Sensorauswahl und versuchen Sie es erneut."
+      "missing_outdoor_temp": "❌ Außentemperatur-Sensor ist erforderlich. Bitte wählen Sie einen Temperatursensor aus.",
+      "unknown": "❌ Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
     }
   }
 }

@@ -212,13 +212,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_menu(
             step_id="init",
             menu_options=["atmospheric", "wind", "rain", "solar", "device_config"],
-            description_placeholders={
-                "description": (
-                    "Configure your Micro Weather Station by selecting sensor categories. "
-                    "Start with atmospheric sensors (required) and optionally add wind, rain, "
-                    "and solar sensors. When done, select 'Device Configuration'."
-                ),
-            },
         )
 
     async def async_step_atmospheric(
@@ -319,19 +312,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             vol.Schema(schema_dict), current_options
         )
 
-        altitude_desc = (
-            "Altitude above sea level (adjusts pressure to sea-level equivalent; "
-            "set to 0 for raw sensor pressure). Default: "
-            f"{self._get_default_altitude()} {self._get_altitude_unit()}."
-        )
-
         return self.async_show_form(
             step_id="atmospheric",
             data_schema=data_schema,
             errors=errors,
-            description_placeholders={
-                "altitude_desc": altitude_desc,
-            },
         )
 
     async def async_step_wind(
