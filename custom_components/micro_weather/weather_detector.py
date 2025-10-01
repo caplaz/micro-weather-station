@@ -116,8 +116,8 @@ class WeatherDetector:
             maxlen=self._history_maxlen
         )
 
-        # Initialize analysis and forecast modules
-        self.analysis = WeatherAnalysis(self._sensor_history)
+        # Initialize weather analysis and forecast modules
+        self.analysis = WeatherAnalysis()
         self.forecast = WeatherForecast(self.analysis)
 
         # Sensor entity IDs mapping

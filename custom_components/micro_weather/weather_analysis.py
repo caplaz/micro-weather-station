@@ -103,15 +103,19 @@ class WeatherAnalysis:
             adjusted_pressure < pressure_thresholds["extremely_low"]
         )
 
-        # Wind analysis (Beaufort scale adapted)
+        # Enhanced wind analysis (Beaufort scale adapted with turbulence detection)
         wind_calm = wind_speed < 1  # 0-1 mph: Calm
         wind_light = 1 <= wind_speed < 8  # 1-7 mph: Light air to light breeze
         wind_strong = 19 <= wind_speed < 32  # 19-31 mph: Strong breeze to near gale
         wind_gale = wind_speed >= 32  # 32+ mph: Gale force
 
+        # Enhanced gust analysis for better storm detection
         gust_factor = wind_gust / max(wind_speed, 1)  # Gust ratio for turbulence
         is_gusty = gust_factor > 1.5 and wind_gust > 10
         is_very_gusty = gust_factor > 2.0 and wind_gust > 15
+
+        # Severe turbulence indicator (suggests thunderstorm activity)
+        is_severe_turbulence = (gust_factor > 3.0 and wind_gust > 20) or wind_gust > 40
 
         # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
         # First check if we have clear precipitation indicators
@@ -147,7 +151,7 @@ class WeatherAnalysis:
                 else:
                     return ATTR_CONDITION_SNOWY  # Light snow/flurries
 
-            # Rain with storm conditions (thunderstorm)
+            # Enhanced storm detection with turbulence analysis
             # Only trigger for significant storm conditions with meaningful precipitation
             if (
                 pressure_extremely_low  # Severe storm pressure (< 29.20 inHg)
@@ -157,6 +161,9 @@ class WeatherAnalysis:
                 or (
                     pressure_very_low and is_very_gusty and rain_rate > 0.25
                 )  # Storm pressure + very gusty + heavy rain
+                or (
+                    is_severe_turbulence and rain_rate > 0.05
+                )  # Severe wind turbulence + any precipitation (thunderstorm indicator)
             ):
                 return ATTR_CONDITION_LIGHTNING_RAINY  # Thunderstorm/severe weather
 
@@ -169,9 +176,11 @@ class WeatherAnalysis:
                 return ATTR_CONDITION_RAINY  # Light rain/drizzle
 
         # PRIORITY 2: SEVERE WEATHER CONDITIONS
-        # (No precipitation but extreme conditions)
-        if pressure_extremely_low and (wind_strong or is_very_gusty):
-            return ATTR_CONDITION_LIGHTNING  # Severe weather system approaching
+        # (No precipitation but extreme conditions suggesting thunderstorm activity)
+        if (
+            pressure_extremely_low and (wind_strong or is_very_gusty)
+        ) or is_severe_turbulence:  # Enhanced: severe turbulence indicates thunderstorm
+            return ATTR_CONDITION_LIGHTNING  # Dry thunderstorm or severe weather system
 
         if wind_gale:  # Gale force winds
             return ATTR_CONDITION_WINDY  # Windstorm

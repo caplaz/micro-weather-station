@@ -91,13 +91,11 @@ Evaporation Fog: humidity ≥95% AND dewpoint_spread ≤3°F AND wind ≤6mph AN
 **Cloud Cover Analysis:**
 
 ```
-IF cloud_cover ≤10% AND pressure >30.00 inHg:
+IF cloud_cover ≤25%:
     → "sunny"
-ELIF cloud_cover ≤25%:
-    → "sunny"
-ELIF cloud_cover ≤50%:
+ELIF cloud_cover ≤60%:
     → "partly_cloudy"
-ELIF cloud_cover ≤75%:
+ELIF cloud_cover ≤85%:
     → "cloudy"
 ELSE:
     → "cloudy" (overcast)
@@ -242,7 +240,7 @@ Pressure thresholds are reduced by approximately 1 hPa (0.0295 inHg) per 8 meter
 
 This correction ensures that weather detection accuracy remains consistent across all elevations, from coastal areas to mountain tops.
 
-## Wind Analysis (Beaufort Scale Adapted)
+## Wind Analysis (Enhanced Beaufort Scale)
 
 - **Calm**: <1 mph
 - **Light**: 1-7 mph (light air to light breeze)
@@ -250,6 +248,16 @@ This correction ensures that weather detection accuracy remains consistent acros
 - **Gale**: ≥32 mph (gale force)
 - **Gusty**: gust_factor >1.5 AND wind_gust >10 mph
 - **Very Gusty**: gust_factor >2.0 AND wind_gust >15 mph
+- **Severe Turbulence**: gust_factor >3.0 AND wind_gust >20 mph OR wind_gust >40 mph
+
+**Enhanced Storm Detection:**
+
+Severe turbulence indicators (gust_factor >3.0 or gusts >40 mph) can indicate thunderstorm activity even without precipitation, improving detection of:
+
+- Dry thunderstorms
+- Approaching severe weather
+- Microbursts and downbursts
+- Tornadic activity
 
 ## Rain State Sensor Requirements
 
@@ -313,14 +321,27 @@ This is critical for fog detection and humidity analysis.
 
 ## Cloud Cover Analysis
 
-Cloud cover percentage is estimated using solar radiation analysis with solar elevation compensation:
+Cloud cover percentage is estimated using solar radiation analysis with solar elevation compensation and intelligent fallback logic for low-light conditions:
+
+**Primary Analysis:**
 
 ```
 solar_cloud_cover = 100 - (solar_radiation / expected_solar_radiation * 100)
 lux_cloud_cover = 100 - (solar_lux / 100000 * 100)
 uv_cloud_cover = 100 - (uv_index / 11 * 100)
 
-Weighted: solar_radiation × 0.6 + solar_lux × 0.3 + uv_index × 0.1
+Weighted: solar_radiation × 0.8 + solar_lux × 0.15 + uv_index × 0.05
+```
+
+**Low Solar Radiation Fallback Logic:**
+
+```
+IF solar_radiation < 50 W/m² AND solar_lux < 5000 lx AND uv_index = 0:
+    → 85% cloud cover (heavy overcast conditions)
+ELIF solar_radiation < 100 W/m² AND solar_lux < 10000 lx:
+    → 70% cloud cover (mostly cloudy conditions)
+ELIF solar_radiation < 200 W/m² AND solar_lux < 20000 lx AND uv_index < 1:
+    → 40% cloud cover (partly cloudy fallback when data is inconclusive)
 ```
 
 **Solar Elevation Compensation:**
@@ -335,7 +356,15 @@ expected_solar_radiation = max_solar_radiation × sin(solar_elevation)
 - **Lower elevation** = Less expected solar radiation (accounts for sun angle)
 - **Fallback**: 45° elevation if sun sensor not configured
 
-This provides more accurate cloud cover percentages throughout the day, accounting for the sun's position in the sky.
+**Geographic Seasonal Adjustment:**
+
+Solar radiation expectations are adjusted based on:
+
+- **Month of year**: Different solar intensity by season
+- **Latitude**: Higher latitudes have more extreme seasonal variations
+- **Northern/Southern hemisphere**: Seasons are flipped in southern hemisphere
+
+This provides more accurate cloud cover percentages throughout the day and year, accounting for the sun's position and seasonal variations.
 
 ## Sensor Data Requirements
 

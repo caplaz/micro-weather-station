@@ -6,6 +6,7 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
+    ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_POURING,
     ATTR_CONDITION_SNOWY,
@@ -145,13 +146,13 @@ class TestWeatherDetector:
         assert result["condition"] == ATTR_CONDITION_POURING
 
     def test_detect_stormy_condition(self, mock_hass, mock_options, mock_sensor_data):
-        """Test detection of stormy conditions."""
+        """Test detection of stormy conditions (thunderstorm with precipitation)."""
         # Set up mock states for stormy conditions
         mock_states = {}
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "rain_rate":
                 state = Mock()
-                state.state = "0.3"
+                state.state = "0.3"  # Heavy rain rate
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "wind_gust":
                 state = Mock()
@@ -159,7 +160,7 @@ class TestWeatherDetector:
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "pressure":
                 state = Mock()
-                state.state = "29.5"  # Low pressure
+                state.state = "29.5"  # Very low pressure (storm system)
                 mock_states[f"sensor.{sensor_key}"] = state
             else:
                 state = Mock()
@@ -170,7 +171,9 @@ class TestWeatherDetector:
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        assert result["condition"] == ATTR_CONDITION_POURING
+        # Enhanced storm detection now correctly identifies this as thunderstorm conditions
+        # Low pressure + high gusts + heavy rain = lightning-rainy (thunderstorm)
+        assert result["condition"] == ATTR_CONDITION_LIGHTNING_RAINY
 
     def test_detect_snowy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of snowy conditions."""

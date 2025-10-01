@@ -350,27 +350,18 @@ For detailed information about the sophisticated meteorological algorithms used 
 
 ## Intelligent Forecasting
 
-The integration provides both daily and hourly forecasts based on your sensor data:
+The integration provides sophisticated 5-day daily and 24-hour hourly forecasts using meteorological principles and your actual sensor data.
 
-### Daily Forecast (5 days)
+For comprehensive information about the advanced forecasting algorithms, meteorological principles, and technical implementation details, see [WEATHER_FORECAST_ALGORITHM](WEATHER_FORECAST_ALGORITHM.md).
 
-- **Temperature Trends**: Based on pressure patterns and seasonal variations
-- **Condition Prediction**: Uses pressure trends, humidity, and wind patterns
-- **Precipitation Probability**: Calculated from atmospheric pressure and humidity levels
-- **Wind Speed Forecasting**: Considers current conditions and weather pattern changes
+### Key Features
 
-### Hourly Forecast (24 hours)
-
-- **Diurnal Temperature Cycle**: Natural daily temperature variations
-- **Short-term Condition Changes**: Hour-by-hour weather evolution
-- **Microclimate Patterns**: Based on your local sensor data trends
-
-### Forecast Features
-
-- **Pressure-based Prediction**: High pressure → clear weather, Low pressure → storms
-- **Humidity Analysis**: High humidity + low pressure = increased rain probability
-- **Wind Pattern Recognition**: Current wind trends influence forecast conditions
-- **Local Calibration**: Adapts to your specific microclimate over time
+- **Pressure-based Prediction**: Uses barometric pressure trends as primary forecast driver
+- **Temperature Forecasting**: Pressure patterns combined with seasonal variations
+- **Condition Prediction**: Sophisticated priority system analyzing multiple weather factors
+- **Precipitation Analysis**: Multi-factor probability calculation using humidity and pressure
+- **Wind Forecasting**: Considers current conditions and atmospheric pressure changes
+- **Local Calibration**: Adapts to your specific microclimate patterns over time
 
 ## Automation Examples
 
