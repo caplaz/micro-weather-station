@@ -1,3 +1,57 @@
+# Changelog
+
+## 2.0.0 (2025-10-01)
+
+### Major Features
+
+- **New Config Flow with Single Panels**: Complete redesign of the configuration interface
+
+  - Streamlined single-panel configuration flow for easier setup
+  - Improved user experience with cleaner, more intuitive interface
+  - Better sensor management and validation
+  - Enhanced error handling and user feedback
+
+- **Altitude Support**: Added comprehensive altitude and elevation support (#9)
+
+  - Dynamic altitude units support (meters/feet based on HA system settings)
+  - Automatic pressure correction for elevation differences
+  - Improved weather detection accuracy at various altitudes
+  - Enhanced documentation for elevation data usage
+
+- **Enhanced Weather Detection Algorithms**: Major improvements to meteorological algorithms
+
+  - Improved cloud cover thresholds for better sunny/partly cloudy detection
+  - Enhanced wind turbulence analysis for severe weather detection
+  - Low solar radiation fallback logic for cloudy conditions
+  - Better storm classification with gust factor analysis (>3.0 indicates thunderstorms)
+  - More accurate weather condition detection across all scenarios
+
+### Technical Improvements
+
+- **Comprehensive Forecast Documentation**: Added detailed `WEATHER_FORECAST_ALGORITHM.md`
+
+  - Complete coverage of 5-day daily and 24-hour hourly forecasting algorithms
+  - Meteorological principles and pressure-based prediction methods
+  - Technical implementation details and validation methods
+
+- **Enhanced Test Coverage**: Improved test suite with 136 total tests
+  - Updated tests for enhanced storm classification accuracy
+  - Better coverage of edge cases and weather detection scenarios
+  - Comprehensive validation of all algorithm improvements
+
+### Documentation
+
+- **Algorithm Documentation**: Created comprehensive documentation for both weather detection and forecasting
+- **README Updates**: Streamlined forecast section with links to detailed documentation
+- **Enhanced Code Comments**: Improved inline documentation throughout the codebase
+
+### Changes
+
+- Significant improvements to weather detection accuracy and reliability
+- Better user experience with streamlined configuration interface
+- Enhanced altitude support for improved meteorological calculations
+- Comprehensive documentation for all algorithms and features
+
 ## 1.4.3 (2025-09-25)
 
 ### Bug Fixes
