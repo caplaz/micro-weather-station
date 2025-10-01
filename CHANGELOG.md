@@ -11,7 +11,7 @@
   - Better sensor management and validation
   - Enhanced error handling and user feedback
 
-- **Altitude Support**: Added comprehensive altitude and elevation support (#9)
+- **Altitude Support**: Added comprehensive altitude and elevation support (#8)
 
   - Dynamic altitude units support (meters/feet based on HA system settings)
   - Automatic pressure correction for elevation differences
