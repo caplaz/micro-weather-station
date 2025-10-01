@@ -320,7 +320,7 @@ title: Weather Sensors
 
 Create a test automation to verify the integration works:
 
-`````yaml
+```yaml
 # Test automation
 automation:
   - alias: "Test Weather Integration"
@@ -334,6 +334,8 @@ automation:
             Weather changed to: {{ states('weather.micro_weather_station') }}
             Temperature: {{ state_attr('weather.micro_weather_station', 'temperature') }}°C
           title: "Weather Update"
+```
+
 ## Entities Created
 
 ### Weather Entity
@@ -421,7 +423,7 @@ automation:
       - service: switch.turn_on
         target:
           entity_id: switch.garden_sprinklers
-`````
+````
 
 ## Temperature Alerts
 
