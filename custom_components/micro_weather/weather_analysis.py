@@ -200,10 +200,12 @@ class WeatherAnalysis:
         if is_daytime:
             cloud_cover = self.analyze_cloud_cover(solar_radiation, solar_lux, uv_index)
 
-            # Simplified: partly cloudy for cloud cover <= 50%
-            if cloud_cover <= 50:
+            # Daytime clear sky conditions: low cloud cover = sunny
+            if cloud_cover <= 25:
+                return ATTR_CONDITION_SUNNY
+            elif cloud_cover <= 60:
                 return ATTR_CONDITION_PARTLYCLOUDY
-            elif cloud_cover <= 75:
+            elif cloud_cover <= 85:
                 return ATTR_CONDITION_CLOUDY
             else:
                 # Overcast with potential for development
