@@ -85,11 +85,10 @@ class TestPrecipitationSupport:
         # Get weather data
         weather_data = detector.get_weather_data()
 
-        # Verify precipitation is included and converted
+        # Verify precipitation is included (no conversion, returns raw sensor value)
         assert "precipitation" in weather_data
-        assert (
-            weather_data["precipitation"] == 2.5
-        )  # 0.1 in/h = 2.54 mm/h, rounded to 2.5
+        assert weather_data["precipitation"] == 0.1  # Raw sensor value in in/h
+        assert weather_data.get("precipitation_unit") == "in/h"
 
     def test_weather_data_no_precipitation_sensor(self):
         """Test that weather data handles missing precipitation sensor gracefully."""

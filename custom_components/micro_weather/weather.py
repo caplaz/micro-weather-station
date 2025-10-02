@@ -12,7 +12,6 @@ from homeassistant.components.weather import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    UnitOfAccumulatedPrecipitation,
     UnitOfLength,
     UnitOfPressure,
     UnitOfSpeed,
@@ -131,15 +130,19 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
 
     @property
     def native_precipitation(self) -> float | None:
-        """Return the current precipitation rate in mm/h."""
+        """Return the current precipitation rate."""
         if self.coordinator.data:
             return self.coordinator.data.get("precipitation")
         return None
 
     @property
-    def native_precipitation_unit(self) -> str:
+    def native_precipitation_unit(self) -> str | None:
         """Return the unit of measurement for precipitation."""
-        return UnitOfAccumulatedPrecipitation.MILLIMETERS
+        if self.coordinator.data:
+            unit = self.coordinator.data.get("precipitation_unit")
+            if unit:
+                return unit
+        return None
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
         """Return the daily forecast."""
@@ -201,6 +204,8 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
 
             # Calculate precipitation based on condition and current precipitation rate
             current_precipitation = self.coordinator.data.get("precipitation", 0)
+            precipitation_unit = self.native_precipitation_unit
+
             if hour_condition in [ATTR_CONDITION_RAINY, ATTR_CONDITION_LIGHTNING_RAINY]:
                 # Use current precipitation rate if available, otherwise estimate based on condition
                 if current_precipitation and current_precipitation > 0:
@@ -209,10 +214,27 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                     hour_precipitation = max(0.1, current_precipitation * variation)
                 else:
                     # Fallback estimates when no current precipitation data
-                    if hour_condition == ATTR_CONDITION_LIGHTNING_RAINY:
-                        hour_precipitation = 8.0  # Heavy storm rainfall
+                    # Values are in mm/h, convert to sensor unit if needed
+                    if precipitation_unit and precipitation_unit.lower() in [
+                        "in/h",
+                        "in/hr",
+                        "inh",
+                        "inch/h",
+                        "inches/h",
+                    ]:
+                        # Convert mm/h to in/h for fallback values
+                        if hour_condition == ATTR_CONDITION_LIGHTNING_RAINY:
+                            hour_precipitation = 8.0 / 25.4  # ~0.31 in/h heavy storm
+                        else:
+                            hour_precipitation = (
+                                3.0 / 25.4
+                            )  # ~0.12 in/h moderate rainfall
                     else:
-                        hour_precipitation = 3.0  # Moderate rainfall
+                        # Use mm/h values (default)
+                        if hour_condition == ATTR_CONDITION_LIGHTNING_RAINY:
+                            hour_precipitation = 8.0  # Heavy storm rainfall in mm/h
+                        else:
+                            hour_precipitation = 3.0  # Moderate rainfall in mm/h
             elif (
                 hour_condition == ATTR_CONDITION_PARTLYCLOUDY
                 and current_precipitation
