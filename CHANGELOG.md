@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.0.1 (2025-10-02)
+
+### Bug Fixes
+
+- **Altitude Field Configuration**: Fixed options flow not remembering altitude value of 0
+  - Altitude field now properly saves and restores 0 values (sea level)
+  - Fixed falsy value handling in configuration saving logic
+  - Added special handling for numeric fields that can legitimately be 0
+
+- **Documentation Fixes**: Corrected various documentation issues
+  - Fixed unicode character encoding issues in README.md
+  - Corrected malformed code blocks in README Step 5 and automation examples
+  - Updated directory structure documentation to reflect current modular architecture
+  - Fixed PR reference number for altitude support feature
+
+### Technical Improvements
+
+- **Configuration Flow Enhancements**: Improved handling of numeric configuration values
+  - Better validation and saving of numeric fields in options flow
+  - Enhanced schema building for optional configuration fields
+  - Added comprehensive test coverage for edge cases
+
 ## 2.0.0 (2025-10-01)
 
 ### Major Features
