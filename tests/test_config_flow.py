@@ -9,6 +9,7 @@ from custom_components.micro_weather.config_flow import (
     OptionsFlowHandler,
 )
 from custom_components.micro_weather.const import (
+    CONF_ALTITUDE,
     CONF_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
@@ -721,3 +722,89 @@ class TestOptionsFlow:
         flow.hass = hass
 
         assert flow._get_altitude_max() == 32808
+
+    @patch("homeassistant.helpers.frame.report_usage")
+    async def test_options_flow_altitude_zero_value(
+        self, mock_report_usage, hass: HomeAssistant
+    ):
+        """Test that altitude value of 0 is properly saved and remembered."""
+        # Create a real config entry
+        config_entry = config_entries.ConfigEntry(
+            entry_id="test_entry",
+            version=1,
+            minor_version=0,
+            domain="micro_weather",
+            title="Test Weather Station",
+            data={},
+            options={
+                CONF_OUTDOOR_TEMP_SENSOR: "sensor.outdoor_temperature",
+                CONF_ALTITUDE: 100,  # Initially set to 100
+                CONF_UPDATE_INTERVAL: 30,
+            },
+            source=config_entries.SOURCE_USER,
+            unique_id="test_unique_id",
+            discovery_keys=set(),
+            subentries_data={},
+        )
+        # Add it to HA's config entries
+        hass.config_entries._entries[config_entry.entry_id] = config_entry
+
+        # Create options flow and set config_entry directly on the instance
+        flow = OptionsFlowHandler()
+        # Bypass the property setter by setting the private attribute
+        flow._config_entry = config_entry
+        flow.hass = hass
+
+        # Start with menu
+        await flow.async_step_init()
+
+        # Configure atmospheric sensors - set altitude to 0
+        result = await flow.async_step_init({"next_step_id": "atmospheric"})
+        assert result["type"] == "form"
+
+        result = await flow.async_step_atmospheric(
+            {
+                CONF_OUTDOOR_TEMP_SENSOR: "sensor.outdoor_temperature",
+                CONF_ALTITUDE: 0,  # Set to 0
+            }
+        )
+        assert result["type"] == "menu"
+
+        # Finish configuration
+        result = await flow.async_step_init({"next_step_id": "device_config"})
+        assert result["type"] == "form"
+
+        result = await flow.async_step_device_config({})
+
+        assert result["type"] == "create_entry"
+        assert result["data"][CONF_ALTITUDE] == 0  # Should be 0, not None
+
+        # Now test that it remembers the 0 value when reopened
+        # Create new config entry with the updated options
+        config_entry2 = config_entries.ConfigEntry(
+            entry_id="test_entry2",
+            version=1,
+            minor_version=0,
+            domain="micro_weather",
+            title="Test Weather Station",
+            data={},
+            options=result["data"],  # Use the updated options
+            source=config_entries.SOURCE_USER,
+            unique_id="test_unique_id2",
+            discovery_keys=set(),
+            subentries_data={},
+        )
+        # Add it to HA's config entries
+        hass.config_entries._entries[config_entry2.entry_id] = config_entry2
+
+        # Create new flow with the updated options
+        flow2 = OptionsFlowHandler()
+        flow2._config_entry = config_entry2
+        flow2.hass = hass
+
+        # Go to atmospheric step again
+        await flow2.async_step_init()
+        result2 = await flow2.async_step_init({"next_step_id": "atmospheric"})
+        assert result2["type"] == "form"
+
+        # The form should have altitude set to 0 in the suggested values

@@ -243,10 +243,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 options = dict(self.config_entry.options)
                 for field in user_input:
                     value = user_input[field]
-                    if value and value not in ("", "None"):
-                        options[field] = value
+                    # Handle different field types appropriately
+                    if field == CONF_ALTITUDE:
+                        # Altitude can be 0, so check for None explicitly
+                        if value is not None and str(value) not in ("", "None"):
+                            options[field] = value
+                        else:
+                            options[field] = None
                     else:
-                        options[field] = None
+                        # For entity fields, empty string means clear the field
+                        if value and value not in ("", "None"):
+                            options[field] = value
+                        else:
+                            options[field] = None
                 self.hass.config_entries.async_update_entry(
                     self.config_entry, options=options
                 )
@@ -295,9 +304,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         schema_dict[
             vol.Optional(
                 CONF_ALTITUDE,
-                default=current_options.get(
-                    CONF_ALTITUDE, self._get_default_altitude()
-                ),
+                default=vol.UNDEFINED,
             )
         ] = selector.NumberSelector(
             selector.NumberSelectorConfig(
@@ -542,11 +549,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 for field in all_sensor_fields:
                     if field in self._data:
                         value = self._data[field]
-                        # Set to None if empty/falsy, otherwise keep value
-                        if value and value not in ("", "None"):
-                            options[field] = value
+                        # Handle different field types appropriately
+                        if field == CONF_ALTITUDE:
+                            # Altitude can be 0, so check for None explicitly
+                            if value is not None and str(value) not in ("", "None"):
+                                options[field] = value
+                            else:
+                                options[field] = None
                         else:
-                            options[field] = None
+                            # For entity fields, empty string means clear the field
+                            if value and value not in ("", "None"):
+                                options[field] = value
+                            else:
+                                options[field] = None
 
                 # Always update the interval
                 update_interval = self._data.get(
