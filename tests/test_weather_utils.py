@@ -2,6 +2,7 @@
 
 from custom_components.micro_weather.weather_utils import (
     convert_altitude_to_meters,
+    convert_precipitation_rate,
     convert_to_celsius,
     convert_to_hpa,
     convert_to_kmh,
@@ -105,3 +106,29 @@ class TestWeatherUtils:
         # Test zero altitude
         assert convert_altitude_to_meters(0.0, False) == 0.0
         assert convert_altitude_to_meters(0.0, True) == 0.0
+
+    def test_convert_precipitation_rate(self):
+        """Test precipitation rate conversion."""
+        # Test inches per hour to mm per hour conversion
+        assert convert_precipitation_rate(1.0, "in/h") == 25.4  # 1 inch = 25.4 mm
+        assert (
+            convert_precipitation_rate(0.1, "in/hr") == 2.5
+        )  # 0.1 inch = 2.54 mm, rounded to 2.5
+        assert convert_precipitation_rate(0.5, "inches/h") == 12.7  # 0.5 inch = 12.7 mm
+
+        # Test mm per hour (no conversion needed)
+        assert convert_precipitation_rate(10.0, "mm/h") == 10.0
+        assert convert_precipitation_rate(5.5, "mmh") == 5.5
+
+        # Test no unit specified (assume mm/h)
+        assert convert_precipitation_rate(3.0, None) == 3.0
+        assert convert_precipitation_rate(7.5, "") == 7.5
+
+        # Test None value
+        assert convert_precipitation_rate(None, "in/h") is None
+
+        # Test invalid value
+        assert convert_precipitation_rate("invalid", "in/h") is None
+
+        # Test unknown unit (assume mm/h)
+        assert convert_precipitation_rate(5.0, "unknown") == 5.0

@@ -5,6 +5,7 @@
 ### Bug Fixes
 
 - **Altitude Field Configuration**: Fixed options flow not remembering altitude value of 0
+
   - Altitude field now properly saves and restores 0 values (sea level)
   - Fixed falsy value handling in configuration saving logic
   - Added special handling for numeric fields that can legitimately be 0
@@ -14,6 +15,19 @@
   - Corrected malformed code blocks in README Step 5 and automation examples
   - Updated directory structure documentation to reflect current modular architecture
   - Fixed PR reference number for altitude support feature
+
+### New Features
+
+- **Current Precipitation Support**: Weather entity now displays actual precipitation rate from rain_rate sensor
+
+  - Added native_precipitation property to weather entity
+  - Smart unit conversion between in/h and mm/h based on sensor units
+  - Precipitation rate displayed in weather card reflects your actual local measurements
+
+- **Enhanced Forecast Precipitation**: Replaced hardcoded forecast values with dynamic calculations
+  - Hourly forecasts now use actual rain_rate sensor data instead of fixed 2.0 mm
+  - Realistic precipitation variations (±20%) based on forecast conditions
+  - Better estimates for different weather conditions (light drizzle to heavy storms)
 
 ### Technical Improvements
 

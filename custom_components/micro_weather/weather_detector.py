@@ -59,6 +59,7 @@ from .weather_analysis import WeatherAnalysis
 from .weather_forecast import WeatherForecast
 from .weather_utils import (
     convert_altitude_to_meters,
+    convert_precipitation_rate,
     convert_to_celsius,
     convert_to_hpa,
     convert_to_kmh,
@@ -257,6 +258,9 @@ class WeatherDetector:
             "wind_direction": sensor_data.get("wind_direction"),
             "visibility": self.analysis.estimate_visibility(
                 condition, self._prepare_analysis_sensor_data(sensor_data)
+            ),
+            "precipitation": convert_precipitation_rate(
+                sensor_data.get("rain_rate"), sensor_data.get("rain_rate_unit")
             ),
             "condition": condition,
             "forecast": self.forecast.generate_enhanced_forecast(

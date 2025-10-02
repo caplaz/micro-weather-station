@@ -12,6 +12,7 @@ from homeassistant.components.weather import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
+    UnitOfAccumulatedPrecipitation,
     UnitOfLength,
     UnitOfPressure,
     UnitOfSpeed,
@@ -128,6 +129,18 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             return self.coordinator.data.get("visibility")
         return None
 
+    @property
+    def native_precipitation(self) -> float | None:
+        """Return the current precipitation rate in mm/h."""
+        if self.coordinator.data:
+            return self.coordinator.data.get("precipitation")
+        return None
+
+    @property
+    def native_precipitation_unit(self) -> str:
+        """Return the unit of measurement for precipitation."""
+        return UnitOfAccumulatedPrecipitation.MILLIMETERS
+
     async def async_forecast_daily(self) -> list[Forecast] | None:
         """Return the daily forecast."""
         if self.coordinator.data and "forecast" in self.coordinator.data:
@@ -186,17 +199,36 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                     current_condition,
                 ][i % 3]
 
+            # Calculate precipitation based on condition and current precipitation rate
+            current_precipitation = self.coordinator.data.get("precipitation", 0)
+            if hour_condition in [ATTR_CONDITION_RAINY, ATTR_CONDITION_LIGHTNING_RAINY]:
+                # Use current precipitation rate if available, otherwise estimate based on condition
+                if current_precipitation and current_precipitation > 0:
+                    # Vary slightly based on forecast hour (±20%)
+                    variation = 1.0 + ((i % 6 - 3) * 0.1)  # -30% to +20% variation
+                    hour_precipitation = max(0.1, current_precipitation * variation)
+                else:
+                    # Fallback estimates when no current precipitation data
+                    if hour_condition == ATTR_CONDITION_LIGHTNING_RAINY:
+                        hour_precipitation = 8.0  # Heavy storm rainfall
+                    else:
+                        hour_precipitation = 3.0  # Moderate rainfall
+            elif (
+                hour_condition == ATTR_CONDITION_PARTLYCLOUDY
+                and current_precipitation
+                and current_precipitation > 0.1
+            ):
+                # Light drizzle for partly cloudy with some precipitation
+                hour_precipitation = min(1.0, current_precipitation * 0.3)
+            else:
+                hour_precipitation = 0.0
+
             hourly_data.append(
                 Forecast(
                     datetime=hour_time.isoformat(),
                     native_temperature=round(current_temp + temp_variation, 1),
                     condition=hour_condition,
-                    native_precipitation=(
-                        2.0
-                        if hour_condition
-                        in [ATTR_CONDITION_RAINY, ATTR_CONDITION_LIGHTNING_RAINY]
-                        else 0.0
-                    ),
+                    native_precipitation=round(hour_precipitation, 1),
                     native_wind_speed=max(1, current_wind + (i * 0.1)),
                     humidity=max(30, min(90, current_humidity + (i * 0.5))),
                 )

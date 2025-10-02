@@ -33,3 +33,29 @@ def convert_altitude_to_meters(
     if is_imperial:
         return round(altitude * 0.3048, 1)  # 1 foot = 0.3048 meters
     return round(altitude, 1)
+
+
+def convert_precipitation_rate(
+    rain_rate: Optional[float], unit: Optional[str]
+) -> Optional[float]:
+    """Convert precipitation rate to mm/h."""
+    if rain_rate is None:
+        return None
+
+    try:
+        rain_rate = float(rain_rate)
+    except (ValueError, TypeError):
+        return None
+
+    if unit is None:
+        # Assume mm/h if no unit specified
+        return round(rain_rate, 1)
+
+    # Convert to mm/h based on input unit
+    if unit.lower() in ["in/h", "in/hr", "inh", "inch/h", "inches/h"]:
+        return round(rain_rate * 25.4, 1)  # inches to mm
+    elif unit.lower() in ["mm/h", "mmh", "mm/hr"]:
+        return round(rain_rate, 1)
+    else:
+        # Unknown unit, assume mm/h
+        return round(rain_rate, 1)
