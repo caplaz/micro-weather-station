@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.2 (2025-10-03)
+
+### Bug Fixes
+
+- **Cloud Cover Calculation Accuracy**: Fixed inaccurate cloud cover estimates causing "cloudy" weather conditions despite clear skies
+
+  - Cloud cover analysis now uses actual solar elevation from sun.sun sensor instead of defaulting to 45°
+  - More accurate weather condition detection based on real solar position
+  - Fixes false "cloudy" reports when solar radiation readings are actually good for clear conditions
+  - Improved meteorological accuracy for daytime weather detection
+
 ## 2.0.1 (2025-10-02)
 
 ### Bug Fixes
