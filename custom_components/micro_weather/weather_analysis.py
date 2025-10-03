@@ -207,7 +207,11 @@ class WeatherAnalysis:
 
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
         if is_daytime:
-            cloud_cover = self.analyze_cloud_cover(solar_radiation, solar_lux, uv_index)
+            # Get solar elevation from sensor data for accurate cloud cover calculation
+            solar_elevation = sensor_data.get("solar_elevation", 45.0)
+            cloud_cover = self.analyze_cloud_cover(
+                solar_radiation, solar_lux, uv_index, solar_elevation
+            )
 
             # Daytime clear sky conditions: low cloud cover = sunny
             if cloud_cover <= 25:
