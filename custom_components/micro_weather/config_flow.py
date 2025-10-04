@@ -121,10 +121,14 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                     selector.EntitySelectorConfig(domain="sensor")
                 ),
                 vol.Optional(CONF_WIND_GUST_SENSOR): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(
+                        domain="sensor", device_class="wind_speed"
+                    )
                 ),
                 vol.Optional(CONF_RAIN_RATE_SENSOR): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
+                    selector.EntitySelectorConfig(
+                        domain="sensor", device_class="precipitation_intensity"
+                    )
                 ),
                 vol.Optional(CONF_RAIN_STATE_SENSOR): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="binary_sensor")
@@ -377,7 +381,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
 
         schema_dict[vol.Optional(CONF_WIND_GUST_SENSOR, default=vol.UNDEFINED)] = (
-            selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+            selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor", device_class="wind_speed"
+                )
+            )
         )
 
         data_schema = self.add_suggested_values_to_schema(
@@ -427,7 +435,11 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         schema_dict: dict[Any, Any] = {}
 
         schema_dict[vol.Optional(CONF_RAIN_RATE_SENSOR, default=vol.UNDEFINED)] = (
-            selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+            selector.EntitySelector(
+                selector.EntitySelectorConfig(
+                    domain="sensor", device_class="precipitation_intensity"
+                )
+            )
         )
 
         schema_dict[vol.Optional(CONF_RAIN_STATE_SENSOR, default=vol.UNDEFINED)] = (

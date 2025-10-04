@@ -285,14 +285,22 @@ class WeatherDetector:
                 altitude,
                 forecast_sensor_data,
             )
-            forecast_data = self.forecast.generate_enhanced_forecast(
-                condition, forecast_sensor_data, altitude
-            )
-            _LOGGER.debug("Forecast generated: %s", forecast_data)
+            try:
+                forecast_data = self.forecast.generate_enhanced_forecast(
+                    condition, forecast_sensor_data, altitude
+                )
+                _LOGGER.debug("Forecast generated successfully: %s", forecast_data)
+            except Exception as e:
+                _LOGGER.error("Forecast generation failed: %s", e)
+                forecast_data = []
         else:
-            forecast_data = self.forecast.generate_enhanced_forecast(
-                condition, self._prepare_forecast_sensor_data(sensor_data), altitude
-            )
+            try:
+                forecast_data = self.forecast.generate_enhanced_forecast(
+                    condition, self._prepare_forecast_sensor_data(sensor_data), altitude
+                )
+            except Exception as e:
+                _LOGGER.error("Forecast generation failed: %s", e)
+                forecast_data = []
 
         # Convert units and prepare data
         weather_data = {
@@ -311,11 +319,20 @@ class WeatherDetector:
                 condition, self._prepare_analysis_sensor_data(sensor_data)
             ),
             "precipitation": sensor_data.get("rain_rate"),
-            "precipitation_unit": sensor_data.get("rain_rate_unit"),
             "condition": condition,
             "forecast": forecast_data,
             "last_updated": datetime.now().isoformat(),
         }
+
+        # Set precipitation_unit based on rain_rate_unit, mapping rate units to distance units
+        rain_rate_unit = sensor_data.get("rain_rate_unit")
+        if rain_rate_unit:
+            rain_rate_unit_lower = rain_rate_unit.lower()
+            if rain_rate_unit_lower in ["mm/h", "mm/hr", "mmh"]:
+                weather_data["precipitation_unit"] = "mm"
+            elif rain_rate_unit_lower in ["in/h", "inch/h", "inh", "inches/h"]:
+                weather_data["precipitation_unit"] = "in"
+            # Add more mappings if needed for other rate units
 
         # Remove None values
         weather_data = {k: v for k, v in weather_data.items() if v is not None}

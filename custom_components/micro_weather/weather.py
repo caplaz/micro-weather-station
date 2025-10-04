@@ -214,15 +214,9 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                     hour_precipitation = max(0.1, current_precipitation * variation)
                 else:
                     # Fallback estimates when no current precipitation data
-                    # Values are in mm/h, convert to sensor unit if needed
-                    if precipitation_unit and precipitation_unit.lower() in [
-                        "in/h",
-                        "in/hr",
-                        "inh",
-                        "inch/h",
-                        "inches/h",
-                    ]:
-                        # Convert mm/h to in/h for fallback values
+                    # Values are rate estimates in the precipitation unit (mm/h or in/h equivalent)
+                    if precipitation_unit == "in":
+                        # Use in/h values for inch unit
                         if hour_condition == ATTR_CONDITION_LIGHTNING_RAINY:
                             hour_precipitation = 8.0 / 25.4  # ~0.31 in/h heavy storm
                         else:
