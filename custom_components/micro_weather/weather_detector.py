@@ -276,6 +276,24 @@ class WeatherDetector:
                 analysis_data.get("dewpoint", 0),
             )
 
+        # Prepare forecast data with debug logging
+        if self.debug_enabled:
+            forecast_sensor_data = self._prepare_forecast_sensor_data(sensor_data)
+            _LOGGER.debug(
+                "Generating forecast with condition='%s', altitude=%.1f, sensor_data=%s",
+                condition,
+                altitude,
+                forecast_sensor_data,
+            )
+            forecast_data = self.forecast.generate_enhanced_forecast(
+                condition, forecast_sensor_data, altitude
+            )
+            _LOGGER.debug("Forecast generated: %s", forecast_data)
+        else:
+            forecast_data = self.forecast.generate_enhanced_forecast(
+                condition, self._prepare_forecast_sensor_data(sensor_data), altitude
+            )
+
         # Convert units and prepare data
         weather_data = {
             "temperature": self._convert_temperature(
@@ -295,9 +313,7 @@ class WeatherDetector:
             "precipitation": sensor_data.get("rain_rate"),
             "precipitation_unit": sensor_data.get("rain_rate_unit"),
             "condition": condition,
-            "forecast": self.forecast.generate_enhanced_forecast(
-                condition, self._prepare_forecast_sensor_data(sensor_data), altitude
-            ),
+            "forecast": forecast_data,
             "last_updated": datetime.now().isoformat(),
         }
 
