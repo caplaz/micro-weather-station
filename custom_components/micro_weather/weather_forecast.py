@@ -74,7 +74,7 @@ class WeatherForecast:
 
             # Enhanced precipitation forecasting
             precipitation = self.forecast_precipitation_enhanced(
-                i, forecast_condition, pressure_analysis, humidity_trend
+                i, forecast_condition, pressure_analysis, humidity_trend, sensor_data
             )
 
             # Enhanced wind forecasting
@@ -311,6 +311,7 @@ class WeatherForecast:
         condition: str,
         pressure_analysis: Dict[str, Any],
         humidity_trend: Dict[str, Any],
+        sensor_data: Dict[str, Any],
     ) -> float:
         """Enhanced precipitation forecasting using multiple data sources.
 
@@ -319,14 +320,15 @@ class WeatherForecast:
             condition: Forecasted weather condition
             pressure_analysis: Pressure trend analysis
             humidity_trend: Historical humidity trends
+            sensor_data: Current sensor data
 
         Returns:
-            float: Precipitation amount in mm
+            float: Precipitation amount in sensor units
         """
         base_precipitation = 0.0
         storm_probability = pressure_analysis.get("storm_probability", 0)
 
-        # Base precipitation by condition
+        # Base precipitation by condition (in mm)
         condition_precip = {
             ATTR_CONDITION_LIGHTNING_RAINY: 15.0,
             ATTR_CONDITION_POURING: 20.0,
@@ -351,7 +353,17 @@ class WeatherForecast:
         confidence_factor = max(0.3, 1.0 - (day * 0.15))
         base_precipitation *= confidence_factor
 
-        return round(base_precipitation, 1)
+        # Convert to sensor units if needed
+        rain_rate_unit = sensor_data.get("rain_rate_unit")
+        if (
+            rain_rate_unit
+            and isinstance(rain_rate_unit, str)
+            and any(unit in rain_rate_unit.lower() for unit in ["in", "inch", "inches"])
+        ):
+            # Convert mm to in
+            base_precipitation /= 25.4
+
+        return round(base_precipitation, 2)
 
     def forecast_wind_enhanced(
         self,
