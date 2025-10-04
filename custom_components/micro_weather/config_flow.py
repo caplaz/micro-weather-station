@@ -12,6 +12,7 @@ import voluptuous as vol
 
 from .const import (
     CONF_ALTITUDE,
+    CONF_DEBUG,
     CONF_DEWPOINT_SENSOR,
     CONF_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
@@ -572,6 +573,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 )
                 options[CONF_UPDATE_INTERVAL] = update_interval
 
+                # Update debug flag
+                debug_enabled = self._data.get(
+                    CONF_DEBUG,
+                    self.config_entry.options.get(CONF_DEBUG, False),
+                )
+                options[CONF_DEBUG] = debug_enabled
+
                 return self.async_create_entry(title="", data=options)
 
             except Exception as err:
@@ -594,6 +602,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         min=1, max=60, step=1, unit_of_measurement="min"
                     )
                 ),
+                vol.Optional(
+                    CONF_DEBUG,
+                    default=current_options.get(CONF_DEBUG, False),
+                ): selector.BooleanSelector(),
             }
         )
 

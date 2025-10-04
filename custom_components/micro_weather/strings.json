@@ -220,10 +220,12 @@
       "device_config": {
         "title": "Device Configuration",
         "data": {
-          "update_interval": "Update Interval (minutes)"
+          "update_interval": "Update Interval (minutes)",
+          "debug": "Enable Debug Logging"
         },
         "data_description": {
-          "update_interval": "How often the weather data is refreshed and sensors are polled. Range: 1-60 minutes. Lower values provide more responsive updates but may increase system load."
+          "update_interval": "How often the weather data is refreshed and sensors are polled. Range: 1-60 minutes. Lower values provide more responsive updates but may increase system load.",
+          "debug": "Enable detailed debug logging for troubleshooting weather detection algorithms and sensor readings. This will increase log verbosity and should only be enabled temporarily for debugging purposes."
         }
       }
     },

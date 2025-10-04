@@ -141,7 +141,26 @@
           "uv_index_sensor": "UV-Index-Sensor",
           "sun_sensor": "Sonnen-Sensor",
           "altitude": "Stationshöhe",
-          "update_interval": "Aktualisierungsintervall (Minuten)"
+          "update_interval": "Aktualisierungsintervall (Minuten)",
+          "debug": "Debug-Protokollierung aktivieren"
+        },
+        "data_description": {
+          "outdoor_temp_sensor": "Erforderlicher Sensor für grundlegende Wettererkennung.",
+          "dewpoint_sensor": "Optionaler Sensor für direkte Taupunktmessung.",
+          "humidity_sensor": "Optionaler Sensor für Nebelerkennung und Komfortberechnungen.",
+          "pressure_sensor": "Optionaler Sensor für Wettervorhersage und Sturmerkennung.",
+          "wind_speed_sensor": "Optionaler Sensor für Windgeschwindigkeitsmessungen.",
+          "wind_direction_sensor": "Optionaler Sensor für Windrichtungsdaten.",
+          "wind_gust_sensor": "Optionaler Sensor für Windböenmessungen.",
+          "rain_rate_sensor": "Optionaler Sensor für Niederschlagsintensität.",
+          "rain_state_sensor": "Optionaler Sensor für Regenerkennung.",
+          "solar_radiation_sensor": "Optionaler Sensor für Sonnenstrahlungsmessungen.",
+          "solar_lux_sensor": "Optionaler Sensor für Lichtmessungen.",
+          "uv_index_sensor": "Optionaler Sensor für UV-Index-Messungen.",
+          "sun_sensor": "Optionaler Sensor für Sonnenhöhendaten.",
+          "altitude": "Stationshöhe über dem Meeresspiegel für Druckberechnungen.",
+          "update_interval": "Wie oft die Wetterdaten aktualisiert werden (1-60 Minuten).",
+          "debug": "Detaillierte Debug-Protokollierung für die Fehlerbehebung von Wettererkennungsalgorithmen und Sensorwerten aktivieren. Dies erhöht die Protokoll-Ausführlichkeit und sollte nur vorübergehend für Debugging-Zwecke aktiviert werden."
         }
       },
       "atmospheric": {
@@ -181,7 +200,12 @@
       "device_config": {
         "title": "Gerätekonfiguration",
         "data": {
-          "update_interval": "Aktualisierungsintervall (Minuten)"
+          "update_interval": "Aktualisierungsintervall (Minuten)",
+          "debug": "Debug-Protokollierung aktivieren"
+        },
+        "data_description": {
+          "update_interval": "Wie oft die Wetterdaten aktualisiert werden (1-60 Minuten).",
+          "debug": "Detaillierte Debug-Protokollierung für die Fehlerbehebung von Wettererkennungsalgorithmen und Sensorwerten aktivieren. Dies erhöht die Protokoll-Ausführlichkeit und sollte nur vorübergehend für Debugging-Zwecke aktiviert werden."
         }
       }
     },
