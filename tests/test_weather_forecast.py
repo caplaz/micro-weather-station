@@ -204,17 +204,28 @@ class TestWeatherForecast:
         humidity_trend = {
             "average": 70.0,
         }
+        sensor_data = {
+            "rain_rate_unit": "mm",  # Default to metric
+        }
 
         # Test normal conditions
         precip_normal = forecast.forecast_precipitation_enhanced(
-            0, ATTR_CONDITION_PARTLYCLOUDY, pressure_analysis, humidity_trend
+            0,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            pressure_analysis,
+            humidity_trend,
+            sensor_data,
         )
         assert isinstance(precip_normal, float)
         assert precip_normal >= 0
 
         # Test stormy conditions
         precip_storm = forecast.forecast_precipitation_enhanced(
-            0, ATTR_CONDITION_LIGHTNING_RAINY, pressure_analysis, humidity_trend
+            0,
+            ATTR_CONDITION_LIGHTNING_RAINY,
+            pressure_analysis,
+            humidity_trend,
+            sensor_data,
         )
         assert precip_storm > precip_normal  # Should be more precipitation
 
@@ -222,15 +233,33 @@ class TestWeatherForecast:
         pressure_high_storm = pressure_analysis.copy()
         pressure_high_storm["storm_probability"] = 80
         precip_high_storm = forecast.forecast_precipitation_enhanced(
-            0, ATTR_CONDITION_RAINY, pressure_high_storm, humidity_trend
+            0, ATTR_CONDITION_RAINY, pressure_high_storm, humidity_trend, sensor_data
         )
         assert precip_high_storm > precip_normal
 
         # Test distant forecast (should have reduced precipitation)
         precip_distant = forecast.forecast_precipitation_enhanced(
-            4, ATTR_CONDITION_PARTLYCLOUDY, pressure_analysis, humidity_trend
+            4,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            pressure_analysis,
+            humidity_trend,
+            sensor_data,
         )
         assert precip_distant <= precip_normal  # Should be reduced
+
+        # Test unit conversion (inches)
+        sensor_data_inches = sensor_data.copy()
+        sensor_data_inches["rain_rate_unit"] = "in"
+        precip_inches = forecast.forecast_precipitation_enhanced(
+            0,
+            ATTR_CONDITION_RAINY,
+            pressure_analysis,
+            humidity_trend,
+            sensor_data_inches,
+        )
+        # Should be converted from mm to inches (approximately 1/25.4)
+        expected_inches = 5.0 / 25.4  # 5.0 mm converted to inches
+        assert abs(precip_inches - expected_inches) < 0.1
 
     def test_forecast_wind_enhanced(self, forecast, mock_analysis):
         """Test enhanced wind forecasting."""
