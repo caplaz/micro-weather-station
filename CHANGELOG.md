@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.0.3 (2025-10-03)
+
+### Bug Fixes
+
+- **Forecast Precipitation Unit Conversion**: Fixed precipitation unit mismatch in forecast generation when rain sensors are configured
+
+  - Forecast precipitation values now properly convert to match weather entity's native units (mm vs inches)
+  - Fixed issue where forecast would not display when rain rate sensor was configured
+  - Added isinstance check to prevent errors with Mock objects during testing
+  - Ensures consistent precipitation units between current conditions and forecast data
+
+### Technical Improvements
+
+- **Comprehensive Weather Entity Test Coverage**: Added extensive test suite for weather entity functionality
+
+  - Created `test_weather.py` with 32 comprehensive tests covering all weather entity methods
+  - Improved test coverage from 76% to 86% overall, weather.py from 0% to 94%
+  - Added tests for entity initialization, properties, availability, daily/hourly forecasts, and unit handling
+  - Enhanced regression detection to prevent forecast display issues
+  - Applied code formatting with black and isort for consistent style
+
+### Changes
+
+- Enhanced test infrastructure to catch forecast and precipitation unit regressions
+- Improved code quality with comprehensive linting and formatting
+- Better reliability for forecast display with rain sensor configurations
+
 ## 2.0.2 (2025-10-03)
 
 ### Bug Fixes
