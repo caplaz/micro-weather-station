@@ -1,5 +1,42 @@
 # Changelog
 
+## 2.1.0 (2025-10-04)
+
+### Bug Fixes
+
+- **Precipitation Unit Compatibility**: Fixed "mm/h is not a recognized distance unit" error that prevented forecast display when rain rate sensors were configured
+
+  - Map rain rate units (mm/h, in/h) to distance units (mm, in) for Home Assistant weather entity compatibility
+  - Maintains accurate precipitation values while using HA-compatible unit labels
+  - Added exception handling for forecast generation to prevent crashes from invalid data
+
+### User Experience Improvements
+
+- **Enhanced Sensor Selection**: Added device class filtering in configuration flow for better sensor discovery
+
+  - Rain rate sensors now filter to `precipitation_intensity` device class only
+  - Wind gust sensors now filter to `wind_speed` device class only
+  - Prevents users from accidentally selecting inappropriate sensors (e.g., pressure sensors for rain rate)
+  - Cleaner sensor dropdowns with relevant options only
+
+- **Debug Logging Configuration**: Added debug logging option to sensor configuration table
+
+  - Users can now enable detailed logging for troubleshooting and development
+  - Debug logging helps diagnose weather detection and sensor issues
+  - Documented in README configuration section for easy reference
+
+### Technical Improvements
+
+- **Robust Error Handling**: Added comprehensive exception handling for forecast generation
+- **Updated Test Suite**: Modified tests to reflect new precipitation unit mapping behavior
+- **Code Quality**: Applied black formatting and maintained all linting standards
+
+### Changes
+
+- Improved reliability when rain rate sensors are configured
+- Better user experience during sensor configuration
+- Enhanced error resilience for forecast calculations
+
 ## 2.0.3 (2025-10-03)
 
 ### Bug Fixes
