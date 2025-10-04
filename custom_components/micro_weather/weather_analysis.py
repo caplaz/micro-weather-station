@@ -558,20 +558,6 @@ class WeatherAnalysis:
         # UV is more sensitive to elevation than total radiation
         max_uv_index = max(1, 11 * elevation_factor)
 
-        # Seasonal adjustment based on current month
-        month = datetime.now().month
-        seasonal_factor = 1.0
-        if month in [12, 1, 2]:  # Winter
-            seasonal_factor = 0.75
-        elif month in [3, 4, 9, 10]:  # Spring/Fall
-            seasonal_factor = 0.9
-        elif month in [5, 6, 7, 8]:  # Summer
-            seasonal_factor = 1.0
-
-        max_solar_radiation *= seasonal_factor
-        max_solar_lux *= seasonal_factor
-        max_uv_index *= seasonal_factor
-
         # Calculate cloud cover from each measurement using realistic maximums
         radiation_ratio = avg_solar_radiation / max_solar_radiation
         cloud_cover_reduction = radiation_ratio * 100

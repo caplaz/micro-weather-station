@@ -196,9 +196,8 @@ class TestWeatherAnalysis:
         assert 0 <= cloud_cover_zero <= 100
 
     def test_analyze_cloud_cover_seasonal_adjustments(self, analysis):
-        """Test cloud cover analysis with seasonal variations."""
-        # Test that seasonal factors are applied (simplified test)
-        # Just verify the method runs without error for different months
+        """Test cloud cover analysis with different months."""
+        # Test that the method runs without error for different months
         import datetime
         from unittest.mock import patch
 
