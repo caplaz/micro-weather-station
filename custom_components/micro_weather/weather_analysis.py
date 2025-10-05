@@ -214,7 +214,7 @@ class WeatherAnalysis:
             )
 
             # Daytime clear sky conditions: low cloud cover = sunny
-            if cloud_cover <= 25:
+            if cloud_cover <= 35:
                 return ATTR_CONDITION_SUNNY
             elif cloud_cover <= 60:
                 return ATTR_CONDITION_PARTLYCLOUDY
