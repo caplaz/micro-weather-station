@@ -123,17 +123,31 @@ class TestWeatherAnalysis:
         )
         assert result is None
 
-        # Test dense fog conditions
+        # Test dense fog conditions (nighttime with no solar radiation)
         result_fog = analysis.analyze_fog_conditions(
-            70.0, 99.0, 69.0, 1.0, 2.0, 5.0, True
+            70.0, 99.5, 69.9, 0.1, 1.5, 0.0, False
         )
         assert result_fog == ATTR_CONDITION_FOG
 
-        # Test radiation fog
+        # Test radiation fog (nighttime with no solar radiation)
         result_rad = analysis.analyze_fog_conditions(
-            70.0, 98.0, 68.0, 2.0, 2.0, 5.0, False
+            70.0, 99.5, 69.5, 0.5, 2.0, 0.0, False
         )
         assert result_rad == ATTR_CONDITION_FOG
+
+        # Test twilight conditions with high humidity - should NOT be fog
+        result_twilight = analysis.analyze_fog_conditions(
+            54.0, 99.0, 53.7, 0.3, 1.3, 22.0, False
+        )
+        assert result_twilight is None  # Twilight with solar radiation = not fog
+
+        # Test extreme fog during twilight (very suppressed solar radiation)
+        result_twilight_fog = analysis.analyze_fog_conditions(
+            70.0, 99.9, 69.4, 0.1, 1.0, 10.0, False
+        )
+        assert (
+            result_twilight_fog == ATTR_CONDITION_FOG
+        )  # Dense fog blocking dawn light
 
     def test_analyze_cloud_cover(self, analysis):
         """Test cloud cover analysis."""

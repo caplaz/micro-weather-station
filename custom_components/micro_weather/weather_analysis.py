@@ -437,11 +437,13 @@ class WeatherAnalysis:
         - Wind speed (light winds favor fog formation)
         - Solar radiation (low radiation indicates existing fog)
         - Time of day (radiation fog typically forms at night/early morning)
+        - Dawn/twilight conditions (prevent false fog detection during sunrise/sunset)
 
         Fog Types Detected:
-        - Dense fog: Extremely high humidity (99%+) with minimal spread
-        - Radiation fog: High humidity (98%+) with light winds at night
+        - Dense fog: Extremely high humidity (99%+) with minimal spread AND very low solar radiation
+        - Radiation fog: High humidity (98%+) with light winds at night AND no solar radiation
         - Advection fog: Moist air moving over cooler surface
+        - Evaporation fog: After rain with warm ground
 
         Args:
             temp: Current temperature in Fahrenheit
@@ -456,18 +458,47 @@ class WeatherAnalysis:
             str: "foggy" if fog conditions are met, "clear" otherwise
 
         Note:
-            Uses conservative thresholds to reduce false positives after
-            user feedback about incorrect fog detection. Nighttime thresholds
-            are more restrictive to prevent false fog detection on clear nights.
+            Uses conservative thresholds to reduce false positives. Special handling
+            for dawn/twilight conditions when solar radiation is present but low,
+            which indicates sunrise/sunset rather than fog.
         """
 
-        # Adjust thresholds based on time of day to reduce nighttime false positives
+        # Detect dawn/twilight conditions (solar radiation present but sun is low)
+        # During dawn/twilight: 5-100 W/m² with increasing light = not fog
+        is_twilight = 5 < solar_rad < 100
+
+        # If we're in twilight with any meaningful solar radiation,
+        # require much stricter conditions for fog detection
+        if is_twilight:
+            _LOGGER.debug(
+                "Twilight conditions detected (solar_rad: %.1f W/m²) - "
+                "humidity: %.1f%%, spread: %.1f°F, wind: %.1f mph",
+                solar_rad,
+                humidity,
+                spread,
+                wind_speed,
+            )
+            # During twilight, only detect fog if conditions are extreme
+            # AND solar radiation is very suppressed (indicating actual fog blocking light)
+            if humidity >= 99.8 and spread <= 0.5 and solar_rad < 15:
+                # Dense fog blocking twilight sun
+                _LOGGER.debug("Extreme fog conditions during twilight - reporting fog")
+                return ATTR_CONDITION_FOG
+            # Otherwise, it's just high humidity during dawn/dusk - not fog
+            _LOGGER.debug(
+                "Twilight with high humidity but not fog - skipping fog detection"
+            )
+            return None
+
+        # Adjust thresholds based on time of day
         if not is_daytime:
-            # Nighttime: More restrictive thresholds to prevent false fog detection
-            dense_humidity_threshold = 99.5  # Higher threshold for dense fog
-            radiation_humidity_threshold = 99  # Much higher threshold for radiation fog
-            radiation_spread_threshold = 1.0  # Tighter spread requirement
-            advection_humidity_threshold = 98  # Higher threshold for advection fog
+            # True nighttime (no solar radiation): More restrictive thresholds
+            dense_humidity_threshold = 99.5
+            radiation_humidity_threshold = 99.5  # Increased from 99
+            radiation_spread_threshold = (
+                0.5  # Decreased from 1.0 - require very tight spread
+            )
+            advection_humidity_threshold = 98
         else:
             # Daytime: Original thresholds
             dense_humidity_threshold = 99
@@ -475,35 +506,41 @@ class WeatherAnalysis:
             radiation_spread_threshold = 2
             advection_humidity_threshold = 95
 
-        # Dense fog conditions (extremely restrictive)
-        if humidity >= dense_humidity_threshold and spread <= 1 and wind_speed <= 2:
-            return ATTR_CONDITION_FOG
-
-        # Radiation fog (more restrictive at night to reduce false positives)
+        # Dense fog conditions (extremely restrictive, requires virtually no solar radiation at night)
         if (
-            humidity >= radiation_humidity_threshold  # Raised from 98 to 99 at night
-            and spread <= radiation_spread_threshold  # Reduced from 2 to 1 at night
-            and wind_speed <= 3  # Reduced from 5 to 3
-            and (not is_daytime or solar_rad < 5)  # More restrictive solar condition
+            humidity >= dense_humidity_threshold
+            and spread <= 0.5  # Very tight spread
+            and wind_speed <= 2
+            and solar_rad <= 2  # Essentially no solar radiation
         ):
             return ATTR_CONDITION_FOG
 
-        # Advection fog (moist air over cooler surface) - also more restrictive at night
+        # Radiation fog (only in true darkness - no solar radiation at all)
         if (
-            humidity >= advection_humidity_threshold  # Raised from 95 to 98 at night
-            and spread <= 3
-            and 3 <= wind_speed <= 12
-        ):  # Raised humidity threshold
+            humidity >= radiation_humidity_threshold
+            and spread <= radiation_spread_threshold
+            and wind_speed <= 3
+            and solar_rad <= 2
+        ):
             return ATTR_CONDITION_FOG
 
-        # Evaporation fog (after rain, warm ground) - more restrictive at night
+        # Advection fog (moist air over cooler surface) - also requires low solar radiation
         if (
-            humidity >= advection_humidity_threshold  # Use same threshold as advection
+            humidity >= advection_humidity_threshold
+            and spread <= 3
+            and 3 <= wind_speed <= 12
+            and solar_rad < 10  # Added solar radiation check
+        ):
+            return ATTR_CONDITION_FOG
+
+        # Evaporation fog (after rain, warm ground) - requires low solar radiation
+        if (
+            humidity >= advection_humidity_threshold
             and spread <= 3
             and wind_speed <= 6
             and temp > 40
-        ):  # Raised thresholds
-            # Check if conditions suggest recent precipitation
+            and solar_rad < 10  # Added solar radiation check
+        ):
             return ATTR_CONDITION_FOG
 
         return None

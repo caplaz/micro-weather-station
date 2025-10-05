@@ -77,11 +77,33 @@ ELIF wind_speed ≥ 19mph AND wind_speed < 32mph:
 
 **Advanced Fog Analysis (when rain_state ≠ "wet"):**
 
+The system uses sophisticated meteorological principles to detect different types of fog based on atmospheric conditions, with special handling for dawn/twilight periods to prevent false detections.
+
+**Twilight Detection (prevents false fog detection during dawn/dusk):**
+
 ```
-Dense Fog: humidity ≥99% AND dewpoint_spread ≤1°F AND wind ≤2mph
-Radiation Fog: humidity ≥98% AND dewpoint_spread ≤2°F AND wind ≤3mph AND (nighttime OR solar <5 W/m²)
-Advection Fog: humidity ≥95% AND dewpoint_spread ≤3°F AND 3mph ≤ wind ≤12mph
-Evaporation Fog: humidity ≥95% AND dewpoint_spread ≤3°F AND wind ≤6mph AND temp >40°F
+IF 5 W/m² < solar_radiation < 100 W/m²:  # Dawn/twilight conditions
+    IF humidity ≥99.8% AND dewpoint_spread ≤0.5°F AND solar_radiation <15 W/m²:
+        → "fog" (extreme fog blocking twilight sun)
+    ELSE:
+        → NOT fog (high humidity during dawn/dusk is normal)
+```
+
+**Nighttime Fog Detection (solar_radiation ≤2 W/m²):**
+
+```
+Dense Fog: humidity ≥99.5% AND dewpoint_spread ≤0.5°F AND wind ≤2mph
+Radiation Fog: humidity ≥99.5% AND dewpoint_spread ≤0.5°F AND wind ≤3mph
+Advection Fog: humidity ≥98% AND dewpoint_spread ≤3°F AND 3mph ≤ wind ≤12mph AND solar <10 W/m²
+Evaporation Fog: humidity ≥98% AND dewpoint_spread ≤3°F AND wind ≤6mph AND temp >40°F AND solar <10 W/m²
+```
+
+**Daytime Fog Detection:**
+
+```
+Dense Fog: humidity ≥99% AND dewpoint_spread ≤0.5°F AND wind ≤2mph AND solar ≤2 W/m²
+Radiation Fog: humidity ≥98% AND dewpoint_spread ≤2°F AND wind ≤3mph AND solar ≤2 W/m²
+Advection Fog: humidity ≥95% AND dewpoint_spread ≤3°F AND 3mph ≤ wind ≤12mph AND solar <10 W/m²
 ```
 
 #### Priority 4: Daytime Conditions
@@ -270,10 +292,19 @@ Severe turbulence indicators (gust_factor >3.0 or gusts >40 mph) can indicate th
 
 ## Fog vs Precipitation Detection
 
-The system intelligently distinguishes between:
+When `rain_state` sensor shows "wet" with no significant `rain_rate`, the system checks for fog conditions first:
 
-1. **Fog Moisture**: High humidity, minimal dewpoint spread, light winds
+1. **Fog Moisture**: High humidity, minimal dewpoint spread, light winds, **AND very low solar radiation**
 2. **Precipitation Moisture**: Measurable rain rate OR wet sensor without fog conditions
+
+### Dawn/Twilight Handling
+
+The system includes special logic to prevent false fog detection during sunrise/sunset:
+
+- **Twilight Range**: 5-100 W/m² solar radiation
+- **Normal Behavior**: High humidity (even 99%) during dawn is common due to overnight cooling
+- **True Fog**: Only detected if solar radiation is severely suppressed (<15 W/m²) with extreme conditions
+- **Example**: Solar radiation of 22 W/m² at solar elevation 3.7° indicates clear dawn, not fog, even with 99% humidity
 
 This prevents false precipitation alerts when fog causes the moisture sensor to read "wet".
 

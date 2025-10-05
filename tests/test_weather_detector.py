@@ -256,16 +256,20 @@ class TestWeatherDetector:
 
     def test_detect_foggy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of foggy conditions."""
-        # Set up mock states for foggy conditions
+        # Set up mock states for foggy conditions (nighttime with very low solar radiation)
         mock_states = {}
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "humidity":
                 state = Mock()
-                state.state = "95.0"  # Very high humidity
+                state.state = "99.5"  # Very high humidity for fog
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "outdoor_temp":
                 state = Mock()
                 state.state = "65.0"  # Cool temperature
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "dewpoint":
+                state = Mock()
+                state.state = "64.6"  # Very close to outdoor temp (spread = 0.4°F)
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "wind_speed":
                 state = Mock()
@@ -274,6 +278,18 @@ class TestWeatherDetector:
             elif sensor_key == "rain_rate":
                 state = Mock()
                 state.state = "0.0"  # No rain
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "solar_radiation":
+                state = Mock()
+                state.state = "0.0"  # No solar radiation (nighttime fog)
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "solar_lux":
+                state = Mock()
+                state.state = "0.0"  # No light (nighttime)
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "uv_index":
+                state = Mock()
+                state.state = "0.0"  # No UV (nighttime)
                 mock_states[f"sensor.{sensor_key}"] = state
             else:
                 state = Mock()
