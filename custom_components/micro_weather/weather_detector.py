@@ -239,9 +239,14 @@ class WeatherDetector:
         self._previous_condition = condition
 
         # Log sensor data and determined weather condition
+        try:
+            sensor_data_json = json.dumps(sensor_data)
+        except (TypeError, ValueError):
+            sensor_data_json = str(sensor_data)
+
         _LOGGER.debug(
             "Weather update - sensor data: %s, condition: %s",
-            json.dumps(sensor_data),
+            sensor_data_json,
             condition,
         )
 
