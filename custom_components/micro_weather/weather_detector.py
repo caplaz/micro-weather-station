@@ -22,6 +22,7 @@ License: MIT
 
 from collections import deque
 from datetime import datetime
+import json
 import logging
 from typing import Any, Dict, Mapping, Optional
 
@@ -236,6 +237,13 @@ class WeatherDetector:
                 condition = self._previous_condition
 
         self._previous_condition = condition
+
+        # Log sensor data and determined weather condition
+        _LOGGER.debug(
+            "Weather update - sensor data: %s, condition: %s",
+            json.dumps(sensor_data),
+            condition,
+        )
 
         # Store condition history
         self._condition_history.append(

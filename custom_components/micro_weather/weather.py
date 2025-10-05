@@ -1,7 +1,5 @@
 """Weather entity for Micro Weather Station."""
 
-import logging
-
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_LIGHTNING_RAINY,
@@ -23,8 +21,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .version import __version__
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(

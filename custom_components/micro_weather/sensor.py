@@ -1,7 +1,5 @@
 """Sensor entities for Micro Weather Station."""
 
-import logging
-
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -14,8 +12,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SENSOR_TYPES
 from .version import __version__
-
-_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
