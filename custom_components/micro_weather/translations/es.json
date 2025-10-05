@@ -142,6 +142,23 @@
           "sun_sensor": "Sensor Solar",
           "altitude": "Altitud de la Estación",
           "update_interval": "Intervalo de Actualización (minutos)"
+        },
+        "data_description": {
+          "outdoor_temp_sensor": "Sensor requerido para detección meteorológica básica. Proporciona lecturas de temperatura utilizadas en todos los cálculos meteorológicos y detección de condiciones.",
+          "dewpoint_sensor": "Sensor opcional que proporciona medición directa del punto de rocío para máxima precisión. Utilizado en detección de niebla (>98% humedad + punto de rocío) y cálculos de confort. Se repliega en punto de rocío calculado si no se proporciona.",
+          "humidity_sensor": "Sensor opcional esencial para detección de niebla (se activa con >98% humedad). Utilizado en cálculos de índice de confort, índice de calor y determinación de probabilidad de precipitación.",
+          "pressure_sensor": "Sensor opcional que permite pronósticos meteorológicos (5 días y horarios). Detecta tormentas por caídas rápidas de presión y proporciona análisis de tendencias para predicción de modelos meteorológicos.",
+          "wind_speed_sensor": "Sensor opcional para detección de condiciones de viento. Detección de tormentas (>25 km/h + lluvia = tormentoso), cálculos de sensación térmica por viento y alertas meteorológicas severas.",
+          "wind_direction_sensor": "Sensor opcional que proporciona datos de dirección del viento para reportes meteorológicos detallados. Utilizado en seguimiento de tormentas y mejora precisión de pronósticos con datos de viento direccional.",
+          "wind_gust_sensor": "Sensor opcional para detección de meteorología severa y medición de intensidad de tormentas. Proporciona alertas de seguridad para condiciones de viento peligrosas y clasificación mejorada de tormentas.",
+          "rain_rate_sensor": "Sensor opcional para medición directa de intensidad de precipitaciones. Activa condiciones meteorológicas lluviosas/tormentosas y sobrescribe otras condiciones cuando se detecta lluvia.",
+          "rain_state_sensor": "Sensor opcional para detección booleana de lluvia (estados seco/mojado). Proporciona sobrescritura inmediata de condiciones meteorológicas cuando está mojado y detección de precipitaciones de respaldo.",
+          "solar_radiation_sensor": "Sensor opcional para detección primaria de cobertura de nubes (>400 W/m² = soleado, <100 = nublado). Utilizado en detección de niebla y sobrescribe otras condiciones para detección de cielo despejado.",
+          "solar_lux_sensor": "Sensor opcional para detección día/noche basada en luz. Detección de cobertura de nubes de respaldo y cálculos de visibilidad cuando sensor de radiación solar no disponible.",
+          "uv_index_sensor": "Sensor opcional para confirmación de cielo despejado (UV alto = definitivamente soleado). Proporciona medición de intensidad solar para recomendaciones de seguridad y precisión mejorada de detección de meteorología soleada.",
+          "sun_sensor": "Sensor opcional que proporciona datos de elevación solar para cálculos precisos de cobertura de nubes. Mejora precisión de detección meteorológica considerando posición del sol (elevación mayor = más radiación solar esperada). Se repliega a 45° elevación si no configurado.",
+          "altitude": "Elevación de la estación sobre el nivel del mar. Utilizada para ajustar las lecturas de presión al equivalente del nivel del mar para detección meteorológica precisa. Establezca en 0 si su sensor de presión ya proporciona presión al nivel del mar (MSLP) o para lecturas de sensor crudas. Mejora precisión de pronósticos, especialmente para predicción meteorológica basada en presión. Utiliza por defecto la configuración de elevación de su Home Assistant si está disponible, de lo contrario 0.0 (utiliza el sistema de unidades de su Home Assistant).",
+          "update_interval": "Qué tan frecuente se actualizan los datos meteorológicos y se consultan los sensores. Rango: 1-60 minutos. Valores más bajos proporcionan actualizaciones más responsivas pero pueden aumentar la carga del sistema."
         }
       },
       "atmospheric": {
@@ -152,6 +169,13 @@
           "humidity_sensor": "Sensor de Humedad",
           "pressure_sensor": "Sensor de Presión Atmosférica",
           "altitude": "Altitud de la Estación"
+        },
+        "data_description": {
+          "outdoor_temp_sensor": "Sensor requerido para detección meteorológica básica. Proporciona lecturas de temperatura utilizadas en todos los cálculos meteorológicos y detección de condiciones.",
+          "dewpoint_sensor": "Sensor opcional que proporciona medición directa del punto de rocío para máxima precisión. Utilizado en detección de niebla (>98% humedad + punto de rocío) y cálculos de confort. Se repliega en punto de rocío calculado si no se proporciona.",
+          "humidity_sensor": "Sensor opcional esencial para detección de niebla (se activa con >98% humedad). Utilizado en cálculos de índice de confort, índice de calor y determinación de probabilidad de precipitación.",
+          "pressure_sensor": "Sensor opcional que permite pronósticos meteorológicos (5 días y horarios). Detecta tormentas por caídas rápidas de presión y proporciona análisis de tendencias para predicción de modelos meteorológicos.",
+          "altitude": "Elevación de la estación sobre el nivel del mar. Utilizada para ajustar las lecturas de presión al equivalente del nivel del mar para detección meteorológica precisa. Establezca en 0 si su sensor de presión ya proporciona presión al nivel del mar (MSLP) o para lecturas de sensor crudas. Mejora precisión de pronósticos, especialmente para predicción meteorológica basada en presión."
         }
       },
       "wind": {
@@ -160,6 +184,11 @@
           "wind_speed_sensor": "Sensor de Velocidad del Viento",
           "wind_direction_sensor": "Sensor de Dirección del Viento",
           "wind_gust_sensor": "Sensor de Ráfagas de Viento"
+        },
+        "data_description": {
+          "wind_speed_sensor": "Sensor opcional para detección de condiciones de viento. Detección de tormentas (>25 km/h + lluvia = tormentoso), cálculos de sensación térmica por viento y alertas meteorológicas severas.",
+          "wind_direction_sensor": "Sensor opcional que proporciona datos de dirección del viento para reportes meteorológicos detallados. Utilizado en seguimiento de tormentas y mejora precisión de pronósticos con datos de viento direccional.",
+          "wind_gust_sensor": "Sensor opcional para detección de meteorología severa y medición de intensidad de tormentas. Proporciona alertas de seguridad para condiciones de viento peligrosas y clasificación mejorada de tormentas."
         }
       },
       "rain": {
@@ -167,6 +196,10 @@
         "data": {
           "rain_rate_sensor": "Sensor de Tasa de Lluvia",
           "rain_state_sensor": "Sensor de Estado de Lluvia"
+        },
+        "data_description": {
+          "rain_rate_sensor": "Sensor opcional para medición directa de intensidad de precipitaciones. Activa condiciones meteorológicas lluviosas/tormentosas y sobrescribe otras condiciones cuando se detecta lluvia.",
+          "rain_state_sensor": "Sensor opcional para detección booleana de lluvia (estados seco/mojado). Proporciona sobrescritura inmediata de condiciones meteorológicas cuando está mojado y detección de precipitaciones de respaldo."
         }
       },
       "solar": {
@@ -176,12 +209,21 @@
           "solar_lux_sensor": "Sensor Solar Lux",
           "uv_index_sensor": "Sensor de Índice UV",
           "sun_sensor": "Sensor Solar"
+        },
+        "data_description": {
+          "solar_radiation_sensor": "Sensor opcional para detección primaria de cobertura de nubes (>400 W/m² = soleado, <100 = nublado). Utilizado en detección de niebla y sobrescribe otras condiciones para detección de cielo despejado.",
+          "solar_lux_sensor": "Sensor opcional para detección día/noche basada en luz. Detección de cobertura de nubes de respaldo y cálculos de visibilidad cuando sensor de radiación solar no disponible.",
+          "uv_index_sensor": "Sensor opcional para confirmación de cielo despejado (UV alto = definitivamente soleado). Proporciona medición de intensidad solar para recomendaciones de seguridad y precisión mejorada de detección de meteorología soleada.",
+          "sun_sensor": "Sensor opcional que proporciona datos de elevación solar para cálculos precisos de cobertura de nubes. Mejora precisión de detección meteorológica considerando posición del sol (elevación mayor = más radiación solar esperada). Se repliega a 45° elevación si no configurado."
         }
       },
       "device_config": {
         "title": "Configuración del Dispositivo",
         "data": {
           "update_interval": "Intervalo de Actualización (minutos)"
+        },
+        "data_description": {
+          "update_interval": "Qué tan frecuente se actualizan los datos meteorológicos y se consultan los sensores. Rango: 1-60 minutos. Valores más bajos proporcionan actualizaciones más responsivas pero pueden aumentar la carga del sistema."
         }
       }
     },

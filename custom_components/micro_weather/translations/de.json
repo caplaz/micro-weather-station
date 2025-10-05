@@ -142,6 +142,23 @@
           "sun_sensor": "Sonnen-Sensor",
           "altitude": "Stationshöhe",
           "update_interval": "Aktualisierungsintervall (Minuten)"
+        },
+        "data_description": {
+          "outdoor_temp_sensor": "Erforderlicher Sensor für grundlegende Wettererkennung. Stellt Temperaturmessungen zur Verfügung, die in allen Wetterberechnungen und Bedingungserkennungen verwendet werden.",
+          "dewpoint_sensor": "Optionaler Sensor, der direkte Taupunktmessung für maximale Genauigkeit bereitstellt. Wird in der Nebel-Erkennung (>98% Luftfeuchtigkeit + Taupunkt) und Komfortberechnungen verwendet. Fällt zurück auf berechneten Taupunkt, falls nicht bereitgestellt.",
+          "humidity_sensor": "Optionaler Sensor, der für Nebel-Erkennung unerlässlich ist (wird bei >98% Luftfeuchtigkeit ausgelöst). Wird in Komfortindex-, Hitzeindex-Berechnungen und Bestimmung der Niederschlags-Wahrscheinlichkeit verwendet.",
+          "pressure_sensor": "Optionaler Sensor, der Wettervorhersagen ermöglicht (5 Tage und stündlich). Erkennt Stürme durch schnelle Druckabfälle und bietet Trendanalysen für die Vorhersage von Wettermodellen.",
+          "wind_speed_sensor": "Optionaler Sensor für Windbedingungs-Erkennung. Sturm-Erkennung (>25 km/h + Regen = stürmisch), Windchill-Berechnungen und schwere Wetterwarnungen.",
+          "wind_direction_sensor": "Optionaler Sensor, der Windrichtungsdaten für detaillierte Wetterberichte bereitstellt. Wird im Sturm-Tracking und verbessert die Vorhersage-Genauigkeit mit richtungsbezogenen Winddaten.",
+          "wind_gust_sensor": "Optionaler Sensor für schwere Wetter-Erkennung und Sturm-Intensitäts-Messung. Bietet Sicherheitswarnungen für gefährliche Windbedingungen und verbesserte Sturm-Klassifizierung.",
+          "rain_rate_sensor": "Optionaler Sensor für direkte Niederschlags-Intensitäts-Messung. Löst regnerische/stürmische Wetterbedingungen aus und überschreibt andere Bedingungen, wenn Regen erkannt wird.",
+          "rain_state_sensor": "Optionaler Sensor für boolesche Regen-Erkennung (trockene/nasse Zustände). Bietet sofortige Wetterbedingungs-Überschreibung bei Nässe und Backup-Niederschlags-Erkennung.",
+          "solar_radiation_sensor": "Optionaler Sensor für primäre Wolkenbedeckungs-Erkennung (>400 W/m² = sonnig, <100 = bewölkt). Wird in Nebel-Erkennung verwendet und überschreibt andere Bedingungen für klaren Himmel-Erkennung.",
+          "solar_lux_sensor": "Optionaler Sensor für lichtbasierte Tag/Nacht-Erkennung. Backup-Wolkenbedeckungs-Erkennung und Sichtbarkeits-Berechnungen, wenn Solarstrahlungs-Sensor nicht verfügbar.",
+          "uv_index_sensor": "Optionaler Sensor für klare Himmel-Bestätigung (hoher UV = definitiv sonnig). Bietet Sonnenintensitäts-Messung für Sicherheitsempfehlungen und verbesserte sonnige Wetter-Erkennungs-Genauigkeit.",
+          "sun_sensor": "Optionaler Sensor, der Sonnenhöhen-Daten für genaue Wolkenbedeckungs-Berechnungen bereitstellt. Verbessert die Wettererkennungs-Genauigkeit unter Berücksichtigung der Sonnenposition (höhere Erhebung = mehr erwartete Sonnenstrahlung). Fällt zurück auf 45° Erhebung, falls nicht konfiguriert.",
+          "altitude": "Höhe der Station über dem Meeresspiegel. Wird verwendet, um Druckmessungen auf Meeresspiegel-Äquivalent für genaue Wettererkennung anzupassen. Setzen Sie auf 0, wenn Ihr Drucksensor bereits Meeresspiegel-Druck (MSLP) oder Rohsensor-Messungen bereitstellt. Verbessert die Vorhersage-Genauigkeit, insbesondere für druckbasierte Wettervorhersagen. Verwendet standardmäßig Ihre Home Assistant Höhen-Einstellung, falls verfügbar, andernfalls 0.0 (verwendet Ihr Home Assistant Einheitensystem).",
+          "update_interval": "Wie oft die Wetterdaten aktualisiert und die Sensoren abgefragt werden. Bereich: 1-60 Minuten. Niedrigere Werte bieten reaktionsschnellere Updates, können aber die Systemlast erhöhen."
         }
       },
       "atmospheric": {
@@ -152,6 +169,13 @@
           "humidity_sensor": "Luftfeuchtigkeits-Sensor",
           "pressure_sensor": "Luftdruck-Sensor",
           "altitude": "Stationshöhe"
+        },
+        "data_description": {
+          "outdoor_temp_sensor": "Erforderlicher Sensor für grundlegende Wettererkennung. Stellt Temperaturmessungen zur Verfügung, die in allen Wetterberechnungen und Bedingungserkennungen verwendet werden.",
+          "dewpoint_sensor": "Optionaler Sensor, der direkte Taupunktmessung für maximale Genauigkeit bereitstellt. Wird in der Nebel-Erkennung (>98% Luftfeuchtigkeit + Taupunkt) und Komfortberechnungen verwendet. Fällt zurück auf berechneten Taupunkt, falls nicht bereitgestellt.",
+          "humidity_sensor": "Optionaler Sensor, der für Nebel-Erkennung unerlässlich ist (wird bei >98% Luftfeuchtigkeit ausgelöst). Wird in Komfortindex-, Hitzeindex-Berechnungen und Bestimmung der Niederschlags-Wahrscheinlichkeit verwendet.",
+          "pressure_sensor": "Optionaler Sensor, der Wettervorhersagen ermöglicht (5 Tage und stündlich). Erkennt Stürme durch schnelle Druckabfälle und bietet Trendanalysen für die Vorhersage von Wettermodellen.",
+          "altitude": "Höhe der Station über dem Meeresspiegel. Wird verwendet, um Druckmessungen auf Meeresspiegel-Äquivalent für genaue Wettererkennung anzupassen. Setzen Sie auf 0, wenn Ihr Drucksensor bereits Meeresspiegel-Druck (MSLP) oder Rohsensor-Messungen bereitstellt. Verbessert die Vorhersage-Genauigkeit, insbesondere für druckbasierte Wettervorhersagen."
         }
       },
       "wind": {
@@ -160,6 +184,11 @@
           "wind_speed_sensor": "Windgeschwindigkeits-Sensor",
           "wind_direction_sensor": "Windrichtungs-Sensor",
           "wind_gust_sensor": "Windböen-Sensor"
+        },
+        "data_description": {
+          "wind_speed_sensor": "Optionaler Sensor für Windbedingungs-Erkennung. Sturm-Erkennung (>25 km/h + Regen = stürmisch), Windchill-Berechnungen und schwere Wetterwarnungen.",
+          "wind_direction_sensor": "Optionaler Sensor, der Windrichtungsdaten für detaillierte Wetterberichte bereitstellt. Wird im Sturm-Tracking und verbessert die Vorhersage-Genauigkeit mit richtungsbezogenen Winddaten.",
+          "wind_gust_sensor": "Optionaler Sensor für schwere Wetter-Erkennung und Sturm-Intensitäts-Messung. Bietet Sicherheitswarnungen für gefährliche Windbedingungen und verbesserte Sturm-Klassifizierung."
         }
       },
       "rain": {
@@ -167,6 +196,10 @@
         "data": {
           "rain_rate_sensor": "Regenraten-Sensor",
           "rain_state_sensor": "Regenstatus-Sensor"
+        },
+        "data_description": {
+          "rain_rate_sensor": "Optionaler Sensor für direkte Niederschlags-Intensitäts-Messung. Löst regnerische/stürmische Wetterbedingungen aus und überschreibt andere Bedingungen, wenn Regen erkannt wird.",
+          "rain_state_sensor": "Optionaler Sensor für boolesche Regen-Erkennung (trockene/nasse Zustände). Bietet sofortige Wetterbedingungs-Überschreibung bei Nässe und Backup-Niederschlags-Erkennung."
         }
       },
       "solar": {
@@ -176,12 +209,21 @@
           "solar_lux_sensor": "Solar Lux-Sensor",
           "uv_index_sensor": "UV-Index-Sensor",
           "sun_sensor": "Sonnen-Sensor"
+        },
+        "data_description": {
+          "solar_radiation_sensor": "Optionaler Sensor für primäre Wolkenbedeckungs-Erkennung (>400 W/m² = sonnig, <100 = bewölkt). Wird in Nebel-Erkennung verwendet und überschreibt andere Bedingungen für klaren Himmel-Erkennung.",
+          "solar_lux_sensor": "Optionaler Sensor für lichtbasierte Tag/Nacht-Erkennung. Backup-Wolkenbedeckungs-Erkennung und Sichtbarkeits-Berechnungen, wenn Solarstrahlungs-Sensor nicht verfügbar.",
+          "uv_index_sensor": "Optionaler Sensor für klare Himmel-Bestätigung (hoher UV = definitiv sonnig). Bietet Sonnenintensitäts-Messung für Sicherheitsempfehlungen und verbesserte sonnige Wetter-Erkennungs-Genauigkeit.",
+          "sun_sensor": "Optionaler Sensor, der Sonnenhöhen-Daten für genaue Wolkenbedeckungs-Berechnungen bereitstellt. Verbessert die Wettererkennungs-Genauigkeit unter Berücksichtigung der Sonnenposition (höhere Erhebung = mehr erwartete Sonnenstrahlung). Fällt zurück auf 45° Erhebung, falls nicht konfiguriert."
         }
       },
       "device_config": {
         "title": "Gerätekonfiguration",
         "data": {
           "update_interval": "Aktualisierungsintervall (Minuten)"
+        },
+        "data_description": {
+          "update_interval": "Wie oft die Wetterdaten aktualisiert und die Sensoren abgefragt werden. Bereich: 1-60 Minuten. Niedrigere Werte bieten reaktionsschnellere Updates, können aber die Systemlast erhöhen."
         }
       }
     },
