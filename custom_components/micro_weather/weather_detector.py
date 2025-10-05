@@ -41,7 +41,6 @@ from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
 
 from .const import (
     CONF_ALTITUDE,
-    CONF_DEBUG,
     CONF_DEWPOINT_SENSOR,
     CONF_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
@@ -118,7 +117,7 @@ class WeatherDetector:
         )
 
         # Initialize weather analysis and forecast modules
-        self.analysis = WeatherAnalysis(debug_enabled=self.debug_enabled)
+        self.analysis = WeatherAnalysis()
         self.forecast = WeatherForecast(self.analysis)
 
         # Sensor entity IDs mapping
@@ -137,11 +136,6 @@ class WeatherDetector:
             "uv_index": options.get(CONF_UV_INDEX_SENSOR),
             "sun": options.get(CONF_SUN_SENSOR),
         }
-
-    @property
-    def debug_enabled(self) -> bool:
-        """Check if debug logging is enabled."""
-        return self.options.get(CONF_DEBUG, False)
 
     def get_weather_data(self) -> Dict[str, Any]:
         """Get current weather data from sensors.
@@ -234,12 +228,11 @@ class WeatherDetector:
             is_major_change = (self._previous_condition, condition) in major_changes
 
             if condition_count == 0 and not is_major_change:
-                if self.debug_enabled:
-                    _LOGGER.debug(
-                        "Preventing condition oscillation: keeping %s instead of %s",
-                        self._previous_condition,
-                        condition,
-                    )
+                _LOGGER.debug(
+                    "Preventing condition oscillation: keeping %s instead of %s",
+                    self._previous_condition,
+                    condition,
+                )
                 condition = self._previous_condition
 
         self._previous_condition = condition
@@ -249,58 +242,14 @@ class WeatherDetector:
             {"timestamp": datetime.now(), "condition": condition}
         )
 
-        # Debug logging: dump sensor values and final condition
-        if self.debug_enabled:
-            analysis_data = self._prepare_analysis_sensor_data(sensor_data)
-            _LOGGER.debug(
-                "Weather analysis complete - Condition: %s | "
-                "Temp: %.1f°F | Humidity: %.1f%% | Pressure: %.2f inHg | "
-                "Wind Speed: %.1f mph | Wind Gust: %.1f mph | Wind Dir: %.0f° | "
-                "Rain Rate: %.3f in/h | Rain State: %s | "
-                "Solar Rad: %.0f W/m² | Solar Elevation: %.1f° | "
-                "Solar Lux: %.0f | UV Index: %.1f | "
-                "Dewpoint: %.1f°F",
-                condition,
-                analysis_data.get("outdoor_temp", 0),
-                analysis_data.get("humidity", 0),
-                analysis_data.get("pressure", 0),
-                analysis_data.get("wind_speed", 0),
-                analysis_data.get("wind_gust", 0),
-                analysis_data.get("wind_direction", 0),
-                analysis_data.get("rain_rate", 0),
-                analysis_data.get("rain_state", "none"),
-                analysis_data.get("solar_radiation", 0),
-                analysis_data.get("solar_elevation", 0),
-                analysis_data.get("solar_lux", 0),
-                analysis_data.get("uv_index", 0),
-                analysis_data.get("dewpoint", 0),
+        # Prepare forecast data
+        try:
+            forecast_data = self.forecast.generate_enhanced_forecast(
+                condition, self._prepare_forecast_sensor_data(sensor_data), altitude
             )
-
-        # Prepare forecast data with debug logging
-        if self.debug_enabled:
-            forecast_sensor_data = self._prepare_forecast_sensor_data(sensor_data)
-            _LOGGER.debug(
-                "Generating forecast with condition='%s', altitude=%.1f, sensor_data=%s",
-                condition,
-                altitude,
-                forecast_sensor_data,
-            )
-            try:
-                forecast_data = self.forecast.generate_enhanced_forecast(
-                    condition, forecast_sensor_data, altitude
-                )
-                _LOGGER.debug("Forecast generated successfully: %s", forecast_data)
-            except Exception as e:
-                _LOGGER.error("Forecast generation failed: %s", e)
-                forecast_data = []
-        else:
-            try:
-                forecast_data = self.forecast.generate_enhanced_forecast(
-                    condition, self._prepare_forecast_sensor_data(sensor_data), altitude
-                )
-            except Exception as e:
-                _LOGGER.error("Forecast generation failed: %s", e)
-                forecast_data = []
+        except Exception as e:
+            _LOGGER.error("Forecast generation failed: %s", e)
+            forecast_data = []
 
         # Convert units and prepare data
         weather_data = {
@@ -460,8 +409,7 @@ class WeatherDetector:
             return convert_to_celsius(temp)
         else:
             # Unknown unit, assume Celsius (most common for weather stations)
-            if self.debug_enabled:
-                _LOGGER.debug("Unknown temperature unit '%s', assuming Celsius", unit)
+            _LOGGER.debug("Unknown temperature unit '%s', assuming Celsius", unit)
             return round(temp, 1)
 
     def _convert_pressure(
@@ -479,8 +427,7 @@ class WeatherDetector:
             return convert_to_hpa(pressure)
         else:
             # Unknown unit, assume hPa (most common for weather stations)
-            if self.debug_enabled:
-                _LOGGER.debug("Unknown pressure unit '%s', assuming hPa", unit)
+            _LOGGER.debug("Unknown pressure unit '%s', assuming hPa", unit)
             return round(pressure, 1)
 
     def _convert_wind_speed(
@@ -501,8 +448,7 @@ class WeatherDetector:
             return round(speed * 3.6, 1)
         else:
             # Unknown unit, assume km/h (most common for weather stations)
-            if self.debug_enabled:
-                _LOGGER.debug("Unknown wind speed unit '%s', assuming km/h", unit)
+            _LOGGER.debug("Unknown wind speed unit '%s', assuming km/h", unit)
             return round(speed, 1)
 
     def _prepare_forecast_sensor_data(

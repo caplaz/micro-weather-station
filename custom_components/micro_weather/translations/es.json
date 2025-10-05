@@ -141,26 +141,7 @@
           "uv_index_sensor": "Sensor de Índice UV",
           "sun_sensor": "Sensor Solar",
           "altitude": "Altitud de la Estación",
-          "update_interval": "Intervalo de Actualización (minutos)",
-          "debug": "Habilitar Registro de Depuración"
-        },
-        "data_description": {
-          "outdoor_temp_sensor": "Sensor requerido para detección meteorológica básica.",
-          "dewpoint_sensor": "Sensor opcional para medición directa del punto de rocío.",
-          "humidity_sensor": "Sensor opcional para detección de niebla y cálculos de confort.",
-          "pressure_sensor": "Sensor opcional para pronóstico meteorológico y detección de tormentas.",
-          "wind_speed_sensor": "Sensor opcional para mediciones de velocidad del viento.",
-          "wind_direction_sensor": "Sensor opcional para datos de dirección del viento.",
-          "wind_gust_sensor": "Sensor opcional para mediciones de ráfagas de viento.",
-          "rain_rate_sensor": "Sensor opcional para intensidad de precipitación.",
-          "rain_state_sensor": "Sensor opcional para detección de lluvia.",
-          "solar_radiation_sensor": "Sensor opcional para mediciones de radiación solar.",
-          "solar_lux_sensor": "Sensor opcional para mediciones de luz.",
-          "uv_index_sensor": "Sensor opcional para mediciones de índice UV.",
-          "sun_sensor": "Sensor opcional para datos de elevación solar.",
-          "altitude": "Altitud de la estación sobre el nivel del mar para cálculos de presión.",
-          "update_interval": "Qué tan frecuente se actualizan los datos meteorológicos (1-60 minutos).",
-          "debug": "Habilitar registro de depuración detallado para solucionar problemas de algoritmos de detección meteorológica y lecturas de sensores. Esto aumentará la verbosidad del registro y solo debe habilitarse temporalmente para fines de depuración."
+          "update_interval": "Intervalo de Actualización (minutos)"
         }
       },
       "atmospheric": {
@@ -200,12 +181,7 @@
       "device_config": {
         "title": "Configuración del Dispositivo",
         "data": {
-          "update_interval": "Intervalo de Actualización (minutos)",
-          "debug": "Habilitar Registro de Depuración"
-        },
-        "data_description": {
-          "update_interval": "Qué tan frecuente se actualizan los datos meteorológicos (1-60 minutos).",
-          "debug": "Habilitar registro de depuración detallado para solucionar problemas de algoritmos de detección meteorológica y lecturas de sensores. Esto aumentará la verbosidad del registro y solo debe habilitarse temporalmente para fines de depuración."
+          "update_interval": "Intervalo de Actualización (minutos)"
         }
       }
     },

@@ -28,18 +28,14 @@ class WeatherAnalysis:
     """Handles weather condition analysis and historical trend calculations."""
 
     def __init__(
-        self,
-        sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None,
-        debug_enabled: bool = False,
+        self, sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None
     ):
         """Initialize weather analysis with optional sensor history.
 
         Args:
             sensor_history: Dictionary of sensor historical data deques
-            debug_enabled: Whether debug logging is enabled
         """
         self._sensor_history = sensor_history or {}
-        self._debug_enabled = debug_enabled
 
     def determine_weather_condition(
         self, sensor_data: Dict[str, Any], altitude: float | None = 0.0
@@ -653,14 +649,13 @@ class WeatherAnalysis:
 
         if total_weight > 0:
             averaged_radiation = weighted_sum / total_weight
-            if self._debug_enabled:
-                _LOGGER.debug(
-                    "Solar radiation average: %.1f W/m² "
-                    "(from %d readings, current: %.1f)",
-                    averaged_radiation,
-                    len(recent_readings),
-                    current_radiation,
-                )
+            _LOGGER.debug(
+                "Solar radiation average: %.1f W/m² "
+                "(from %d readings, current: %.1f)",
+                averaged_radiation,
+                len(recent_readings),
+                current_radiation,
+            )
             return averaged_radiation
 
         return current_radiation

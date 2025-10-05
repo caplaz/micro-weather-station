@@ -25,7 +25,6 @@ CONF_SOLAR_LUX_SENSOR = "solar_lux_sensor"
 CONF_UV_INDEX_SENSOR = "uv_index_sensor"
 CONF_SUN_SENSOR = "sun_sensor"
 CONF_ALTITUDE = "altitude"
-CONF_DEBUG = "debug"
 
 # Default configuration values
 DEFAULT_TEMPERATURE_RANGE = (-10, 35)  # Celsius

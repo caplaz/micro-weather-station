@@ -141,8 +141,7 @@
           "uv_index_sensor": "Sensore Indice UV",
           "sun_sensor": "Sensore Solare",
           "altitude": "Altitudine della Stazione",
-          "update_interval": "Intervallo di Aggiornamento (minuti)",
-          "debug": "Abilita Registrazione Debug"
+          "update_interval": "Intervallo di Aggiornamento (minuti)"
         },
         "data_description": {
           "outdoor_temp_sensor": "Sensore richiesto per rilevamento meteorologico di base. Fornisce letture di temperatura utilizzate in tutti i calcoli meteorologici e rilevamento condizioni.",
@@ -159,8 +158,7 @@
           "uv_index_sensor": "Sensore opzionale per conferma cielo sereno (UV alto = definitivamente soleggiato). Fornisce misurazione intensità solare per raccomandazioni sicurezza e precisione migliorata rilevamento meteo soleggiato.",
           "sun_sensor": "Sensore opzionale che fornisce dati elevazione solare per calcoli precisi copertura nuvolosa. Migliora precisione rilevamento meteorologico considerando posizione sole (elevazione maggiore = più radiazione solare attesa). Si ripega a 45° elevazione se non configurato.",
           "altitude": "Elevazione della stazione sopra il livello del mare. Utilizzata per regolare le letture di pressione all'equivalente del livello del mare per rilevamento meteorologico accurato. Imposta a 0 se il tuo sensore di pressione fornisce già pressione al livello del mare (MSLP) o per letture sensore grezze. Migliora precisione previsioni, specialmente per previsione meteorologica basata su pressione. Predefinito alla tua impostazione elevazione Home Assistant se disponibile, altrimenti 0.0 (usa il tuo sistema unità Home Assistant).",
-          "update_interval": "Quanto spesso i dati meteorologici vengono aggiornati e i sensori interrogati. Intervallo: 1-60 minuti. Valori più bassi forniscono aggiornamenti più reattivi ma possono aumentare il carico sistema.",
-          "debug": "Abilita registrazione debug dettagliata per la risoluzione dei problemi degli algoritmi di rilevamento meteorologico e delle letture dei sensori. Questo aumenterà la verbosità del registro e dovrebbe essere abilitato solo temporaneamente per scopi di debug."
+          "update_interval": "Quanto spesso i dati meteorologici vengono aggiornati e i sensori interrogati. Intervallo: 1-60 minuti. Valori più bassi forniscono aggiornamenti più reattivi ma possono aumentare il carico sistema."
         }
       },
       "atmospheric": {
@@ -222,12 +220,10 @@
       "device_config": {
         "title": "Configurazione Dispositivo",
         "data": {
-          "update_interval": "Intervallo di Aggiornamento (minuti)",
-          "debug": "Abilita Registrazione Debug"
+          "update_interval": "Intervallo di Aggiornamento (minuti)"
         },
         "data_description": {
-          "update_interval": "Quanto spesso i dati meteorologici vengono aggiornati e i sensori interrogati. Intervallo: 1-60 minuti. Valori più bassi forniscono aggiornamenti più reattivi ma possono aumentare il carico sistema.",
-          "debug": "Abilita registrazione debug dettagliata per la risoluzione dei problemi degli algoritmi di rilevamento meteorologico e delle letture dei sensori. Questo aumenterà la verbosità del registro e dovrebbe essere abilitato solo temporaneamente per scopi di debug."
+          "update_interval": "Quanto spesso i dati meteorologici vengono aggiornati e i sensori interrogati. Intervallo: 1-60 minuti. Valori più bassi forniscono aggiornamenti più reattivi ma possono aumentare il carico sistema."
         }
       }
     },

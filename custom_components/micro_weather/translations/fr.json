@@ -141,8 +141,7 @@
           "uv_index_sensor": "Capteur d'Index UV",
           "sun_sensor": "Capteur Solaire",
           "altitude": "Altitude de la Station",
-          "update_interval": "Intervalle de Mise à Jour (minutes)",
-          "debug": "Activer la Journalisation de Débogage"
+          "update_interval": "Intervalle de Mise à Jour (minutes)"
         },
         "data_description": {
           "outdoor_temp_sensor": "Capteur requis pour la détection météorologique de base. Fournit des lectures de température utilisées dans tous les calculs météorologiques et la détection de conditions.",
@@ -159,8 +158,7 @@
           "uv_index_sensor": "Capteur optionnel pour la confirmation de ciel dégagé (UV élevé = définitivement ensoleillé). Fournit une mesure d'intensité solaire pour des recommandations de sécurité et une précision améliorée de détection de météo ensoleillée.",
           "sun_sensor": "Capteur optionnel fournissant des données d'élévation solaire pour des calculs précis de couverture nuageuse. Améliore la précision de détection météorologique en tenant compte de la position du soleil (élévation plus élevée = plus de radiation solaire attendue). Se rabat à 45° d'élévation si non configuré.",
           "altitude": "Élévation de la station au-dessus du niveau de la mer. Utilisée pour ajuster les lectures de pression à l'équivalent du niveau de la mer pour une détection météorologique précise. Réglez à 0 si votre capteur de pression fournit déjà la pression au niveau de la mer (MSLP) ou pour des lectures de capteur brutes. Améliore la précision des prévisions, surtout pour la prédiction météorologique basée sur la pression. Par défaut à votre paramètre d'élévation Home Assistant s'il est disponible, sinon 0.0 (utilise votre système d'unités Home Assistant).",
-          "update_interval": "À quelle fréquence les données météorologiques sont rafraîchies et les capteurs sont interrogés. Plage : 1-60 minutes. Des valeurs plus faibles fournissent des mises à jour plus réactives mais peuvent augmenter la charge système.",
-          "debug": "Activer la journalisation de débogage détaillée pour le dépannage des algorithmes de détection météorologique et des lectures de capteurs. Cela augmentera la verbosité du journal et ne doit être activé que temporairement à des fins de débogage."
+          "update_interval": "À quelle fréquence les données météorologiques sont rafraîchies et les capteurs sont interrogés. Plage : 1-60 minutes. Des valeurs plus faibles fournissent des mises à jour plus réactives mais peuvent augmenter la charge système."
         }
       },
       "atmospheric": {
@@ -222,12 +220,10 @@
       "device_config": {
         "title": "Configuration de l'Appareil",
         "data": {
-          "update_interval": "Intervalle de Mise à Jour (minutes)",
-          "debug": "Activer la Journalisation de Débogage"
+          "update_interval": "Intervalle de Mise à Jour (minutes)"
         },
         "data_description": {
-          "update_interval": "À quelle fréquence les données météorologiques sont rafraîchies et les capteurs sont interrogés. Plage : 1-60 minutes. Des valeurs plus faibles fournissent des mises à jour plus réactives mais peuvent augmenter la charge système.",
-          "debug": "Activer la journalisation de débogage détaillée pour le dépannage des algorithmes de détection météorologique et des lectures de capteurs. Cela augmentera la verbosité du journal et ne doit être activé que temporairement à des fins de débogage."
+          "update_interval": "À quelle fréquence les données météorologiques sont rafraîchies et les capteurs sont interrogés. Plage : 1-60 minutes. Des valeurs plus faibles fournissent des mises à jour plus réactives mais peuvent augmenter la charge système."
         }
       }
     },
