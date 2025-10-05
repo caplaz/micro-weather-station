@@ -241,22 +241,25 @@ class WeatherAnalysis:
         # PRIORITY 6: NIGHTTIME CONDITIONS
         else:
             # Night analysis based on atmospheric conditions
+            # Prioritize clear conditions when pressure is favorable, even with moderate humidity
             if pressure_very_high and wind_calm and humidity < 70:
                 return ATTR_CONDITION_CLEAR_NIGHT  # Perfect clear night
             elif pressure_high and not is_gusty and humidity < 80:
                 return ATTR_CONDITION_CLEAR_NIGHT  # Clear night
-            elif pressure_normal and wind_light:
-                return ATTR_CONDITION_PARTLYCLOUDY  # Partly cloudy night
-            elif humidity > 85:
-                return ATTR_CONDITION_CLOUDY  # High humidity = likely cloudy/overcast night
-            elif pressure_low and humidity > 75 and wind_speed < 3:
-                return ATTR_CONDITION_CLOUDY  # Low pressure + high humidity + calm = cloudy
             elif pressure_low and humidity < 65:
-                return ATTR_CONDITION_CLEAR_NIGHT  # Low pressure, low humidity
+                return ATTR_CONDITION_CLEAR_NIGHT  # Low pressure, low humidity = clear
+            elif pressure_normal and wind_light and humidity < 85:
+                return ATTR_CONDITION_PARTLYCLOUDY  # Partly cloudy night (moderate humidity OK)
+            elif humidity > 90:
+                return ATTR_CONDITION_CLOUDY  # Very high humidity = likely cloudy/overcast night
+            elif pressure_low and humidity > 80 and wind_speed < 3:
+                return ATTR_CONDITION_CLOUDY  # Low pressure + high humidity + calm = cloudy
             elif pressure_low:
                 return (
                     ATTR_CONDITION_PARTLYCLOUDY  # Low pressure with moderate conditions
                 )
+            elif humidity > 85:
+                return ATTR_CONDITION_CLOUDY  # High humidity = likely cloudy/overcast night
             else:
                 return ATTR_CONDITION_PARTLYCLOUDY  # Default night condition
 
@@ -458,32 +461,51 @@ class WeatherAnalysis:
 
         Note:
             Uses conservative thresholds to reduce false positives after
-            user feedback about incorrect fog detection.
+            user feedback about incorrect fog detection. Nighttime thresholds
+            are more restrictive to prevent false fog detection on clear nights.
         """
 
-        # Dense fog conditions
-        # (very restrictive - must be extremely close to saturation)
-        if humidity >= 99 and spread <= 1 and wind_speed <= 2:
+        # Adjust thresholds based on time of day to reduce nighttime false positives
+        if not is_daytime:
+            # Nighttime: More restrictive thresholds to prevent false fog detection
+            dense_humidity_threshold = 99.5  # Higher threshold for dense fog
+            radiation_humidity_threshold = 99  # Much higher threshold for radiation fog
+            radiation_spread_threshold = 1.0  # Tighter spread requirement
+            advection_humidity_threshold = 98  # Higher threshold for advection fog
+        else:
+            # Daytime: Original thresholds
+            dense_humidity_threshold = 99
+            radiation_humidity_threshold = 98
+            radiation_spread_threshold = 2
+            advection_humidity_threshold = 95
+
+        # Dense fog conditions (extremely restrictive)
+        if humidity >= dense_humidity_threshold and spread <= 1 and wind_speed <= 2:
             return ATTR_CONDITION_FOG
 
-        # Radiation fog (more restrictive than before to reduce false positives)
+        # Radiation fog (more restrictive at night to reduce false positives)
         if (
-            humidity >= 98  # Raised from 95 to 98 - requires near saturation
-            and spread <= 2  # Reduced from 3 to 2 - closer to dewpoint required
-            and wind_speed <= 3  # Reduced from 5 to 3 - lighter winds required
+            humidity >= radiation_humidity_threshold  # Raised from 98 to 99 at night
+            and spread <= radiation_spread_threshold  # Reduced from 2 to 1 at night
+            and wind_speed <= 3  # Reduced from 5 to 3
             and (not is_daytime or solar_rad < 5)  # More restrictive solar condition
         ):
             return ATTR_CONDITION_FOG
 
-        # Advection fog (moist air over cooler surface) - kept similar
+        # Advection fog (moist air over cooler surface) - also more restrictive at night
         if (
-            humidity >= 95 and spread <= 3 and 3 <= wind_speed <= 12
+            humidity >= advection_humidity_threshold  # Raised from 95 to 98 at night
+            and spread <= 3
+            and 3 <= wind_speed <= 12
         ):  # Raised humidity threshold
             return ATTR_CONDITION_FOG
 
-        # Evaporation fog (after rain, warm ground) - more restrictive
+        # Evaporation fog (after rain, warm ground) - more restrictive at night
         if (
-            humidity >= 95 and spread <= 3 and wind_speed <= 6 and temp > 40
+            humidity >= advection_humidity_threshold  # Use same threshold as advection
+            and spread <= 3
+            and wind_speed <= 6
+            and temp > 40
         ):  # Raised thresholds
             # Check if conditions suggest recent precipitation
             return ATTR_CONDITION_FOG
