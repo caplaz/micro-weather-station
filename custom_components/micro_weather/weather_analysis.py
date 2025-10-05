@@ -506,7 +506,8 @@ class WeatherAnalysis:
             radiation_spread_threshold = 2
             advection_humidity_threshold = 95
 
-        # Dense fog conditions (extremely restrictive, requires virtually no solar radiation at night)
+        # Dense fog conditions (extremely restrictive, requires
+        # virtually no solar radiation at night)
         if (
             humidity >= dense_humidity_threshold
             and spread <= 0.5  # Very tight spread
