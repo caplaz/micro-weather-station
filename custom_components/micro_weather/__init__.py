@@ -55,10 +55,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = MicroWeatherCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
 
-    # After first refresh, trigger another immediate refresh to ensure latest data
-    # This helps with the initial state being available quickly after HA restart
-    await coordinator.async_request_refresh()
-
     # Store coordinator in hass data
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
