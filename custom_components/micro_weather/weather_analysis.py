@@ -146,10 +146,8 @@ class WeatherAnalysis:
 
             # Determine precipitation type based on temperature
             if is_freezing:
-                if rain_rate > 0.1:
-                    return ATTR_CONDITION_SNOWY  # Heavy snow
-                else:
-                    return ATTR_CONDITION_SNOWY  # Light snow/flurries
+                # Snow conditions (temperature at or below freezing)
+                return ATTR_CONDITION_SNOWY
 
             # Enhanced storm detection with turbulence analysis
             # Only trigger for significant storm conditions with meaningful precipitation
@@ -221,11 +219,8 @@ class WeatherAnalysis:
             elif cloud_cover <= 85:
                 return ATTR_CONDITION_CLOUDY
             else:
-                # Overcast with potential for development
-                if pressure_low and humidity > 80:
-                    return ATTR_CONDITION_CLOUDY  # Threatening overcast
-                else:
-                    return ATTR_CONDITION_CLOUDY
+                # Very overcast (cloud_cover > 85%)
+                return ATTR_CONDITION_CLOUDY
 
         # PRIORITY 5: TWILIGHT CONDITIONS
         elif is_twilight:
@@ -238,24 +233,33 @@ class WeatherAnalysis:
         else:
             # Night analysis based on atmospheric conditions
             # Prioritize clear conditions when pressure is favorable, even with moderate humidity
-            if pressure_very_high and wind_calm and humidity < 70:
+            # Order conditions from most specific to least specific
+
+            # Most specific: Combined conditions
+            if pressure_low and humidity > 90 and wind_speed < 3:
+                return ATTR_CONDITION_CLOUDY  # Low pressure + very high humidity + calm = cloudy
+
+            # Clear night conditions (favorable pressure/humidity combinations)
+            elif pressure_very_high and wind_calm and humidity < 70:
                 return ATTR_CONDITION_CLEAR_NIGHT  # Perfect clear night
             elif pressure_high and not is_gusty and humidity < 80:
                 return ATTR_CONDITION_CLEAR_NIGHT  # Clear night
             elif pressure_low and humidity < 65:
                 return ATTR_CONDITION_CLEAR_NIGHT  # Low pressure, low humidity = clear
+
+            # Partly cloudy night (moderate conditions)
             elif pressure_normal and wind_light and humidity < 85:
                 return ATTR_CONDITION_PARTLYCLOUDY  # Partly cloudy night (moderate humidity OK)
+            elif pressure_low and humidity < 90:
+                return (
+                    ATTR_CONDITION_PARTLYCLOUDY  # Low pressure with moderate humidity
+                )
+
+            # Cloudy night (high humidity)
             elif humidity > 90:
                 return ATTR_CONDITION_CLOUDY  # Very high humidity = likely cloudy/overcast night
-            elif pressure_low and humidity > 90 and wind_speed < 3:
-                return ATTR_CONDITION_CLOUDY  # Low pressure + very high humidity + calm = cloudy
-            elif pressure_low:
-                return (
-                    ATTR_CONDITION_PARTLYCLOUDY  # Low pressure with moderate conditions
-                )
-            elif humidity > 90:
-                return ATTR_CONDITION_CLOUDY  # High humidity = likely cloudy/overcast night
+
+            # Default night condition
             else:
                 return ATTR_CONDITION_PARTLYCLOUDY  # Default night condition
 
