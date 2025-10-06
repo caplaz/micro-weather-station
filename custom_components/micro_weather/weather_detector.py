@@ -240,7 +240,10 @@ class WeatherDetector:
 
         # Log sensor data and determined weather condition
         try:
-            sensor_data_json = json.dumps(sensor_data)
+            # Add altitude to sensor data for logging purposes
+            log_data = sensor_data.copy()
+            log_data["altitude_m"] = altitude
+            sensor_data_json = json.dumps(log_data)
         except (TypeError, ValueError):
             sensor_data_json = str(sensor_data)
 
