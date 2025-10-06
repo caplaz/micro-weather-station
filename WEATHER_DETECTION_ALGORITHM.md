@@ -113,7 +113,7 @@ Advection Fog: humidity ≥95% AND dewpoint_spread ≤3°F AND 3mph ≤ wind ≤
 **Cloud Cover Analysis:**
 
 ```
-IF cloud_cover ≤25%:
+IF cloud_cover ≤40%:
     → "sunny"
 ELIF cloud_cover ≤60%:
     → "partly_cloudy"
@@ -141,20 +141,20 @@ ELSE:
 **Nighttime Detection:** All solar sensors ≤ threshold values
 
 ```
-IF pressure >30.20 inHg AND wind <1mph AND humidity <70%:
+IF pressure_low AND humidity > 90 AND wind_speed < 3:
+    → "cloudy" (low pressure + very high humidity + calm = cloudy)
+ELIF pressure_very_high AND wind_speed < 1 AND humidity < 70:
     → "clear-night" (perfect clear night)
-ELIF pressure >30.00 inHg AND not gusty AND humidity <80%:
+ELIF pressure_high AND not_gusty AND humidity < 80:
     → "clear-night" (clear night)
-ELIF pressure normal AND 1mph ≤ wind <8mph:
-    → "partly_cloudy" (partly cloudy night)
-ELIF humidity >85%:
-    → "cloudy" (high humidity = likely cloudy/overcast night)
-ELIF pressure <29.80 inHg AND humidity >75% AND wind <3mph:
-    → "cloudy" (low pressure + high humidity + calm = cloudy)
-ELIF pressure <29.80 inHg AND humidity <65%:
-    → "clear-night" (low pressure but low humidity = can still be clear)
-ELIF pressure <29.80 inHg:
-    → "partly_cloudy" (low pressure with moderate conditions)
+ELIF pressure_low AND humidity < 65:
+    → "clear-night" (low pressure, low humidity = clear)
+ELIF pressure_normal AND 1mph ≤ wind_speed < 8mph AND humidity < 85:
+    → "partly_cloudy" (partly cloudy night with moderate humidity)
+ELIF pressure_low AND humidity < 90:
+    → "partly_cloudy" (low pressure with moderate humidity)
+ELIF humidity > 90:
+    → "cloudy" (very high humidity = likely cloudy/overcast night)
 ELSE:
     → "partly_cloudy" (default night condition)
 ```
@@ -362,6 +362,23 @@ lux_cloud_cover = 100 - (solar_lux / 100000 * 100)
 uv_cloud_cover = 100 - (uv_index / 11 * 100)
 
 Weighted: solar_radiation × 0.8 + solar_lux × 0.15 + uv_index × 0.05
+```
+
+**Intelligent Weighting (adapts to sensor availability):**
+
+```
+When UV sensor working (uv_index > 0):
+  solar_radiation × 0.8 + solar_lux × 0.15 + uv_index × 0.05
+
+When UV sensor faulty/unavailable (uv_index = 0):
+  solar_radiation × 0.85 + solar_lux × 0.15
+
+Lux-only fallback (when solar radiation < 10 W/m²):
+  solar_lux × 0.9 + uv_index × 0.1 (if UV available)
+  solar_lux only (if UV unavailable)
+
+UV-only fallback (when solar < 10 W/m² and lux < 1000):
+  uv_index only
 ```
 
 **Low Solar Radiation Fallback Logic:**

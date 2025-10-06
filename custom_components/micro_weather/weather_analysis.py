@@ -212,7 +212,7 @@ class WeatherAnalysis:
             )
 
             # Daytime clear sky conditions: low cloud cover = sunny
-            if cloud_cover <= 35:
+            if cloud_cover <= 40:
                 return ATTR_CONDITION_SUNNY
             elif cloud_cover <= 60:
                 return ATTR_CONDITION_PARTLYCLOUDY
@@ -631,11 +631,22 @@ class WeatherAnalysis:
 
         # Weight the measurements (solar radiation is most reliable for cloud cover)
         if avg_solar_radiation > 10:  # Only use if we have meaningful solar data
-            cloud_cover = (
-                solar_cloud_cover * 0.8 + lux_cloud_cover * 0.15 + uv_cloud_cover * 0.05
-            )
+            # Only include UV in weighting if we have a meaningful UV reading
+            if uv_index > 0:
+                cloud_cover = (
+                    solar_cloud_cover * 0.8
+                    + lux_cloud_cover * 0.15
+                    + uv_cloud_cover * 0.05
+                )
+            else:
+                # No UV data - redistribute weights to solar and lux
+                cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15
         elif solar_lux > 1000:  # Fallback to lux if radiation is low
-            cloud_cover = lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
+            cloud_cover = (
+                lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
+                if uv_index > 0
+                else lux_cloud_cover
+            )
         elif uv_index > 0.5:  # Last resort
             cloud_cover = uv_cloud_cover
         elif avg_solar_radiation == 0 and solar_lux == 0 and uv_index == 0:
