@@ -1,5 +1,32 @@
 # Changelog
 
+## 2.1.1 (2025-10-06)
+
+### Bug Fixes
+
+- **Cloud Cover Calculation Improvements**: Enhanced accuracy for clear sky detection
+
+  - Increased sunny threshold from 35% to 40% cloud cover
+  - Balances meteorological accuracy with low sun angle conditions
+  - Accommodates early morning/late afternoon when sun elevation is low
+
+- **UV Sensor Fault Handling**: Added intelligent detection and handling of faulty UV sensors
+
+  - Detects when UV sensor is faulty/unavailable (uv_index = 0)
+  - Redistributes weights: solar radiation 85%, lux 15% (instead of including UV)
+  - Prevents false high cloud cover readings from broken UV sensors
+
+### Technical Improvements
+
+- **Documentation Fixes**: Corrected malformed markdown code blocks in algorithm documentation
+- **Improved Weighting Logic**: Enhanced explanation with clearer fallback logic for sensor combinations
+
+### Changes
+
+- Better accuracy for clear sky conditions, especially at low sun angles
+- More robust handling of sensor faults and missing data
+- Improved documentation quality and clarity
+
 ## 2.1.0 (2025-10-04)
 
 ### Bug Fixes
