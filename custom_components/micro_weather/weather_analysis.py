@@ -248,13 +248,13 @@ class WeatherAnalysis:
                 return ATTR_CONDITION_PARTLYCLOUDY  # Partly cloudy night (moderate humidity OK)
             elif humidity > 90:
                 return ATTR_CONDITION_CLOUDY  # Very high humidity = likely cloudy/overcast night
-            elif pressure_low and humidity > 80 and wind_speed < 3:
-                return ATTR_CONDITION_CLOUDY  # Low pressure + high humidity + calm = cloudy
+            elif pressure_low and humidity > 90 and wind_speed < 3:
+                return ATTR_CONDITION_CLOUDY  # Low pressure + very high humidity + calm = cloudy
             elif pressure_low:
                 return (
                     ATTR_CONDITION_PARTLYCLOUDY  # Low pressure with moderate conditions
                 )
-            elif humidity > 85:
+            elif humidity > 90:
                 return ATTR_CONDITION_CLOUDY  # High humidity = likely cloudy/overcast night
             else:
                 return ATTR_CONDITION_PARTLYCLOUDY  # Default night condition
