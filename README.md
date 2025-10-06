@@ -236,6 +236,7 @@ The configuration flow will guide you through selecting your sensors:
 
 - **Outdoor Temperature**: Select your outdoor temperature sensor entity (required)
 - **Update Interval**: Set how often to check sensors (default: 5 minutes)
+- **Elevation**: Set your location's elevation above sea level for accurate pressure correction
 
 #### Optional Sensors
 
@@ -255,7 +256,6 @@ Configure additional sensors for enhanced weather detection:
 | **Solar Lux**       | Light level sensor (lx)       | Day/night and cloud detection (backup)                 |
 | **UV Index**        | UV index sensor               | Clear sky detection and solar intensity                |
 | **Sun Sensor**      | Solar elevation sensor        | Precise cloud cover calculations based on sun position |
-| **Debug Logging**   | Enable debug logging          | Detailed logging for troubleshooting and development   |
 
 #### Unit Conversion Support
 
@@ -279,6 +279,7 @@ The integration automatically detects and converts between different sensor unit
 ```yaml
 # Example sensor mappings:
 Outdoor Temperature: sensor.outdoor_temperature # Required
+Elevation: 350 # meters above sea level (automatically uses your HA unit system)
 Humidity: sensor.outdoor_humidity # Optional - fog detection
 Pressure: sensor.atmospheric_pressure # Optional - storm prediction
 Wind Speed: sensor.wind_speed # Optional - wind conditions
