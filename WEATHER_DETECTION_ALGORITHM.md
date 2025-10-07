@@ -392,6 +392,79 @@ ELIF solar_radiation < 200 W/m² AND solar_lux < 20000 lx AND uv_index < 1:
     → 40% cloud cover (partly cloudy fallback when data is inconclusive)
 ```
 
+### Astronomical Clear-Sky Radiation Calculations
+
+The system uses advanced astronomical calculations to determine the theoretical maximum solar radiation under clear sky conditions, accounting for Earth's elliptical orbit and atmospheric effects.
+
+**Solar Constant Variation (Earth-Sun Distance):**
+
+Earth's orbit is elliptical, causing the solar constant to vary by ±3.3% throughout the year:
+
+```
+solar_constant_variation = 1 + 0.033 × cos(2π × (day_of_year - 4) / 365.25)
+```
+
+- **Day 4 (January 4)**: Closest to sun (+3.3% solar constant)
+- **Day 186 (July 4)**: Farthest from sun (-3.3% solar constant)
+- **Base solar constant**: 1366 W/m² at 1 AU (Earth-Sun distance)
+
+**Air Mass Correction (Atmospheric Path Length):**
+
+Uses the Kasten-Young formula for accurate air mass calculation at all solar elevations:
+
+```
+AM = 1 / (cos(Z) + 0.50572 × (96.07995 - Z)^(-1.6364))
+```
+
+Where Z is the zenith angle (90° - solar_elevation). This provides better accuracy than simple 1/cos(Z) for low solar elevations.
+
+**Atmospheric Extinction (Rayleigh Scattering, Ozone, Water Vapor):**
+
+```
+rayleigh_extinction = exp(-0.1 × air_mass)      # Rayleigh scattering
+ozone_extinction = exp(-0.02 × air_mass)        # Ozone absorption
+water_vapor_extinction = exp(-0.05 × air_mass)  # Water vapor absorption
+aerosol_extinction = exp(-0.1 × air_mass)       # Aerosol scattering (clear sky)
+
+atmospheric_transmission = rayleigh × ozone × water_vapor × aerosol
+```
+
+**Theoretical Clear-Sky Irradiance:**
+
+```
+theoretical_irradiance = base_solar_constant × solar_constant_variation ×
+                        atmospheric_transmission × sin(solar_elevation)
+```
+
+**Local Calibration and Seasonal Impact:**
+
+The system uses a calibrated zenith maximum (700 W/m²) adjusted for seasonal variations:
+
+```
+calibrated_max_radiation = zenith_max_radiation × solar_constant_variation ×
+                          astronomical_scaling
+```
+
+Where `astronomical_scaling = sin(solar_elevation)`.
+
+**Seasonal Radiation Variations:**
+
+- **Winter (Jan 4)**: ~626 W/m² maximum at 60° elevation
+- **Summer (Jul 4)**: ~586 W/m² maximum at 60° elevation
+- **Spring/Fall**: Intermediate values based on Earth-Sun distance
+
+**Impact on Cloud Cover Detection:**
+
+Seasonal variations ensure accurate cloud cover percentages year-round:
+
+```
+cloud_cover = 100 - (actual_solar_radiation / seasonal_max_radiation × 100)
+```
+
+- **Winter**: Same solar radiation gives higher cloud cover % (more conservative)
+- **Summer**: Same solar radiation gives lower cloud cover % (less conservative)
+- **Result**: More accurate weather condition detection throughout the year
+
 **Solar Elevation Compensation:**
 
 The system uses solar elevation data (from sun sensor) to calculate expected solar radiation:

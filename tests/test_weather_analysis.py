@@ -672,3 +672,172 @@ class TestWeatherAnalysis:
         # Test with boundary values
         direction_boundary = analysis.calculate_prevailing_direction([0, 360, 359.9])
         assert direction_boundary == "north"  # All should map to north sector
+
+    def test_calculate_clear_sky_max_radiation(self, analysis):
+        """Test clear-sky maximum radiation calculation."""
+        # Test at zenith (90° elevation)
+        max_rad_zenith = analysis._calculate_clear_sky_max_radiation(90.0)
+        assert isinstance(max_rad_zenith, float)
+        assert 600 < max_rad_zenith < 1200  # Should be in reasonable range
+
+        # Test at moderate elevation (45°)
+        max_rad_45 = analysis._calculate_clear_sky_max_radiation(45.0)
+        assert isinstance(max_rad_45, float)
+        assert 200 < max_rad_45 < 600  # Should be lower than zenith
+
+        # Test at low elevation (20°)
+        max_rad_20 = analysis._calculate_clear_sky_max_radiation(20.0)
+        assert isinstance(max_rad_20, float)
+        assert 50 < max_rad_20 < 300  # Should be much lower
+
+        # Test at horizon (0° elevation)
+        max_rad_0 = analysis._calculate_clear_sky_max_radiation(0.0)
+        assert max_rad_0 == 50.0  # Should return minimum value
+
+        # Test below horizon (negative elevation)
+        max_rad_negative = analysis._calculate_clear_sky_max_radiation(-10.0)
+        assert max_rad_negative == 50.0  # Should return minimum value
+
+        # Test that higher elevation gives higher radiation
+        assert max_rad_zenith > max_rad_45 > max_rad_20
+
+    def test_calculate_clear_sky_max_radiation_seasonal_variations(self, analysis):
+        """Test seasonal variations in clear-sky radiation calculation."""
+        import datetime
+
+        # Test winter conditions (higher solar constant due to closer Earth-Sun distance)
+        winter_rad = analysis._calculate_clear_sky_max_radiation(
+            60.0, datetime.datetime(2024, 1, 4)
+        )
+        print(f"Winter radiation: {winter_rad}")
+
+        # Test summer conditions (lower solar constant due to farther Earth-Sun distance)
+        summer_rad = analysis._calculate_clear_sky_max_radiation(
+            60.0, datetime.datetime(2024, 7, 4)
+        )
+        print(f"Summer radiation: {summer_rad}")
+
+        # Winter (perihelion) should have higher radiation due to closer distance to sun
+        assert winter_rad > summer_rad
+
+        # Check that the difference is meaningful (should be several W/m²)
+        assert winter_rad - summer_rad > 10
+
+    def test_calculate_clear_sky_max_radiation_bounds(self, analysis):
+        """Test bounds checking in clear-sky radiation calculation."""
+        # Test that very high elevations don't exceed maximum
+        max_rad_high = analysis._calculate_clear_sky_max_radiation(85.0)
+        assert max_rad_high <= 1200.0  # Should be capped at maximum
+
+        # Test that very low elevations don't go below minimum
+        max_rad_low = analysis._calculate_clear_sky_max_radiation(1.0)
+        assert max_rad_low >= 50.0  # Should be floored at minimum
+
+    def test_calculate_air_mass(self, analysis):
+        """Test air mass calculation."""
+        # Test at zenith (90° elevation)
+        air_mass_zenith = analysis._calculate_air_mass(90.0)
+        assert abs(air_mass_zenith - 1.0) < 0.01  # Should be very close to 1.0
+
+        # Test at moderate elevation (45°)
+        air_mass_45 = analysis._calculate_air_mass(45.0)
+        assert 1.4 < air_mass_45 < 1.5  # Should be around 1.41
+
+        # Test at low elevation (20°)
+        air_mass_20 = analysis._calculate_air_mass(20.0)
+        assert 2.8 < air_mass_20 < 3.0  # Should be around 2.9
+
+        # Test at very low elevation (5°)
+        air_mass_5 = analysis._calculate_air_mass(5.0)
+        assert 10 < air_mass_5 < 15  # Should be high air mass
+
+        # Test below horizon
+        air_mass_negative = analysis._calculate_air_mass(-10.0)
+        assert air_mass_negative == 38.0  # Should return maximum air mass
+
+        # Test that air mass increases as elevation decreases
+        assert air_mass_zenith < air_mass_45 < air_mass_20 < air_mass_5
+
+    def test_calculate_air_mass_edge_cases(self, analysis):
+        """Test air mass calculation edge cases."""
+        # Test at exactly 0° elevation
+        air_mass_zero = analysis._calculate_air_mass(0.0)
+        assert air_mass_zero == 38.0  # Should return maximum air mass
+
+        # Test at very high elevation (near zenith)
+        air_mass_89 = analysis._calculate_air_mass(89.0)
+        assert 1.0 <= air_mass_89 < 1.01  # Should be very close to 1.0
+
+        # Test boundary values
+        air_mass_90 = analysis._calculate_air_mass(90.0)
+        assert abs(air_mass_90 - 1.0) < 0.01
+
+        air_mass_1 = analysis._calculate_air_mass(1.0)
+        assert air_mass_1 > 20  # Should be very high
+
+    def test_calculate_air_mass_kasten_young_formula(self, analysis):
+        """Test that air mass uses Kasten-Young formula correctly."""
+        # Test specific values to verify Kasten-Young implementation
+        # At 45° elevation, air mass should be approximately 1.41
+        air_mass_45 = analysis._calculate_air_mass(45.0)
+        expected_45 = 1.0 / (
+            0.7071067811865476 + 0.50572 * (96.07995 - 45.0) ** (-1.6364)
+        )  # Manual calculation
+        assert abs(air_mass_45 - expected_45) < 0.01
+
+        # At 30° elevation, air mass should be approximately 1.99
+        air_mass_30 = analysis._calculate_air_mass(30.0)
+        expected_30 = 1.0 / (
+            0.5 + 0.50572 * (96.07995 - 30.0) ** (-1.6364)
+        )  # Manual calculation
+        assert abs(air_mass_30 - expected_30) < 0.01
+
+    def test_clear_sky_radiation_integration_with_cloud_cover(self, analysis):
+        """Test integration between clear-sky radiation and cloud cover analysis."""
+        # Test that clear-sky radiation affects cloud cover calculation
+        # Same actual radiation at different elevations should give different cloud cover
+
+        # At high elevation (higher clear-sky max)
+        cloud_cover_high = analysis.analyze_cloud_cover(300.0, 30000.0, 3.0, 80.0)
+        # At low elevation (lower clear-sky max)
+        cloud_cover_low = analysis.analyze_cloud_cover(300.0, 30000.0, 3.0, 30.0)
+
+        # Same actual radiation should give lower cloud cover percentage at lower elevation
+        # because the clear-sky maximum is lower, so actual radiation represents
+        # higher percentage of max
+        assert cloud_cover_low < cloud_cover_high
+
+        # Test extreme case: very low elevation
+        cloud_cover_very_low = analysis.analyze_cloud_cover(200.0, 20000.0, 2.0, 10.0)
+        assert isinstance(cloud_cover_very_low, float)
+        assert 0 <= cloud_cover_very_low <= 100
+
+    def test_astronomical_calculations_with_different_dates(self, analysis):
+        """Test astronomical calculations vary correctly with date."""
+        import datetime
+
+        # Test perihelion (closest to sun, highest radiation)
+        rad_perihelion = analysis._calculate_clear_sky_max_radiation(
+            60.0, datetime.datetime(2024, 1, 4)
+        )
+
+        # Test aphelion (farthest from sun, lowest radiation)
+        rad_aphelion = analysis._calculate_clear_sky_max_radiation(
+            60.0, datetime.datetime(2024, 7, 4)
+        )
+
+        # Perihelion should have higher radiation
+        assert rad_perihelion > rad_aphelion
+
+        # Test equinoxes (intermediate radiation)
+        rad_spring = analysis._calculate_clear_sky_max_radiation(
+            60.0, datetime.datetime(2024, 3, 20)
+        )
+
+        rad_fall = analysis._calculate_clear_sky_max_radiation(
+            60.0, datetime.datetime(2024, 9, 22)
+        )
+
+        # Equinoxes should be between perihelion and aphelion
+        assert rad_aphelion < rad_spring < rad_perihelion
+        assert rad_aphelion < rad_fall < rad_perihelion
