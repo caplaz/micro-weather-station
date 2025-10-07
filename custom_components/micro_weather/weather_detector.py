@@ -117,8 +117,8 @@ class WeatherDetector:
             maxlen=self._history_maxlen
         )
 
-        # Initialize weather analysis and forecast modules
-        self.analysis = WeatherAnalysis()
+        # Initialize weather analysis and forecast modules with shared sensor history
+        self.analysis = WeatherAnalysis(sensor_history=self._sensor_history)
         self.forecast = WeatherForecast(self.analysis)
 
         # Sensor entity IDs mapping
@@ -376,10 +376,8 @@ class WeatherDetector:
                             sun_entity_id,
                         )
         else:
-            # Fallback: use default elevation if no sun sensor configured
-            sensor_data["solar_elevation"] = (
-                45.0  # Reasonable default for moderate solar angle
-            )
+            # Don't set a default - let the analysis handle missing solar elevation
+            pass
 
         return sensor_data
 

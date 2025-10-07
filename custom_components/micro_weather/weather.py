@@ -65,14 +65,6 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         """Return if entity is available."""
         return bool(self.coordinator.data)
 
-    async def async_added_to_hass(self) -> None:
-        """Run when entity about to be added to hass."""
-        await super().async_added_to_hass()
-        # Trigger immediate refresh when entity is first added
-        # This ensures data is available quickly after HA restart
-        if not self.coordinator.data:
-            await self.coordinator.async_request_refresh()
-
     @property
     def condition(self) -> str | None:
         """Return the current condition."""

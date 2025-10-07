@@ -206,7 +206,37 @@ class WeatherAnalysis:
         # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
         if is_daytime:
             # Get solar elevation from sensor data for accurate cloud cover calculation
-            solar_elevation = sensor_data.get("solar_elevation", 45.0)
+            # If solar_elevation is missing, check if we have solar sensor data
+            solar_elevation = sensor_data.get("solar_elevation")
+            has_solar_data = solar_radiation > 0 or solar_lux > 0 or uv_index > 0
+
+            # If we have solar data but no elevation, use a reasonable default
+            # If we have neither, fall back to atmospheric analysis
+            if solar_elevation is None:
+                if has_solar_data:
+                    solar_elevation = (
+                        45.0  # Default when we have solar data but no elevation
+                    )
+                else:
+                    # No solar data and no elevation - use atmospheric fallback
+                    _LOGGER.debug(
+                        "Solar sensors and elevation unavailable during daytime - "
+                        "using atmospheric fallback analysis"
+                    )
+                    # Use atmospheric conditions for weather determination
+                    if humidity < 50 and temp_dewpoint_spread > 10:
+                        return ATTR_CONDITION_SUNNY
+                    elif humidity < 70 and temp_dewpoint_spread > 5 and pressure_normal:
+                        return ATTR_CONDITION_SUNNY
+                    elif pressure_high and humidity < 75:
+                        return ATTR_CONDITION_SUNNY
+                    elif pressure_low and humidity < 80:
+                        return ATTR_CONDITION_PARTLYCLOUDY
+                    elif humidity >= 85:
+                        return ATTR_CONDITION_CLOUDY
+                    else:
+                        return ATTR_CONDITION_PARTLYCLOUDY
+
             cloud_cover = self.analyze_cloud_cover(
                 solar_radiation, solar_lux, uv_index, solar_elevation
             )
