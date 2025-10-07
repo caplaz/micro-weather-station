@@ -60,6 +60,13 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         # Set initial state to unavailable until we have data
         self._attr_available = bool(coordinator.data)
 
+    async def async_added_to_hass(self) -> None:
+        """Handle entity being added to Home Assistant."""
+        await super().async_added_to_hass()
+        # Request refresh if we don't have data yet
+        if not self.coordinator.data:
+            await self.coordinator.async_request_refresh()
+
     @property
     def available(self) -> bool:
         """Return if entity is available."""

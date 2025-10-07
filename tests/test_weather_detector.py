@@ -353,9 +353,9 @@ class TestWeatherDetector:
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
 
-        # With the improved algorithm and 40% sunny threshold, this should detect sunny
-        # (not partly cloudy as it would have before the threshold increase)
-        assert result["condition"] == ATTR_CONDITION_SUNNY
+        # With astronomical calculations, this low solar radiation should detect cloudy
+        # (not sunny as it would have with the old absolute threshold logic)
+        assert result["condition"] == ATTR_CONDITION_CLOUDY
 
         # Verify cloud cover is around 40% (the fallback value)
         # Note: We can't directly test cloud cover here since it's internal to analysis

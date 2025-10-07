@@ -161,21 +161,27 @@ class TestWeatherAnalysis:
 
         # Test no solar input (night/heavy overcast)
         cloud_cover_night = analysis.analyze_cloud_cover(0.0, 0.0, 0.0)
-        assert cloud_cover_night == 85.0  # Very low solar data = heavy overcast
+        assert cloud_cover_night == 100.0  # No solar input = complete overcast
 
     def test_analyze_cloud_cover_low_solar_radiation_fallback(self, analysis):
         """Test cloud cover analysis with improved low solar radiation logic."""
         # Test very low solar values (heavy overcast)
         cloud_cover_heavy = analysis.analyze_cloud_cover(20.0, 3000.0, 0.0, 15.0)
-        assert cloud_cover_heavy == 85.0  # Heavy overcast conditions
+        assert cloud_cover_heavy == pytest.approx(
+            88.6, abs=0.1
+        )  # Astronomical calculation
 
         # Test moderately low solar values (mostly cloudy)
         cloud_cover_mostly = analysis.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
-        assert cloud_cover_mostly == 70.0  # Mostly cloudy conditions
+        assert cloud_cover_mostly == pytest.approx(
+            61.6, abs=0.1
+        )  # Astronomical calculation
 
         # Test borderline low solar values (partly cloudy fallback)
         cloud_cover_fallback = analysis.analyze_cloud_cover(150.0, 15000.0, 0.8, 20.0)
-        assert cloud_cover_fallback == 40.0  # Fallback for inconclusive data
+        assert cloud_cover_fallback == pytest.approx(
+            41.7, abs=0.1
+        )  # Astronomical calculation
 
         # Test that higher values don't trigger fallback
         cloud_cover_normal = analysis.analyze_cloud_cover(250.0, 25000.0, 2.0, 30.0)
@@ -253,9 +259,11 @@ class TestWeatherAnalysis:
         assert 0 <= cloud_cover_uv <= 100
 
         # Test mostly cloudy conditions (very low solar measurements)
-        # This should trigger the 70.0 mostly cloudy classification
+        # This should use astronomical calculation for very low measurements
         cloud_cover_mostly = analysis.analyze_cloud_cover(1.0, 200.0, 0.2, 45.0)
-        assert cloud_cover_mostly == 70.0  # Mostly cloudy conditions
+        assert cloud_cover_mostly == pytest.approx(
+            99.5, abs=0.1
+        )  # Astronomical calculation
 
     def test_analyze_cloud_cover_edge_cases(self, analysis):
         """Test cloud cover analysis edge cases."""
@@ -264,7 +272,7 @@ class TestWeatherAnalysis:
 
         # Test with zero values (triggers heavy overcast)
         cloud_cover_zero = analysis.analyze_cloud_cover(0.0, 0.0, 0.0, 45.0)
-        assert cloud_cover_zero == 85.0  # Heavy overcast conditions
+        assert cloud_cover_zero == 100.0  # No solar input = complete overcast
 
         # Test with very high values (should cap at 0% cloud cover)
         cloud_cover_max = analysis.analyze_cloud_cover(2000.0, 200000.0, 20.0, 90.0)

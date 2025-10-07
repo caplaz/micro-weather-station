@@ -612,19 +612,37 @@ class WeatherAnalysis:
         # like passing clouds, while still responding to genuine weather changes
         avg_solar_radiation = self._get_solar_radiation_average(solar_radiation)
 
+        # Calculate theoretical clear-sky maximum using astronomical principles
+        max_solar_radiation = self._calculate_clear_sky_max_radiation(solar_elevation)
+
         # Handle very low solar radiation cases more intelligently
         # Very low values during daytime indicate heavy overcast conditions
-        if avg_solar_radiation < 200 and solar_lux < 20000 and uv_index < 1:
-            # If all solar measurements are extremely low, it indicates heavy clouds
-            if avg_solar_radiation < 50 and solar_lux < 5000 and uv_index == 0:
+        # Use relative thresholds based on expected clear-sky radiation, but only when astronomical calculations are unreliable
+        relative_radiation_threshold = max_solar_radiation * 0.3  # 30% of expected max
+        if (
+            avg_solar_radiation < relative_radiation_threshold
+            and solar_lux < 20000
+            and uv_index < 1
+            and solar_elevation < 15  # Only apply fallback when sun is very low
+        ):  # Only apply fallback when astronomical calculations are less reliable
+            # If all solar measurements are extremely low relative to expectations,
+            # it indicates heavy clouds
+            if (
+                (
+                    avg_solar_radiation < max_solar_radiation * 0.1
+                    or avg_solar_radiation < 50
+                )
+                and (solar_lux < 5000 or solar_lux < max_solar_radiation * 6)
+                and uv_index == 0
+            ):
                 return 85.0  # Heavy overcast conditions
-            elif avg_solar_radiation < 100 and solar_lux < 10000:
+            elif (
+                avg_solar_radiation < max_solar_radiation * 0.2
+                or avg_solar_radiation < 100
+            ) and solar_lux < 10000:
                 return 70.0  # Mostly cloudy conditions
             else:
                 return 40.0  # Partly cloudy when data is inconclusive
-
-        # Calculate theoretical clear-sky maximum using astronomical principles
-        max_solar_radiation = self._calculate_clear_sky_max_radiation(solar_elevation)
 
         # Calculate lux maximum (roughly 100-150 lux per W/m² depending on spectrum)
         # Use 120 lx/W/m² as a reasonable average
@@ -645,30 +663,37 @@ class WeatherAnalysis:
         uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
 
         # Weight the measurements (solar radiation is most reliable for cloud cover)
-        if avg_solar_radiation > 10:  # Only use if we have meaningful solar data
-            # Only include UV in weighting if we have a meaningful UV reading
-            if uv_index > 0:
+        # Use astronomical calculations whenever we have meaningful solar measurements
+        if avg_solar_radiation > 0 or solar_lux > 0 or uv_index > 0:
+            if (
+                avg_solar_radiation > 10
+            ):  # Primary: use all measurements when radiation is good
+                # Only include UV in weighting if we have a meaningful UV reading
+                if uv_index > 0:
+                    cloud_cover = (
+                        solar_cloud_cover * 0.8
+                        + lux_cloud_cover * 0.15
+                        + uv_cloud_cover * 0.05
+                    )
+                else:
+                    # No UV data - redistribute weights to solar and lux
+                    cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15
+            elif solar_lux > 100:  # Secondary: use lux and UV when radiation is low
                 cloud_cover = (
-                    solar_cloud_cover * 0.8
-                    + lux_cloud_cover * 0.15
-                    + uv_cloud_cover * 0.05
+                    lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
+                    if uv_index > 0
+                    else lux_cloud_cover
                 )
+            elif uv_index > 0:  # Tertiary: use UV as last resort
+                cloud_cover = uv_cloud_cover
             else:
-                # No UV data - redistribute weights to solar and lux
-                cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15
-        elif solar_lux > 1000:  # Fallback to lux if radiation is low
-            cloud_cover = (
-                lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
-                if uv_index > 0
-                else lux_cloud_cover
-            )
-        elif uv_index > 0.5:  # Last resort
-            cloud_cover = uv_cloud_cover
+                # Very low measurements but some solar data - use solar radiation primarily
+                cloud_cover = solar_cloud_cover
         elif avg_solar_radiation == 0 and solar_lux == 0 and uv_index == 0:
             # No solar input at all - assume complete overcast (night or very cloudy)
             cloud_cover = 100
         else:
-            cloud_cover = 50  # Unknown - assume partly cloudy
+            cloud_cover = 50.0  # Unknown - assume partly cloudy
 
         return cloud_cover
 
