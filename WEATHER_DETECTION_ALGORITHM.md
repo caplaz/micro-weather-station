@@ -58,8 +58,10 @@ ELSE:
 #### Priority 2: Severe Weather Conditions (No Precipitation)
 
 ```
-IF pressure < 29.20 inHg AND (wind_speed ≥19mph OR wind_gust >15mph with gust_factor >2.0):
+IF pressure < 29.50 inHg AND wind_speed ≥19mph AND gust_factor >2.0 AND wind_gust >15mph:
     → "lightning" (severe weather system approaching)
+ELIF gust_factor >3.0 AND wind_gust >20mph OR wind_gust >40mph:
+    → "lightning" (severe turbulence indicating thunderstorm activity)
 IF wind_speed ≥ 32mph:
     → "windy" (gale force winds)
 ```

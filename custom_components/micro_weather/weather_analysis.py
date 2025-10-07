@@ -175,8 +175,9 @@ class WeatherAnalysis:
 
         # PRIORITY 2: SEVERE WEATHER CONDITIONS
         # (No precipitation but extreme conditions suggesting thunderstorm activity)
+        # More conservative: require very low pressure AND strong winds, OR severe turbulence
         if (
-            pressure_extremely_low and (wind_strong or is_very_gusty)
+            pressure_very_low and wind_strong and is_very_gusty
         ) or is_severe_turbulence:  # Enhanced: severe turbulence indicates thunderstorm
             return ATTR_CONDITION_LIGHTNING  # Dry thunderstorm or severe weather system
 
