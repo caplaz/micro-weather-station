@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.2.0 (2025-10-07)
+
+### Major Features
+
+- **Astronomical Cloud Cover Analysis**: Complete overhaul of cloud cover calculation algorithm using astronomical principles
+
+  - Replaced fixed thresholds with relative percentages of theoretical clear-sky radiation
+  - Implemented solar elevation-based calculations for maximum expected solar radiation
+  - Added intelligent fallback logic that only applies when astronomical calculations are unreliable (<15° solar elevation)
+  - Improved measurement weighting: solar radiation (primary) > lux > UV index
+  - Enhanced edge case handling with complete overcast detection (100%) when no solar input
+
+### Technical Improvements
+
+- **Enhanced Test Coverage**: Updated test suite to validate astronomical calculation accuracy
+- **Code Quality**: All pre-commit hooks pass with black formatting and comprehensive linting
+- **Algorithm Accuracy**: More precise weather condition detection across all solar elevation angles
+
+### Changes
+
+- Significant improvement in cloud cover detection accuracy using scientific astronomical calculations
+- Better reliability for weather entity initialization and data availability
+- Enhanced meteorological precision for both clear sky and cloudy conditions
+
 ## 2.1.1 (2025-10-06)
 
 ### Bug Fixes

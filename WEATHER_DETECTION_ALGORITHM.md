@@ -489,6 +489,146 @@ Solar radiation expectations are adjusted based on:
 
 This provides more accurate cloud cover percentages throughout the day and year, accounting for the sun's position and seasonal variations.
 
+## Astronomical Cloud Cover Analysis (Version 2.2.0)
+
+Version 2.2.0 introduces revolutionary astronomical cloud cover detection using scientific principles for unprecedented accuracy, especially during early morning, late afternoon, and low-sun-angle conditions where traditional fixed-threshold methods fail.
+
+### Breakthrough Technology Overview
+
+The astronomical cloud cover analysis replaces fixed thresholds with dynamic calculations based on:
+
+- **Theoretical clear-sky radiation** using solar elevation and astronomical principles
+- **Relative percentage thresholds** instead of absolute values (30%, 20%, etc.)
+- **Intelligent fallback logic** that only applies when astronomical calculations are unreliable (<15° solar elevation)
+- **Scientific precision** employing meteorological principles for superior weather condition detection
+
+### Solar Elevation Integration
+
+**Dynamic Expected Radiation Calculation:**
+
+```
+expected_solar_radiation = theoretical_clear_sky_max × sin(solar_elevation)
+```
+
+- **Higher solar elevation** = More expected radiation (better cloud cover accuracy)
+- **Lower solar elevation** = Less expected radiation (accounts for sun angle effects)
+- **Real-time adjustment** = Cloud cover percentages adapt throughout the day
+
+### Relative Threshold System
+
+**Traditional Fixed Thresholds (Before 2.2.0):**
+
+- Heavy overcast: solar_radiation < 200 W/m²
+- Mostly cloudy: solar_radiation < 100 W/m²
+- Partly cloudy: solar_radiation < 50 W/m²
+
+**Astronomical Relative Thresholds (Version 2.2.0):**
+
+- Heavy overcast: solar_radiation < 30% of expected clear-sky radiation
+- Mostly cloudy: solar_radiation < 20% of expected clear-sky radiation
+- Partly cloudy: solar_radiation < 10% of expected clear-sky radiation
+
+### Theoretical Clear-Sky Radiation Calculations
+
+The system calculates theoretical maximum solar radiation using advanced astronomical formulas:
+
+**Earth-Sun Distance Variation:**
+
+```
+solar_constant_variation = 1 + 0.033 × cos(2π × (day_of_year - 4) / 365.25)
+```
+
+- **January 4**: +3.3% (closest to sun)
+- **July 4**: -3.3% (farthest from sun)
+
+**Air Mass Correction (Kasten-Young Formula):**
+
+```
+AM = 1 / (cos(Z) + 0.50572 × (96.07995 - Z)^(-1.6364))
+```
+
+Where Z is the zenith angle (90° - solar_elevation), providing superior accuracy at low solar elevations.
+
+**Atmospheric Extinction:**
+
+```
+atmospheric_transmission = rayleigh_extinction × ozone_extinction ×
+                          water_vapor_extinction × aerosol_extinction
+```
+
+**Final Theoretical Irradiance:**
+
+```
+theoretical_irradiance = base_solar_constant × solar_constant_variation ×
+                        atmospheric_transmission × sin(solar_elevation)
+```
+
+### Intelligent Fallback Logic
+
+**When Astronomical Calculations Are Reliable:**
+
+- Use full astronomical calculations for all solar elevations ≥15°
+- Apply relative percentage thresholds based on theoretical clear-sky radiation
+- Provide scientifically accurate cloud cover percentages
+
+**When Astronomical Calculations Are Unreliable:**
+
+- Solar elevation <15° (very low sun angles)
+- Apply intelligent fallback logic only when needed
+- Use absolute thresholds with solar elevation context
+- Maintain accuracy during dawn, dusk, and low-sun conditions
+
+### Seasonal and Geographic Accuracy
+
+**Seasonal Radiation Variations:**
+
+- **Winter**: Same measured radiation gives higher cloud cover % (more conservative detection)
+- **Summer**: Same measured radiation gives lower cloud cover % (less conservative detection)
+- **Result**: Consistent accuracy year-round
+
+**Geographic Considerations:**
+
+- **Latitude effects**: Higher latitudes have more extreme seasonal variations
+- **Hemisphere differences**: Seasons are appropriately flipped in southern hemisphere
+- **Local calibration**: Adapts to your specific location's solar patterns
+
+### Enhanced Weather Condition Detection
+
+**Improved Accuracy Examples:**
+
+- **Early morning (low sun)**: Traditional methods often show "cloudy" even on clear days
+- **Late afternoon**: Astronomical calculations correctly identify clear vs. cloudy conditions
+- **Seasonal variations**: Winter cloud detection is more accurate with astronomical scaling
+- **Edge cases**: Better handling of transitional lighting conditions
+
+**Scientific Validation:**
+
+- Uses established astronomical formulas (Kasten-Young air mass)
+- Accounts for Earth's elliptical orbit and seasonal solar constant variations
+- Incorporates atmospheric extinction from Rayleigh scattering, ozone, and water vapor
+- Provides meteorologically accurate cloud cover percentages
+
+### Technical Implementation
+
+**Algorithm Flow:**
+
+1. Calculate theoretical clear-sky radiation using solar elevation
+2. Apply astronomical scaling factors for season and location
+3. Use relative percentage thresholds instead of fixed values
+4. Fall back to intelligent absolute thresholds only when astronomical calculations are unreliable
+5. Weight measurements: solar radiation (primary) > lux > UV index
+6. Apply hysteresis to prevent condition oscillation
+
+**Benefits:**
+
+- **Unprecedented accuracy** in cloud cover detection
+- **Scientific precision** using astronomical principles
+- **Year-round consistency** across all seasons
+- **Location awareness** adapting to your geographic position
+- **Real-time adaptation** throughout the day as sun position changes
+
+This breakthrough technology represents a significant advancement in home weather station accuracy, providing professional-grade cloud cover analysis using your existing sensor infrastructure.
+
 ## Sensor Data Requirements
 
 ### Required Sensors
