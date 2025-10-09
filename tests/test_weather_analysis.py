@@ -1051,7 +1051,7 @@ class TestWeatherAnalysis:
         original_analyze_cloud_cover = analysis.analyze_cloud_cover
 
         # First call - establish baseline with sunny condition
-        analysis.analyze_cloud_cover = lambda *args, **kwargs: 25.0  # Sunny
+        analysis.analyze_cloud_cover = lambda *args, **kwargs: 20.0  # Sunny (≤25%)
         condition1 = analysis.determine_weather_condition(
             {
                 "solar_radiation": 800.0,
@@ -1064,10 +1064,10 @@ class TestWeatherAnalysis:
         assert condition1 == "sunny"
 
         # Second call - small change to partly cloudy cloud cover
-        # This should be rejected by hysteresis
+        # This should be rejected by hysteresis (change from 20% to 28% = 8% change, below 10% threshold)
         analysis.analyze_cloud_cover = (
-            lambda *args, **kwargs: 38.0
-        )  # Still sunny range, but closer to boundary
+            lambda *args, **kwargs: 28.0
+        )  # Partly cloudy range (25-50%)
         condition2 = analysis.determine_weather_condition(
             {
                 "solar_radiation": 750.0,  # Slightly less radiation
@@ -1077,10 +1077,14 @@ class TestWeatherAnalysis:
             },
             0.0,
         )
-        assert condition2 == "sunny"  # Should maintain sunny due to hysteresis
+        assert (
+            condition2 == "sunny"
+        )  # Should maintain sunny due to hysteresis (8% change < 10% threshold)
 
         # Third call - significant change that should trigger condition change
-        analysis.analyze_cloud_cover = lambda *args, **kwargs: 55.0  # Partly cloudy
+        analysis.analyze_cloud_cover = (
+            lambda *args, **kwargs: 45.0
+        )  # Still partly cloudy
         condition3 = analysis.determine_weather_condition(
             {
                 "solar_radiation": 600.0,  # Much less radiation
@@ -1092,7 +1096,7 @@ class TestWeatherAnalysis:
         )
         assert (
             condition3 == "partlycloudy"
-        )  # Should allow change due to significant cloud cover increase
+        )  # Should allow change due to significant cloud cover increase (45-28=17% > 10%)
 
         # Restore original method
         analysis.analyze_cloud_cover = original_analyze_cloud_cover
@@ -1113,13 +1117,13 @@ class TestWeatherAnalysis:
 
         assert result == "sunny"  # Should be rejected
         assert "Condition stable: keeping sunny" in caplog.text
-        assert "change: 5.0 < threshold: 15.0" in caplog.text
+        assert "change: 5.0 < threshold: 10.0" in caplog.text
 
         # Clear log and test acceptance (large change from most recent baseline)
         caplog.clear()
         with caplog.at_level(logging.DEBUG):
-            result = analysis._apply_condition_hysteresis("partlycloudy", 50.0)
+            result = analysis._apply_condition_hysteresis("partlycloudy", 45.0)
 
         assert result == "partlycloudy"  # Should be accepted
         assert "Condition change: sunny -> partlycloudy" in caplog.text
-        assert "change: 15.0 >= threshold: 15.0" in caplog.text
+        assert "change: 10.0 >= threshold: 10.0" in caplog.text

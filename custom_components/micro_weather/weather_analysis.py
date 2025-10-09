@@ -701,17 +701,23 @@ class WeatherAnalysis:
         """
         Map cloud cover percentage to weather condition.
 
+        Uses meteorological standards:
+        - 0-25%: Clear/few clouds = sunny
+        - 25-50%: Partly cloudy/scattered clouds = partlycloudy
+        - 50-75%: Mostly cloudy/broken clouds = cloudy
+        - 75%+: Overcast = cloudy (no overcast condition available)
+
         Args:
             cloud_cover: Cloud cover percentage (0-100)
 
         Returns:
             str: Weather condition constant
         """
-        if cloud_cover <= 40:
+        if cloud_cover <= 25:
             return ATTR_CONDITION_SUNNY
-        elif cloud_cover <= 60:
+        elif cloud_cover <= 50:
             return ATTR_CONDITION_PARTLYCLOUDY
-        elif cloud_cover <= 85:
+        elif cloud_cover <= 75:
             return ATTR_CONDITION_CLOUDY
         else:
             return ATTR_CONDITION_CLOUDY
@@ -789,9 +795,9 @@ class WeatherAnalysis:
         # Define hysteresis thresholds based on condition transitions
         hysteresis_thresholds = {
             # From sunny to partly cloudy: require significant cloud increase
-            (ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY): 15.0,
+            (ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY): 10.0,
             # From partly cloudy to sunny: require significant clearing
-            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_SUNNY): 15.0,
+            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_SUNNY): 10.0,
             # From partly cloudy to cloudy: moderate threshold
             (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY): 10.0,
             # From cloudy to partly cloudy: moderate threshold
