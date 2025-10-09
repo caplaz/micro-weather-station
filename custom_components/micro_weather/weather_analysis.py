@@ -36,6 +36,8 @@ class WeatherAnalysis:
             sensor_history: Dictionary of sensor historical data deques
         """
         self._sensor_history = sensor_history or {}
+        # Track recent weather conditions for hysteresis (time-based, not count-based)
+        self._condition_history = deque()  # No maxlen - we'll manage by time
 
     def determine_weather_condition(
         self, sensor_data: Dict[str, Any], altitude: float | None = 0.0
@@ -242,16 +244,14 @@ class WeatherAnalysis:
                 solar_radiation, solar_lux, uv_index, solar_elevation
             )
 
-            # Daytime clear sky conditions: low cloud cover = sunny
-            if cloud_cover <= 40:
-                return ATTR_CONDITION_SUNNY
-            elif cloud_cover <= 60:
-                return ATTR_CONDITION_PARTLYCLOUDY
-            elif cloud_cover <= 85:
-                return ATTR_CONDITION_CLOUDY
-            else:
-                # Very overcast (cloud_cover > 85%)
-                return ATTR_CONDITION_CLOUDY
+            # Apply hysteresis to prevent rapid condition changes
+            # Only change condition if cloud cover has changed significantly
+            proposed_condition = self._map_cloud_cover_to_condition(cloud_cover)
+            final_condition = self._apply_condition_hysteresis(
+                proposed_condition, cloud_cover
+            )
+
+            return final_condition
 
         # PRIORITY 5: TWILIGHT CONDITIONS
         elif is_twilight:
@@ -697,6 +697,154 @@ class WeatherAnalysis:
 
         return cloud_cover
 
+    def _map_cloud_cover_to_condition(self, cloud_cover: float) -> str:
+        """
+        Map cloud cover percentage to weather condition.
+
+        Args:
+            cloud_cover: Cloud cover percentage (0-100)
+
+        Returns:
+            str: Weather condition constant
+        """
+        if cloud_cover <= 40:
+            return ATTR_CONDITION_SUNNY
+        elif cloud_cover <= 60:
+            return ATTR_CONDITION_PARTLYCLOUDY
+        elif cloud_cover <= 85:
+            return ATTR_CONDITION_CLOUDY
+        else:
+            return ATTR_CONDITION_CLOUDY
+
+    def _apply_condition_hysteresis(
+        self, proposed_condition: str, current_cloud_cover: float
+    ) -> str:
+        """
+        Apply hysteresis to prevent rapid condition changes.
+
+        Weather conditions should be stable and only change when there's
+        a significant and sustained change in cloud cover. This prevents
+        the annoying oscillation between "sunny" and "partly cloudy"
+        that can occur with small solar radiation fluctuations.
+
+        Uses time-based history (last 1 hour) rather than fixed count to ensure
+        hysteresis always compares against recent conditions, regardless of
+        update frequency.
+
+        Args:
+            proposed_condition: The condition suggested by current cloud cover
+            current_cloud_cover: Current cloud cover percentage
+
+        Returns:
+            str: Final condition after applying hysteresis
+        """
+        # Clean up old entries (keep last 24 hours to prevent unbounded growth)
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        self._condition_history = deque(
+            [
+                entry
+                for entry in self._condition_history
+                if entry["timestamp"] > cutoff_time
+            ]
+        )
+
+        # Get recent history (last 1 hour for hysteresis comparison)
+        hysteresis_cutoff = datetime.now() - timedelta(hours=1)
+        recent_history = [
+            entry
+            for entry in self._condition_history
+            if entry["timestamp"] > hysteresis_cutoff
+        ]
+
+        # If we have no recent history, use the proposed condition
+        if not recent_history:
+            self._condition_history.append(
+                {
+                    "condition": proposed_condition,
+                    "cloud_cover": current_cloud_cover,
+                    "timestamp": datetime.now(),
+                }
+            )
+            return proposed_condition
+
+        # Get the most recent condition from the time window
+        last_entry = recent_history[-1]
+        last_condition = last_entry["condition"]
+        last_cloud_cover = last_entry["cloud_cover"]
+
+        # If the proposed condition is the same as the last one, keep it
+        if proposed_condition == last_condition:
+            self._condition_history.append(
+                {
+                    "condition": proposed_condition,
+                    "cloud_cover": current_cloud_cover,
+                    "timestamp": datetime.now(),
+                }
+            )
+            return proposed_condition
+
+        # Calculate the cloud cover difference
+        cloud_cover_change = abs(current_cloud_cover - last_cloud_cover)
+
+        # Define hysteresis thresholds based on condition transitions
+        hysteresis_thresholds = {
+            # From sunny to partly cloudy: require significant cloud increase
+            (ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY): 15.0,
+            # From partly cloudy to sunny: require significant clearing
+            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_SUNNY): 15.0,
+            # From partly cloudy to cloudy: moderate threshold
+            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY): 10.0,
+            # From cloudy to partly cloudy: moderate threshold
+            (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_PARTLYCLOUDY): 10.0,
+            # Other transitions: low threshold (allow easier changes)
+        }
+
+        transition_key = (last_condition, proposed_condition)
+        hysteresis_threshold = hysteresis_thresholds.get(transition_key, 5.0)
+
+        # Check if the change is significant enough
+        if cloud_cover_change >= hysteresis_threshold:
+            # Significant change - allow the transition
+            _LOGGER.debug(
+                "Condition change: %s -> %s (cloud cover: %.1f -> %.1f, "
+                "change: %.1f >= threshold: %.1f)",
+                last_condition,
+                proposed_condition,
+                last_cloud_cover,
+                current_cloud_cover,
+                cloud_cover_change,
+                hysteresis_threshold,
+            )
+            self._condition_history.append(
+                {
+                    "condition": proposed_condition,
+                    "cloud_cover": current_cloud_cover,
+                    "timestamp": datetime.now(),
+                }
+            )
+            return proposed_condition
+        else:
+            # Not significant enough - maintain previous condition
+            _LOGGER.debug(
+                "Condition stable: keeping %s (proposed: %s, cloud cover: %.1f -> %.1f, "
+                "change: %.1f < threshold: %.1f)",
+                last_condition,
+                proposed_condition,
+                last_cloud_cover,
+                current_cloud_cover,
+                cloud_cover_change,
+                hysteresis_threshold,
+            )
+            # Still record the current data but keep the old condition
+            self._condition_history.append(
+                {
+                    "condition": last_condition,  # Keep the stable condition
+                    "cloud_cover": current_cloud_cover,
+                    "timestamp": datetime.now(),
+                }
+            )
+            return last_condition
+
     def _get_solar_radiation_average(self, current_radiation: float) -> float:
         """
         Calculate moving average of solar radiation to filter temporary fluctuations.
@@ -1005,11 +1153,14 @@ class WeatherAnalysis:
         # Default visibility
         return 15.0
 
-    def store_historical_data(self, sensor_data: Dict[str, Any]) -> None:
+    def store_historical_data(
+        self, sensor_data: Dict[str, Any], weather_condition: str | None = None
+    ) -> None:
         """Store current sensor readings in historical buffer.
 
         Args:
             sensor_data: Current sensor readings to store
+            weather_condition: Current weather condition (optional)
         """
         timestamp = datetime.now()
 
@@ -1018,6 +1169,14 @@ class WeatherAnalysis:
                 self._sensor_history[sensor_key].append(
                     {"timestamp": timestamp, "value": value}
                 )
+
+        # Store weather condition if provided
+        if weather_condition:
+            if "weather_condition" not in self._sensor_history:
+                self._sensor_history["weather_condition"] = deque(maxlen=50)
+            self._sensor_history["weather_condition"].append(
+                {"timestamp": timestamp, "value": weather_condition}
+            )
 
     def get_historical_trends(self, sensor_key: str, hours: int = 24) -> Dict[str, Any]:
         """Calculate historical trends for a sensor over the specified time period.

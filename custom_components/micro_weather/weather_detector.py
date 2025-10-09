@@ -1,6 +1,6 @@
 """Weather condition detector using real sensor data.
 
-This module implements advanced meteorological analysis algorithms to determine
+This module implements advanced meteorological analysis to determine
 accurate weather conditions based on real sensor readings. It analyzes:
 
 - Precipitation patterns (rain rate, state detection)
@@ -26,16 +26,6 @@ import json
 import logging
 from typing import Any, Dict, Mapping, Optional
 
-from homeassistant.components.weather import (
-    ATTR_CONDITION_CLEAR_NIGHT,
-    ATTR_CONDITION_FOG,
-    ATTR_CONDITION_LIGHTNING,
-    ATTR_CONDITION_LIGHTNING_RAINY,
-    ATTR_CONDITION_POURING,
-    ATTR_CONDITION_SNOWY,
-    ATTR_CONDITION_SUNNY,
-    ATTR_CONDITION_WINDY,
-)
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
@@ -98,9 +88,6 @@ class WeatherDetector:
         self.options = options
         self._last_condition = "partly_cloudy"
         self._condition_start_time = datetime.now()
-        self._previous_condition: str = (
-            "partly_cloudy"  # Track previous condition for hysteresis
-        )
 
         # Historical data storage (last 48 hours, 15-minute intervals = ~192 readings)
         self._history_maxlen = 192  # 48 hours * 4 readings per hour
@@ -167,76 +154,19 @@ class WeatherDetector:
             self._prepare_analysis_sensor_data(sensor_data)
         )
 
-        # Determine weather condition
-        condition = self._determine_weather_condition(sensor_data)
-
         # Get altitude for forecast generation (converted to meters)
         altitude = convert_altitude_to_meters(
             self.options.get(CONF_ALTITUDE, 0.0),
             self.hass.config.units is US_CUSTOMARY_SYSTEM,
         )
 
-        # Add hysteresis to prevent rapid oscillation between states
-        # Only change condition if it's been stable for at least 2 updates
-        # or is significantly different
-        if len(self._condition_history) >= 2 and self._previous_condition != condition:
-            # Count how many times we've seen this condition recently
-            recent_conditions = [
-                entry["condition"] for entry in list(self._condition_history)[-3:]
-            ]
-            condition_count = recent_conditions.count(condition)
+        # Determine weather condition
+        condition = self._determine_weather_condition(sensor_data)
 
-            # Only change if this condition has been seen at least once recently
-            # or if it's a major state change (e.g., clear to stormy)
-            major_changes = [
-                # Thunderstorm transitions (LIGHTNING_RAINY)
-                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_LIGHTNING_RAINY),
-                (ATTR_CONDITION_LIGHTNING_RAINY, ATTR_CONDITION_SUNNY),
-                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_LIGHTNING_RAINY),
-                (ATTR_CONDITION_LIGHTNING_RAINY, ATTR_CONDITION_CLEAR_NIGHT),
-                (ATTR_CONDITION_FOG, ATTR_CONDITION_LIGHTNING_RAINY),
-                (ATTR_CONDITION_LIGHTNING_RAINY, ATTR_CONDITION_FOG),
-                # Heavy rain transitions (POURING)
-                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_POURING),
-                (ATTR_CONDITION_POURING, ATTR_CONDITION_SUNNY),
-                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_POURING),
-                (ATTR_CONDITION_POURING, ATTR_CONDITION_CLEAR_NIGHT),
-                (ATTR_CONDITION_FOG, ATTR_CONDITION_POURING),
-                (ATTR_CONDITION_POURING, ATTR_CONDITION_FOG),
-                # Snow transitions (SNOWY)
-                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_SNOWY),
-                (ATTR_CONDITION_SNOWY, ATTR_CONDITION_SUNNY),
-                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_SNOWY),
-                (ATTR_CONDITION_SNOWY, ATTR_CONDITION_CLEAR_NIGHT),
-                (ATTR_CONDITION_FOG, ATTR_CONDITION_SNOWY),
-                (ATTR_CONDITION_SNOWY, ATTR_CONDITION_FOG),
-                # Lightning transitions (LIGHTNING)
-                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_LIGHTNING),
-                (ATTR_CONDITION_LIGHTNING, ATTR_CONDITION_SUNNY),
-                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_LIGHTNING),
-                (ATTR_CONDITION_LIGHTNING, ATTR_CONDITION_CLEAR_NIGHT),
-                (ATTR_CONDITION_FOG, ATTR_CONDITION_LIGHTNING),
-                (ATTR_CONDITION_LIGHTNING, ATTR_CONDITION_FOG),
-                # Windy transitions (WINDY)
-                (ATTR_CONDITION_SUNNY, ATTR_CONDITION_WINDY),
-                (ATTR_CONDITION_WINDY, ATTR_CONDITION_SUNNY),
-                (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_WINDY),
-                (ATTR_CONDITION_WINDY, ATTR_CONDITION_CLEAR_NIGHT),
-                (ATTR_CONDITION_FOG, ATTR_CONDITION_WINDY),
-                (ATTR_CONDITION_WINDY, ATTR_CONDITION_FOG),
-            ]
-
-            is_major_change = (self._previous_condition, condition) in major_changes
-
-            if condition_count == 0 and not is_major_change:
-                _LOGGER.debug(
-                    "Preventing condition oscillation: keeping %s instead of %s",
-                    self._previous_condition,
-                    condition,
-                )
-                condition = self._previous_condition
-
-        self._previous_condition = condition
+        # Store the final condition in historical data
+        self.analysis.store_historical_data(
+            {}, condition  # Empty sensor data, just the condition
+        )
 
         # Log sensor data and determined weather condition
         try:
@@ -251,11 +181,6 @@ class WeatherDetector:
             "Weather update - sensor data: %s, condition: %s",
             sensor_data_json,
             condition,
-        )
-
-        # Store condition history
-        self._condition_history.append(
-            {"timestamp": datetime.now(), "condition": condition}
         )
 
         # Prepare forecast data

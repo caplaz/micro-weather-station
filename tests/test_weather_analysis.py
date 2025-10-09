@@ -849,3 +849,277 @@ class TestWeatherAnalysis:
         # Equinoxes should be between perihelion and aphelion
         assert rad_aphelion < rad_spring < rad_perihelion
         assert rad_aphelion < rad_fall < rad_perihelion
+
+    def test_apply_condition_hysteresis_no_history(self, analysis):
+        """Test hysteresis with no previous condition history."""
+        # First call should always return the proposed condition
+        result = analysis._apply_condition_hysteresis("sunny", 25.0)
+        assert result == "sunny"
+
+        # Check that history was initialized
+        assert len(analysis._condition_history) == 1
+        assert analysis._condition_history[0]["condition"] == "sunny"
+        assert analysis._condition_history[0]["cloud_cover"] == 25.0
+
+    def test_apply_condition_hysteresis_same_condition(self, analysis):
+        """Test hysteresis when proposed condition is same as previous."""
+        # Set up initial history
+        analysis._condition_history.append(
+            {"condition": "sunny", "cloud_cover": 25.0, "timestamp": datetime.now()}
+        )
+
+        # Same condition should be returned immediately
+        result = analysis._apply_condition_hysteresis("sunny", 30.0)
+        assert result == "sunny"
+
+        # History should be updated
+        assert len(analysis._condition_history) == 2
+        assert analysis._condition_history[-1]["condition"] == "sunny"
+        assert analysis._condition_history[-1]["cloud_cover"] == 30.0
+
+    def test_apply_condition_hysteresis_sunny_to_partlycloudy_below_threshold(
+        self, analysis
+    ):
+        """Test hysteresis prevents sunny to partlycloudy when change is too small."""
+        # Set up initial history with sunny condition
+        analysis._condition_history.append(
+            {"condition": "sunny", "cloud_cover": 35.0, "timestamp": datetime.now()}
+        )
+
+        # Try to change to partlycloudy with small cloud cover increase (only 5%)
+        # Threshold is 15%, so this should be rejected
+        result = analysis._apply_condition_hysteresis("partlycloudy", 40.0)
+        assert result == "sunny"  # Should maintain previous condition
+
+        # History should record the rejected change attempt
+        assert len(analysis._condition_history) == 2
+        assert (
+            analysis._condition_history[-1]["condition"] == "sunny"
+        )  # Kept old condition
+        assert (
+            analysis._condition_history[-1]["cloud_cover"] == 40.0
+        )  # Recorded new cloud cover
+
+    def test_apply_condition_hysteresis_sunny_to_partlycloudy_above_threshold(
+        self, analysis
+    ):
+        """Test hysteresis allows sunny to partlycloudy when change exceeds threshold."""
+        # Set up initial history with sunny condition
+        analysis._condition_history.append(
+            {"condition": "sunny", "cloud_cover": 30.0, "timestamp": datetime.now()}
+        )
+
+        # Try to change to partlycloudy with significant cloud cover increase (20%)
+        # Threshold is 15%, so this should be allowed
+        result = analysis._apply_condition_hysteresis("partlycloudy", 50.0)
+        assert result == "partlycloudy"  # Should allow the change
+
+        # History should record the successful change
+        assert len(analysis._condition_history) == 2
+        assert analysis._condition_history[-1]["condition"] == "partlycloudy"
+        assert analysis._condition_history[-1]["cloud_cover"] == 50.0
+
+    def test_apply_condition_hysteresis_partlycloudy_to_sunny_below_threshold(
+        self, analysis
+    ):
+        """Test hysteresis prevents partlycloudy to sunny when change is too small."""
+        # Set up initial history with partlycloudy condition
+        analysis._condition_history.append(
+            {
+                "condition": "partlycloudy",
+                "cloud_cover": 45.0,
+                "timestamp": datetime.now(),
+            }
+        )
+
+        # Try to change to sunny with small cloud cover decrease (only 8%)
+        # Threshold is 15%, so this should be rejected
+        result = analysis._apply_condition_hysteresis("sunny", 37.0)
+        assert result == "partlycloudy"  # Should maintain previous condition
+
+    def test_apply_condition_hysteresis_partlycloudy_to_sunny_above_threshold(
+        self, analysis
+    ):
+        """Test hysteresis allows partlycloudy to sunny when change exceeds threshold."""
+        # Set up initial history with partlycloudy condition
+        analysis._condition_history.append(
+            {
+                "condition": "partlycloudy",
+                "cloud_cover": 50.0,
+                "timestamp": datetime.now(),
+            }
+        )
+
+        # Try to change to sunny with significant cloud cover decrease (25%)
+        # Threshold is 15%, so this should be allowed
+        result = analysis._apply_condition_hysteresis("sunny", 25.0)
+        assert result == "sunny"  # Should allow the change
+
+    def test_apply_condition_hysteresis_partlycloudy_to_cloudy_above_threshold(
+        self, analysis
+    ):
+        """Test hysteresis for partlycloudy to cloudy transition."""
+        # Set up initial history with partlycloudy condition
+        analysis._condition_history.append(
+            {
+                "condition": "partlycloudy",
+                "cloud_cover": 50.0,
+                "timestamp": datetime.now(),
+            }
+        )
+
+        # Try to change to cloudy with moderate cloud cover increase (15%)
+        # Threshold for partlycloudy->cloudy is 10%, so this should be allowed
+        result = analysis._apply_condition_hysteresis("cloudy", 65.0)
+        assert result == "cloudy"  # Should allow the change
+
+    def test_apply_condition_hysteresis_cloudy_to_partlycloudy_below_threshold(
+        self, analysis
+    ):
+        """Test hysteresis prevents cloudy to partlycloudy when change is too small."""
+        # Set up initial history with cloudy condition
+        analysis._condition_history.append(
+            {"condition": "cloudy", "cloud_cover": 70.0, "timestamp": datetime.now()}
+        )
+
+        # Try to change to partlycloudy with small cloud cover decrease (only 5%)
+        # Threshold is 10%, so this should be rejected
+        result = analysis._apply_condition_hysteresis("partlycloudy", 65.0)
+        assert result == "cloudy"  # Should maintain previous condition
+
+    def test_apply_condition_hysteresis_unknown_transition(self, analysis):
+        """Test hysteresis with unknown transition (uses default threshold)."""
+        # Set up initial history
+        analysis._condition_history.append(
+            {"condition": "sunny", "cloud_cover": 20.0, "timestamp": datetime.now()}
+        )
+
+        # Try a transition that doesn't have a specific threshold (should use 5% default)
+        # First try with change below default threshold
+        result = analysis._apply_condition_hysteresis("cloudy", 23.0)  # Only 3% change
+        assert result == "sunny"  # Should be rejected due to low threshold
+
+        # Now try with change above default threshold from the original baseline
+        # Since hysteresis uses the most recent history entry, we need a bigger change
+        result = analysis._apply_condition_hysteresis(
+            "cloudy", 28.0
+        )  # 8% change from last (23.0)
+        assert result == "cloudy"  # Should be allowed
+
+    def test_apply_condition_hysteresis_history_limit(self, analysis):
+        """Test that condition history is properly managed with time-based cleanup."""
+        from datetime import timedelta
+
+        # Add entries spanning more than 24 hours
+        base_time = datetime.now()
+        for i in range(15):
+            # Spread entries over 30 hours (some will be old, some recent)
+            timestamp = base_time - timedelta(
+                hours=30 - i * 2
+            )  # 0, 2, 4, ..., 28 hours ago
+            analysis._condition_history.append(
+                {"condition": "sunny", "cloud_cover": 25.0 + i, "timestamp": timestamp}
+            )
+
+        # Before cleanup, should have all 15 entries
+        assert len(analysis._condition_history) == 15
+
+        # Trigger cleanup by calling hysteresis (which does cleanup)
+        analysis._apply_condition_hysteresis("sunny", 25.0)
+
+        # After cleanup, should only have entries from last 24 hours
+        # (entries from 0-22 hours ago = 12 entries)
+        assert len(analysis._condition_history) <= 12  # Should be cleaned up
+
+        # All remaining entries should be within 24 hours
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        for entry in analysis._condition_history:
+            assert entry["timestamp"] > cutoff_time
+
+        # The most recent entries should be preserved
+        # (entries from most recent timestamps should be there)
+        recent_entries = [
+            entry
+            for entry in analysis._condition_history
+            if entry["timestamp"] > base_time - timedelta(hours=24)
+        ]
+        assert len(recent_entries) > 0
+
+    def test_determine_weather_condition_with_hysteresis(self, analysis):
+        """Test that determine_weather_condition applies hysteresis correctly."""
+        # Mock the cloud cover analysis to return controlled values
+        original_analyze_cloud_cover = analysis.analyze_cloud_cover
+
+        # First call - establish baseline with sunny condition
+        analysis.analyze_cloud_cover = lambda *args, **kwargs: 25.0  # Sunny
+        condition1 = analysis.determine_weather_condition(
+            {
+                "solar_radiation": 800.0,
+                "solar_lux": 80000.0,
+                "uv_index": 8.0,
+                "solar_elevation": 45.0,
+            },
+            0.0,
+        )
+        assert condition1 == "sunny"
+
+        # Second call - small change to partly cloudy cloud cover
+        # This should be rejected by hysteresis
+        analysis.analyze_cloud_cover = (
+            lambda *args, **kwargs: 38.0
+        )  # Still sunny range, but closer to boundary
+        condition2 = analysis.determine_weather_condition(
+            {
+                "solar_radiation": 750.0,  # Slightly less radiation
+                "solar_lux": 75000.0,
+                "uv_index": 7.5,
+                "solar_elevation": 45.0,
+            },
+            0.0,
+        )
+        assert condition2 == "sunny"  # Should maintain sunny due to hysteresis
+
+        # Third call - significant change that should trigger condition change
+        analysis.analyze_cloud_cover = lambda *args, **kwargs: 55.0  # Partly cloudy
+        condition3 = analysis.determine_weather_condition(
+            {
+                "solar_radiation": 600.0,  # Much less radiation
+                "solar_lux": 60000.0,
+                "uv_index": 6.0,
+                "solar_elevation": 45.0,
+            },
+            0.0,
+        )
+        assert (
+            condition3 == "partlycloudy"
+        )  # Should allow change due to significant cloud cover increase
+
+        # Restore original method
+        analysis.analyze_cloud_cover = original_analyze_cloud_cover
+
+    def test_hysteresis_debug_logging(self, analysis, caplog):
+        """Test that hysteresis provides appropriate debug logging."""
+        import logging
+
+        # Set up initial history
+        analysis._condition_history.append(
+            {"condition": "sunny", "cloud_cover": 30.0, "timestamp": datetime.now()}
+        )
+
+        # Enable debug logging
+        with caplog.at_level(logging.DEBUG):
+            # Trigger hysteresis rejection (small change)
+            result = analysis._apply_condition_hysteresis("partlycloudy", 35.0)
+
+        assert result == "sunny"  # Should be rejected
+        assert "Condition stable: keeping sunny" in caplog.text
+        assert "change: 5.0 < threshold: 15.0" in caplog.text
+
+        # Clear log and test acceptance (large change from most recent baseline)
+        caplog.clear()
+        with caplog.at_level(logging.DEBUG):
+            result = analysis._apply_condition_hysteresis("partlycloudy", 50.0)
+
+        assert result == "partlycloudy"  # Should be accepted
+        assert "Condition change: sunny -> partlycloudy" in caplog.text
+        assert "change: 15.0 >= threshold: 15.0" in caplog.text
