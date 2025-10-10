@@ -672,11 +672,26 @@ class WeatherAnalysis:
             ):  # Primary: use all measurements when radiation is good
                 # Only include UV in weighting if we have a meaningful UV reading
                 if uv_index > 0:
-                    cloud_cover = (
-                        solar_cloud_cover * 0.8
-                        + lux_cloud_cover * 0.15
-                        + uv_cloud_cover * 0.05
-                    )
+                    # Check if UV is consistent with solar radiation
+                    # If UV indicates much cloudier conditions than solar, it may be faulty
+                    uv_solar_diff = abs(solar_cloud_cover - uv_cloud_cover)
+                    if uv_solar_diff > 30.0:  # UV differs significantly from solar
+                        _LOGGER.debug(
+                            "UV measurement inconsistent with solar radiation "
+                            "(UV: %.1f%%, Solar: %.1f%%, diff: %.1f%%) - ignoring UV",
+                            uv_cloud_cover,
+                            solar_cloud_cover,
+                            uv_solar_diff,
+                        )
+                        # Ignore UV and redistribute weights to solar and lux
+                        cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15
+                    else:
+                        # UV is consistent - use all three measurements
+                        cloud_cover = (
+                            solar_cloud_cover * 0.8
+                            + lux_cloud_cover * 0.15
+                            + uv_cloud_cover * 0.05
+                        )
                 else:
                     # No UV data - redistribute weights to solar and lux
                     cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15

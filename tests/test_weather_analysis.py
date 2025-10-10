@@ -174,14 +174,14 @@ class TestWeatherAnalysis:
         # Test moderately low solar values (mostly cloudy)
         cloud_cover_mostly = analysis.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
         assert cloud_cover_mostly == pytest.approx(
-            61.6, abs=0.1
-        )  # Astronomical calculation
+            59.8, abs=0.1
+        )  # Astronomical calculation (UV ignored due to inconsistency)
 
         # Test borderline low solar values (partly cloudy fallback)
         cloud_cover_fallback = analysis.analyze_cloud_cover(150.0, 15000.0, 0.8, 20.0)
         assert cloud_cover_fallback == pytest.approx(
-            41.8, abs=0.1
-        )  # Astronomical calculation
+            39.1, abs=0.1
+        )  # Astronomical calculation (UV ignored due to inconsistency)
 
         # Test that higher values don't trigger fallback
         cloud_cover_normal = analysis.analyze_cloud_cover(250.0, 25000.0, 2.0, 30.0)
