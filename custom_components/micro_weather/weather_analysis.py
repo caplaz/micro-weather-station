@@ -37,7 +37,9 @@ class WeatherAnalysis:
         """
         self._sensor_history = sensor_history or {}
         # Track recent weather conditions for hysteresis (time-based, not count-based)
-        self._condition_history = deque()  # No maxlen - we'll manage by time
+        self._condition_history: deque[Dict[str, Any]] = (
+            deque()
+        )  # No maxlen - we'll manage by time
 
     def determine_weather_condition(
         self, sensor_data: Dict[str, Any], altitude: float | None = 0.0

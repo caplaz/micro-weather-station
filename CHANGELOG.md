@@ -1,5 +1,55 @@
 # Changelog
 
+## 2.2.1 (2025-10-10)
+
+### Improvements
+
+- **Weather Entity Initialization**: Restored async_added_to_hass method for proper Home Assistant lifecycle
+
+  - Ensures coordinator data refresh when entity is added to Home Assistant
+  - Prevents entity from showing as unavailable on first load
+
+- **Enhanced Cloud Cover Analysis**: Improved astronomical calculations with better edge case handling
+
+  - Complete overcast (100%) detection when no solar input detected
+  - More accurate heavy overcast detection using astronomical principles
+  - Better measurement weighting: solar radiation > lux > UV index
+
+- **Hysteresis Improvements**: Enhanced condition stability with time-based history management
+
+  - Changed condition history from count-based (max 10) to time-based (1 hour window)
+  - Hysteresis now compares against recent conditions within last hour instead of fixed count
+  - Prevents issues with infrequent updates comparing against very old conditions
+  - Maintains 24-hour cleanup to prevent unbounded memory growth
+
+- **Weather Condition Mapping**: Updated to use standard meteorological ranges
+
+  - Sunny: ≤25% cloud cover (was ≤40%)
+  - Partly cloudy: 25-50% cloud cover (was 40-60%)
+  - Cloudy: 50-75% cloud cover (was 60-85%)
+  - Reduced hysteresis threshold for sunny↔partlycloudy transitions from 15% to 10%
+
+### Bug Fixes
+
+- **Severe Weather Detection**: Made severe weather detection more conservative
+
+  - Require pressure < 29.50 inHg AND wind_speed ≥19mph AND gusty conditions for severe weather
+  - Add separate condition for severe turbulence (gust_factor >3.0 with gusts >20mph OR gust >40mph)
+  - Prevent false 'lightning' alerts for low pressure systems with moderate gusty winds
+  - Improve accuracy for weather conditions like approaching low pressure systems with wind gusts
+
+### Technical Improvements
+
+- **Updated Test Suite**: Modified tests to reflect new atmospheric extinction model, condition thresholds, and hysteresis behavior
+- **Algorithm Refinement**: More accurate cloud cover analysis for early morning and late afternoon conditions
+- **Enhanced Test Coverage**: Updated tests for improved weather entity initialization and astronomical calculations
+
+### Changes
+
+- Better weather entity reliability and initialization
+- More responsive weather condition updates with refined hysteresis thresholds
+- More conservative severe weather detection to reduce false alerts
+
 ## 2.2.0 (2025-10-07)
 
 ### Major Features
