@@ -190,7 +190,8 @@ class WeatherAnalysis:
 
         # PRIORITY 2.5: WINDY CONDITIONS
         # (Gusty or strong winds without precipitation)
-        if is_very_gusty or wind_strong:
+        # Require either sustained winds >= 15 mph OR very gusty conditions with minimum sustained wind
+        if wind_strong or (is_very_gusty and wind_speed >= 8):
             return ATTR_CONDITION_WINDY  # Windy conditions
 
         # PRIORITY 3: FOG CONDITIONS (Critical for safety)
