@@ -412,13 +412,14 @@ solar_constant_variation = 1 + 0.033 × cos(2π × (day_of_year - 4) / 365.25)
 
 **Air Mass Correction (Atmospheric Path Length):**
 
-Uses the Kasten-Young formula for accurate air mass calculation at all solar elevations:
+Uses the Gueymard 2003 formula for accurate air mass calculation at all solar elevations:
 
 ```
-AM = 1 / (cos(Z) + 0.50572 × (96.07995 - Z)^(-1.6364))
+AM = (1.002432 × cos²(Z) + 0.148386 × cos(Z) + 0.0096467) /
+     (cos³(Z) + 0.149864 × cos²(Z) + 0.0102963 × cos(Z) + 0.000303978)
 ```
 
-Where Z is the zenith angle (90° - solar_elevation). This provides better accuracy than simple 1/cos(Z) for low solar elevations.
+Where Z is the zenith angle (90° - solar_elevation). This provides improved accuracy for low sun angles and all atmospheric conditions.
 
 **Atmospheric Extinction (Rayleigh Scattering, Ozone, Water Vapor):**
 
@@ -440,14 +441,14 @@ theoretical_irradiance = base_solar_constant × solar_constant_variation ×
 
 **Local Calibration and Seasonal Impact:**
 
-The system uses a calibrated zenith maximum (700 W/m²) adjusted for seasonal variations:
+The system uses a configurable zenith maximum solar radiation (default 1000 W/m²) adjusted for seasonal variations. This can be calibrated for your specific sensor and location using the config flow:
 
 ```
 calibrated_max_radiation = zenith_max_radiation × solar_constant_variation ×
                           astronomical_scaling
 ```
 
-Where `astronomical_scaling = sin(solar_elevation)`.
+Where `zenith_max_radiation` is user-configurable, and `astronomical_scaling` is based on solar elevation and atmospheric transmission.
 
 **Seasonal Radiation Variations:**
 
@@ -541,10 +542,11 @@ solar_constant_variation = 1 + 0.033 × cos(2π × (day_of_year - 4) / 365.25)
 - **January 4**: +3.3% (closest to sun)
 - **July 4**: -3.3% (farthest from sun)
 
-**Air Mass Correction (Kasten-Young Formula):**
+**Air Mass Correction (Gueymard 2003 Formula):**
 
 ```
-AM = 1 / (cos(Z) + 0.50572 × (96.07995 - Z)^(-1.6364))
+AM = (1.002432 × cos²(Z) + 0.148386 × cos(Z) + 0.0096467) /
+     (cos³(Z) + 0.149864 × cos²(Z) + 0.0102963 × cos(Z) + 0.000303978)
 ```
 
 Where Z is the zenith angle (90° - solar_elevation), providing superior accuracy at low solar elevations.

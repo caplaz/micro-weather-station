@@ -1,5 +1,39 @@
 # Changelog
 
+## [2.3.0] - 2025-10-12
+
+### Major Features
+
+- **Configurable Zenith Maximum Radiation**: Added user-configurable `zenith_max_radiation` setting for precise solar calibration
+
+  - Allows fine-tuning of solar radiation calculations for your specific sensor and location
+  - Improves cloud cover detection accuracy by accounting for local atmospheric conditions
+  - Available in the integration's configuration flow for easy adjustment
+
+- **Enhanced Wind Detection**: Improved wind condition analysis and classification
+
+  - Better detection of gusts, turbulence, and severe wind events
+  - More accurate wind-based weather condition determination
+  - Enhanced handling of wind patterns for improved storm detection
+
+- **Gueymard 2003 Air Mass Formula**: Upgraded solar radiation calculations with scientifically accurate air mass formula
+
+  - Replaced previous formula with the industry-standard Gueymard 2003 air mass calculation
+  - Provides superior accuracy for solar radiation analysis at all solar elevations
+  - Improves cloud cover estimation, especially at low sun angles
+
+### Technical Improvements
+
+- **Solar Analysis Precision**: Enhanced astronomical calculations for better weather detection accuracy
+- **Wind Algorithm Refinement**: Updated wind detection logic for more reliable severe weather identification
+- **Configuration Flexibility**: Added new calibration options for advanced users
+
+### Changes
+
+- More accurate weather condition detection through improved solar and wind analysis
+- Enhanced user calibration options for location-specific optimization
+- Scientific accuracy improvements in meteorological calculations
+
 ## 2.2.1 (2025-10-10)
 
 ### Improvements
