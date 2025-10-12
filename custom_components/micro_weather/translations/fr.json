@@ -90,13 +90,15 @@
           "solar_radiation_sensor": "Capteur de Radiation Solaire",
           "solar_lux_sensor": "Capteur Solaire Lux",
           "uv_index_sensor": "Capteur d'Index UV",
-          "sun_sensor": "Capteur Solaire"
+          "sun_sensor": "Capteur Solaire",
+          "zenith_max_radiation": "Radiation Maximale au Zénith"
         },
         "data_description": {
           "solar_radiation_sensor": "Capteur optionnel pour la détection primaire de couverture nuageuse (>400 W/m² = ensoleillé, <100 = nuageux). Utilisé dans la détection de brouillard et remplace les autres conditions pour la détection de ciel dégagé.",
           "solar_lux_sensor": "Capteur optionnel pour la détection jour/nuit basée sur la lumière. Détection de couverture nuageuse de secours et calculs de visibilité lorsque le capteur de radiation solaire n'est pas disponible.",
           "uv_index_sensor": "Capteur optionnel pour la confirmation de ciel dégagé (UV élevé = définitivement ensoleillé). Fournit une mesure d'intensité solaire pour des recommandations de sécurité et une précision améliorée de détection de météo ensoleillée.",
-          "sun_sensor": "Capteur optionnel fournissant des données d'élévation solaire pour des calculs précis de couverture nuageuse. Améliore la précision de détection météorologique en tenant compte de la position du soleil (élévation plus élevée = plus de radiation solaire attendue). Se rabat à 45° d'élévation si non configuré."
+          "sun_sensor": "Capteur optionnel fournissant des données d'élévation solaire pour des calculs précis de couverture nuageuse. Améliore la précision de détection météorologique en tenant compte de la position du soleil (élévation plus élevée = plus de radiation solaire attendue). Se rabat à 45° d'élévation si non configuré.",
+          "zenith_max_radiation": "Radiation solaire maximale au zénith (soleil directement au-dessus). Utilisée pour normaliser les lectures de radiation solaire pour des calculs précis de couverture nuageuse. Valeurs typiques : 400-1200 W/m² selon l'emplacement et les conditions atmosphériques."
         }
       },
       "final": {
@@ -208,13 +210,15 @@
           "solar_radiation_sensor": "Capteur de Radiation Solaire",
           "solar_lux_sensor": "Capteur Solaire Lux",
           "uv_index_sensor": "Capteur d'Index UV",
-          "sun_sensor": "Capteur Solaire"
+          "sun_sensor": "Capteur Solaire",
+          "zenith_max_radiation": "Radiation Maximale au Zénith"
         },
         "data_description": {
           "solar_radiation_sensor": "Capteur optionnel pour la détection primaire de couverture nuageuse (>400 W/m² = ensoleillé, <100 = nuageux). Utilisé dans la détection de brouillard et remplace les autres conditions pour la détection de ciel dégagé.",
           "solar_lux_sensor": "Capteur optionnel pour la détection jour/nuit basée sur la lumière. Détection de couverture nuageuse de secours et calculs de visibilité lorsque le capteur de radiation solaire n'est pas disponible.",
           "uv_index_sensor": "Capteur optionnel pour la confirmation de ciel dégagé (UV élevé = définitivement ensoleillé). Fournit une mesure d'intensité solaire pour des recommandations de sécurité et une précision améliorée de détection de météo ensoleillée.",
-          "sun_sensor": "Capteur optionnel fournissant des données d'élévation solaire pour des calculs précis de couverture nuageuse. Améliore la précision de détection météorologique en tenant compte de la position du soleil (élévation plus élevée = plus de radiation solaire attendue). Se rabat à 45° d'élévation si non configuré."
+          "sun_sensor": "Capteur optionnel fournissant des données d'élévation solaire pour des calculs précis de couverture nuageuse. Améliore la précision de détection météorologique en tenant compte de la position du soleil (élévation plus élevée = plus de radiation solaire attendue). Se rabat à 45° d'élévation si non configuré.",
+          "zenith_max_radiation": "Radiation solaire maximale au zénith (soleil directement au-dessus). Utilisée pour normaliser les lectures de radiation solaire pour des calculs précis de couverture nuageuse. Valeurs typiques : 400-1200 W/m² selon l'emplacement et les conditions atmosphériques."
         }
       },
       "device_config": {

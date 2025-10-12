@@ -90,13 +90,15 @@
           "solar_radiation_sensor": "Sensore Radiazione Solare",
           "solar_lux_sensor": "Sensore Solare Lux",
           "uv_index_sensor": "Sensore Indice UV",
-          "sun_sensor": "Sensore Solare"
+          "sun_sensor": "Sensore Solare",
+          "zenith_max_radiation": "Radiazione Massima allo Zenit"
         },
         "data_description": {
           "solar_radiation_sensor": "Sensore opzionale per rilevamento primario copertura nuvolosa (>400 W/m² = soleggiato, <100 = nuvoloso). Utilizzato nel rilevamento nebbia e sovrascrive altre condizioni per rilevamento cielo sereno.",
           "solar_lux_sensor": "Sensore opzionale per rilevamento giorno/notte basato sulla luce. Rilevamento copertura nuvolosa backup e calcoli visibilità quando sensore radiazione solare non disponibile.",
           "uv_index_sensor": "Sensore opzionale per conferma cielo sereno (UV alto = definitivamente soleggiato). Fornisce misurazione intensità solare per raccomandazioni sicurezza e precisione migliorata rilevamento meteo soleggiato.",
-          "sun_sensor": "Sensore opzionale che fornisce dati elevazione solare per calcoli precisi copertura nuvolosa. Migliora precisione rilevamento meteorologico considerando posizione sole (elevazione maggiore = più radiazione solare attesa). Si ripega a 45° elevazione se non configurato."
+          "sun_sensor": "Sensore opzionale che fornisce dati elevazione solare per calcoli precisi copertura nuvolosa. Migliora precisione rilevamento meteorologico considerando posizione sole (elevazione maggiore = più radiazione solare attesa). Si ripega a 45° elevazione se non configurato.",
+          "zenith_max_radiation": "Radiazione solare massima allo zenit (sole direttamente sopra). Utilizzata per normalizzare le letture di radiazione solare per calcoli precisi di copertura nuvolosa. Valori tipici: 400-1200 W/m² a seconda della posizione e delle condizioni atmosferiche."
         }
       },
       "final": {
@@ -208,13 +210,15 @@
           "solar_radiation_sensor": "Sensore Radiazione Solare",
           "solar_lux_sensor": "Sensore Solare Lux",
           "uv_index_sensor": "Sensore Indice UV",
-          "sun_sensor": "Sensore Solare"
+          "sun_sensor": "Sensore Solare",
+          "zenith_max_radiation": "Radiazione Massima allo Zenit"
         },
         "data_description": {
           "solar_radiation_sensor": "Sensore opzionale per rilevamento primario copertura nuvolosa (>400 W/m² = soleggiato, <100 = nuvoloso). Utilizzato nel rilevamento nebbia e sovrascrive altre condizioni per rilevamento cielo sereno.",
           "solar_lux_sensor": "Sensore opzionale per rilevamento giorno/notte basato sulla luce. Rilevamento copertura nuvolosa backup e calcoli visibilità quando sensore radiazione solare non disponibile.",
           "uv_index_sensor": "Sensore opzionale per conferma cielo sereno (UV alto = definitivamente soleggiato). Fornisce misurazione intensità solare per raccomandazioni sicurezza e precisione migliorata rilevamento meteo soleggiato.",
-          "sun_sensor": "Sensore opzionale che fornisce dati elevazione solare per calcoli precisi copertura nuvolosa. Migliora precisione rilevamento meteorologico considerando posizione sole (elevazione maggiore = più radiazione solare attesa). Si ripega a 45° elevazione se non configurato."
+          "sun_sensor": "Sensore opzionale che fornisce dati elevazione solare per calcoli precisi copertura nuvolosa. Migliora precisione rilevamento meteorologico considerando posizione sole (elevazione maggiore = più radiazione solare attesa). Si ripega a 45° elevazione se non configurato.",
+          "zenith_max_radiation": "Radiazione solare massima allo zenit (sole direttamente sopra). Utilizzata per normalizzare le letture di radiazione solare per calcoli precisi di copertura nuvolosa. Valori tipici: 400-1200 W/m² a seconda della posizione e delle condizioni atmosferiche."
         }
       },
       "device_config": {

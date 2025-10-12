@@ -45,6 +45,8 @@ from .const import (
     CONF_WIND_DIRECTION_SENSOR,
     CONF_WIND_GUST_SENSOR,
     CONF_WIND_SPEED_SENSOR,
+    CONF_ZENITH_MAX_RADIATION,
+    DEFAULT_ZENITH_MAX_RADIATION,
 )
 from .weather_analysis import WeatherAnalysis
 from .weather_forecast import WeatherForecast
@@ -105,7 +107,13 @@ class WeatherDetector:
         )
 
         # Initialize weather analysis and forecast modules with shared sensor history
-        self.analysis = WeatherAnalysis(sensor_history=self._sensor_history)
+        zenith_max_radiation = options.get(
+            CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
+        )
+        self.analysis = WeatherAnalysis(
+            sensor_history=self._sensor_history,
+            zenith_max_radiation=zenith_max_radiation,
+        )
         self.forecast = WeatherForecast(self.analysis)
 
         # Sensor entity IDs mapping

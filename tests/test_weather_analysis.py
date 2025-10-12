@@ -168,19 +168,19 @@ class TestWeatherAnalysis:
         # Test very low solar values (heavy overcast)
         cloud_cover_heavy = analysis.analyze_cloud_cover(20.0, 3000.0, 0.0, 15.0)
         assert cloud_cover_heavy == pytest.approx(
-            88.6, abs=0.1
+            92.0, abs=0.1
         )  # Astronomical calculation
 
         # Test moderately low solar values (mostly cloudy)
         cloud_cover_mostly = analysis.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
         assert cloud_cover_mostly == pytest.approx(
-            59.8, abs=0.1
+            73.1, abs=0.1
         )  # Astronomical calculation (UV ignored due to inconsistency)
 
         # Test borderline low solar values (partly cloudy fallback)
         cloud_cover_fallback = analysis.analyze_cloud_cover(150.0, 15000.0, 0.8, 20.0)
         assert cloud_cover_fallback == pytest.approx(
-            39.1, abs=0.1
+            57.4, abs=0.1
         )  # Astronomical calculation (UV ignored due to inconsistency)
 
         # Test that higher values don't trigger fallback
@@ -262,7 +262,7 @@ class TestWeatherAnalysis:
         # This should use astronomical calculation for very low measurements
         cloud_cover_mostly = analysis.analyze_cloud_cover(1.0, 200.0, 0.2, 45.0)
         assert cloud_cover_mostly == pytest.approx(
-            99.5, abs=0.1
+            99.6, abs=0.1
         )  # Astronomical calculation
 
     def test_analyze_cloud_cover_edge_cases(self, analysis):
@@ -691,12 +691,12 @@ class TestWeatherAnalysis:
         # Test at moderate elevation (45°)
         max_rad_45 = analysis._calculate_clear_sky_max_radiation(45.0)
         assert isinstance(max_rad_45, float)
-        assert 200 < max_rad_45 < 600  # Should be lower than zenith
+        assert 200 < max_rad_45 < 800  # Should be lower than zenith
 
         # Test at low elevation (20°)
         max_rad_20 = analysis._calculate_clear_sky_max_radiation(20.0)
         assert isinstance(max_rad_20, float)
-        assert 50 < max_rad_20 < 300  # Should be much lower
+        assert 50 < max_rad_20 < 400  # Should be much lower
 
         # Test at horizon (0° elevation)
         max_rad_0 = analysis._calculate_clear_sky_max_radiation(0.0)

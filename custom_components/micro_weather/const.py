@@ -25,6 +25,7 @@ CONF_SOLAR_LUX_SENSOR = "solar_lux_sensor"
 CONF_UV_INDEX_SENSOR = "uv_index_sensor"
 CONF_SUN_SENSOR = "sun_sensor"
 CONF_ALTITUDE = "altitude"
+CONF_ZENITH_MAX_RADIATION = "zenith_max_radiation"
 
 # Default configuration values
 DEFAULT_TEMPERATURE_RANGE = (-10, 35)  # Celsius
@@ -32,6 +33,7 @@ DEFAULT_HUMIDITY_RANGE = (30, 90)  # Percentage
 DEFAULT_PRESSURE_RANGE = (990, 1030)  # hPa
 DEFAULT_WIND_SPEED_RANGE = (0, 25)  # km/h
 DEFAULT_UPDATE_INTERVAL = 5  # minutes
+DEFAULT_ZENITH_MAX_RADIATION = 1000.0  # W/m² at zenith
 
 # Sensor types
 SENSOR_TYPES = {

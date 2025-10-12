@@ -21,6 +21,8 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_WINDY,
 )
 
+from .const import DEFAULT_ZENITH_MAX_RADIATION
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -28,18 +30,22 @@ class WeatherAnalysis:
     """Handles weather condition analysis and historical trend calculations."""
 
     def __init__(
-        self, sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None
+        self,
+        sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None,
+        zenith_max_radiation: float = DEFAULT_ZENITH_MAX_RADIATION,
     ):
         """Initialize weather analysis with optional sensor history.
 
         Args:
             sensor_history: Dictionary of sensor historical data deques
+            zenith_max_radiation: Maximum solar radiation at zenith (W/m²) for calibration
         """
         self._sensor_history = sensor_history or {}
         # Track recent weather conditions for hysteresis (time-based, not count-based)
         self._condition_history: deque[Dict[str, Any]] = (
             deque()
         )  # No maxlen - we'll manage by time
+        self.zenith_max_radiation = zenith_max_radiation
 
     def determine_weather_condition(
         self, sensor_data: Dict[str, Any], altitude: float | None = 0.0
@@ -999,10 +1005,9 @@ class WeatherAnalysis:
         # 5. Apply local calibration factor
         # This accounts for your specific location, sensor calibration, and typical
         # atmospheric conditions
-        # We use 700 W/m² as the calibrated maximum at zenith (90° elevation) as
-        # requested, then apply astronomical corrections for the current solar
-        # elevation
-        zenith_max_radiation = 700.0  # Your calibrated maximum at zenith
+        # We use the configured zenith maximum radiation, then apply astronomical corrections
+        # for the current solar elevation
+        zenith_max_radiation = self.zenith_max_radiation  # Configurable zenith maximum
 
         # Calculate the astronomical scaling factor (what fraction of zenith
         # irradiance we should expect)
@@ -1045,7 +1050,8 @@ class WeatherAnalysis:
         when the sun is directly overhead (zenith). It accounts for the increased
         atmospheric absorption at lower solar elevations.
 
-        Uses the Kasten-Young air mass formula for improved accuracy at low elevations.
+        Uses the Gueymard 2003 formula for improved accuracy at all elevations:
+        AM = 1.002432*cos²(Z) + 0.148386*cos(Z) + 0.0096467 / (cos³(Z) + 0.149864*cos²(Z) + 0.0102963*cos(Z) + 0.000303978)
 
         Args:
             solar_elevation: Solar elevation angle in degrees
@@ -1059,12 +1065,19 @@ class WeatherAnalysis:
         # Convert elevation to zenith angle
         zenith_angle = 90.0 - solar_elevation
         zenith_rad = math.radians(zenith_angle)
+        cos_z = math.cos(zenith_rad)
 
-        # Kasten-Young formula (more accurate than simple 1/cos for low elevations)
-        # AM = 1 / (cos(Z) + 0.50572 * (96.07995 - Z)^(-1.6364))
-        air_mass = 1.0 / (
-            math.cos(zenith_rad) + 0.50572 * math.pow(96.07995 - zenith_angle, -1.6364)
+        # Gueymard 2003 formula - most accurate air mass calculation
+        # AM = 1.002432*cos²(Z) + 0.148386*cos(Z) + 0.0096467 / (cos³(Z) + 0.149864*cos²(Z) + 0.0102963*cos(Z) + 0.000303978)
+        cos_z_squared = cos_z * cos_z
+        cos_z_cubed = cos_z_squared * cos_z
+
+        numerator = 1.002432 * cos_z_squared + 0.148386 * cos_z + 0.0096467
+        denominator = (
+            cos_z_cubed + 0.149864 * cos_z_squared + 0.0102963 * cos_z + 0.000303978
         )
+
+        air_mass = numerator / denominator
 
         # Ensure minimum air mass of 1.0 (zenith)
         return max(1.0, air_mass)
@@ -1286,19 +1299,43 @@ class WeatherAnalysis:
         slope = (n * sum_xy - sum_x * sum_y) / denominator
         return slope
 
-    def analyze_pressure_trends(self, altitude: float | None = 0.0) -> Dict[str, Any]:
-        """Analyze pressure trends for weather prediction.
+    def get_altitude_adjusted_pressure_thresholds_hpa(
+        self, altitude: float
+    ) -> Dict[str, float]:
+        """Get pressure thresholds adjusted for altitude above sea level.
+
+        Barometric pressure decreases with altitude according to the barometric formula.
+        Standard sea-level thresholds need adjustment for accurate weather analysis
+        at different elevations.
 
         Args:
-            altitude: Altitude in meters above sea level for threshold adjustment
+            altitude: Altitude in meters above sea level
 
         Returns:
-            dict: Pressure trend analysis including:
-                - current_trend: Short-term pressure change
-                - long_term_trend: 24-hour pressure trend
-                - pressure_system: Type of pressure system
-                - storm_probability: Probability of storm development
+            dict: Pressure thresholds in hPa adjusted for altitude
         """
+        # Standard sea-level pressure thresholds (hPa)
+        sea_level_thresholds = {
+            "very_high": 1025.0,  # Very high pressure system
+            "high": 1015.0,  # High pressure system
+            "normal_high": 1005.0,  # Normal to high pressure
+            "normal": 995.0,  # Normal pressure
+            "low": 985.0,  # Low pressure system
+            "very_low": 975.0,  # Very low pressure (storm)
+        }
+
+        # Pressure decreases by approximately 1 hPa per 8 meters of elevation
+        # This is a simplified approximation of the barometric formula
+        altitude_correction = altitude / 8.0  # hPa decrease per meter
+
+        # Adjust all thresholds downward for higher altitudes
+        adjusted_thresholds = {}
+        for key, sea_level_pressure in sea_level_thresholds.items():
+            adjusted_thresholds[key] = sea_level_pressure - altitude_correction
+
+        return adjusted_thresholds
+
+    def analyze_pressure_trends(self, altitude: float | None = 0.0) -> Dict[str, Any]:
         altitude = altitude or 0.0  # Default to 0.0 if None
         # Get pressure trends over different time periods
         short_trend = self.get_historical_trends("pressure", hours=3)  # 3-hour trend
@@ -1312,7 +1349,9 @@ class WeatherAnalysis:
         long_term_change = long_trend["trend"] * 24  # 24-hour change
 
         # Get altitude-adjusted pressure thresholds
-        pressure_thresholds = self.get_altitude_adjusted_pressure_thresholds(altitude)
+        pressure_thresholds = self.get_altitude_adjusted_pressure_thresholds_hpa(
+            altitude
+        )
 
         # Classify pressure system using altitude-adjusted thresholds
         if current_pressure > pressure_thresholds["very_high"]:

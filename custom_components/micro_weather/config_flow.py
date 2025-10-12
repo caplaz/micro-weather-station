@@ -26,7 +26,9 @@ from .const import (
     CONF_WIND_DIRECTION_SENSOR,
     CONF_WIND_GUST_SENSOR,
     CONF_WIND_SPEED_SENSOR,
+    CONF_ZENITH_MAX_RADIATION,
     DEFAULT_UPDATE_INTERVAL,
+    DEFAULT_ZENITH_MAX_RADIATION,
     DOMAIN,
 )
 
@@ -462,15 +464,20 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Handle solar/sun sensors configuration."""
         if user_input is not None:
             # Ensure optional fields are present in user_input
-            self._optional_entities(
-                [
-                    CONF_SOLAR_RADIATION_SENSOR,
-                    CONF_SOLAR_LUX_SENSOR,
-                    CONF_UV_INDEX_SENSOR,
-                    CONF_SUN_SENSOR,
-                ],
-                user_input,
-            )
+            optional_fields = [
+                CONF_SOLAR_RADIATION_SENSOR,
+                CONF_SOLAR_LUX_SENSOR,
+                CONF_UV_INDEX_SENSOR,
+                CONF_SUN_SENSOR,
+            ]
+
+            # Only include zenith_max_radiation in optional fields if solar radiation sensor is configured
+            if self.config_entry.options.get(
+                CONF_SOLAR_RADIATION_SENSOR
+            ) or user_input.get(CONF_SOLAR_RADIATION_SENSOR):
+                optional_fields.append(CONF_ZENITH_MAX_RADIATION)
+
+            self._optional_entities(optional_fields, user_input)
 
             # Store solar sensor data
             self._data.update(user_input)
@@ -492,6 +499,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         # Get current options for defaults
         current_options = self.config_entry.options
 
+        # Check if solar radiation sensor is configured
+        has_solar_radiation = bool(current_options.get(CONF_SOLAR_RADIATION_SENSOR))
+
         # Build solar sensors schema
         schema_dict: dict[Any, Any] = {}
 
@@ -500,6 +510,24 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         ] = selector.EntitySelector(
             selector.EntitySelectorConfig(domain="sensor", device_class="irradiance")
         )
+
+        # Show Zenith Max Radiation if solar radiation sensor is configured
+        # Note: If user selects solar radiation sensor in this form, they'll need to
+        # submit and return to see the zenith field
+        if has_solar_radiation:
+            schema_dict[
+                vol.Optional(
+                    CONF_ZENITH_MAX_RADIATION,
+                    default=DEFAULT_ZENITH_MAX_RADIATION,
+                )
+            ] = selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=400,
+                    max=1200,
+                    step=10,
+                    unit_of_measurement="W/m²",
+                )
+            )
 
         schema_dict[vol.Optional(CONF_SOLAR_LUX_SENSOR, default=vol.UNDEFINED)] = (
             selector.EntitySelector(
