@@ -211,15 +211,17 @@ class TestWeatherDetector:
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "solar_radiation":
                 state = Mock()
-                state.state = "280.0"  # Moderate solar radiation for partly cloudy
+                state.state = "450.0"  # Moderate solar radiation for partly cloudy (adjusted for new zenith max)
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "solar_lux":
                 state = Mock()
-                state.state = "28000.0"  # Moderate lux for partly cloudy
+                state.state = "45000.0"  # Moderate lux for partly cloudy (adjusted proportionally)
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "uv_index":
                 state = Mock()
-                state.state = "2.8"  # Moderate UV for partly cloudy
+                state.state = (
+                    "4.5"  # Moderate UV for partly cloudy (adjusted proportionally)
+                )
                 mock_states[f"sensor.{sensor_key}"] = state
             else:
                 state = Mock()
