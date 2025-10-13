@@ -3,6 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
+    ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_RAINY,
@@ -333,6 +335,431 @@ class TestMicroWeatherEntity:
             precip = lightning_forecasts[0]["native_precipitation"]
             assert 0.05 <= precip <= 0.2
             # Should be close to 0.1 in/h with variation
+
+    async def test_async_forecast_hourly_nighttime_conditions(
+        self, weather_entity, coordinator
+    ):
+        """Test that sunny conditions become clear_night during nighttime hours."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time to be 10 PM (nighttime) - timezone aware
+        mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
+
+        with patch("datetime.datetime") as mock_dt_class:
+            mock_dt_class.now.return_value = mock_now
+            # Mock fromisoformat to return proper timezone-aware datetime objects
+            mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
+                s.replace("Z", "+00:00")
+            )
+
+            # Mock sun.sun entity with sunrise/sunset times
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {
+                "next_rising": "2024-01-02T07:00:00Z",  # 7 AM next day
+                "next_setting": "2024-01-02T18:00:00Z",  # 6 PM next day
+            }
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                result = await weather_entity.async_forecast_hourly()
+
+                assert result is not None
+                assert len(result) == 24
+
+                # Check nighttime hours (before sunrise and after sunset)
+                # Hours 0-6 should be nighttime (23:00 to 05:00 when current time is 22:00)
+                night_forecasts = result[:7]
+                for forecast in night_forecasts:
+                    # Nighttime conditions should be either clear_night (from sunny) or cloudy (from partlycloudy)
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_CLEAR_NIGHT,
+                        ATTR_CONDITION_CLOUDY,
+                    ], f"Expected clear_night or cloudy at night, got {forecast['condition']} at hour {forecast['datetime']}"
+
+                # Check daytime hours (after sunrise and before sunset)
+                # Hours 8-17 should be daytime (around 7 AM to 5 PM next day)
+                day_forecasts = result[8:18]  # Hours 8-17 (roughly 7 AM to 5 PM)
+                sunny_day_forecasts = [
+                    f for f in day_forecasts if f["condition"] == ATTR_CONDITION_SUNNY
+                ]
+                assert (
+                    len(sunny_day_forecasts) > 0
+                ), "Should have some sunny conditions during daytime"
+
+    async def test_async_forecast_hourly_sun_entity_fallback(
+        self, weather_entity, coordinator
+    ):
+        """Test fallback to hardcoded times when sun.sun entity is unavailable."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time to be 10 PM (nighttime) - timezone aware
+        mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
+
+        with patch("datetime.datetime") as mock_dt_class:
+            mock_dt_class.now.return_value = mock_now
+
+            # Mock sun.sun entity as None (unavailable)
+            with patch.object(
+                weather_entity.coordinator.hass.states, "get", return_value=None
+            ):
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                result = await weather_entity.async_forecast_hourly()
+
+                assert result is not None
+                assert len(result) == 24
+
+                # With fallback to hardcoded 6 AM/6 PM, hours 0-6 should be nighttime
+                night_forecasts = result[:7]
+                for forecast in night_forecasts:
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_CLEAR_NIGHT,
+                        ATTR_CONDITION_CLOUDY,
+                    ], f"Expected clear_night or cloudy at night with fallback, got {forecast['condition']}"
+
+                # Hours 7-18 should be daytime (6 AM to 6 PM hardcoded)
+                day_forecasts = result[7:19]
+                sunny_day_forecasts = [
+                    f for f in day_forecasts if f["condition"] == ATTR_CONDITION_SUNNY
+                ]
+                assert (
+                    len(sunny_day_forecasts) > 0
+                ), "Should have sunny conditions during hardcoded daytime"
+
+    async def test_async_forecast_hourly_sun_entity_missing_attributes(
+        self, weather_entity, coordinator
+    ):
+        """Test fallback when sun.sun entity exists but attributes are missing."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time to be 2 AM (nighttime) - timezone aware
+        mock_now = datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc)
+
+        with patch("datetime.datetime") as mock_dt_class:
+            mock_dt_class.now.return_value = mock_now
+
+            # Mock sun.sun entity with missing attributes
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {}  # Empty attributes
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                result = await weather_entity.async_forecast_hourly()
+
+                assert result is not None
+                assert len(result) == 24
+
+                # Should fall back to hardcoded times - first few hours should be nighttime (before 6 AM)
+                # Hours 0-2 (3 AM to 4 AM) should be nighttime, hours 3-5 (5 AM to 6 AM) might be edge cases
+                # Let's check the actual hours and ensure nighttime conversion happens
+                night_forecasts = []
+                for i, forecast in enumerate(result[:6]):  # Check first 6 hours
+                    hour = datetime.fromisoformat(forecast["datetime"]).hour
+                    if hour < 6:  # Before 6 AM should be nighttime
+                        night_forecasts.append((i, forecast))
+
+                # Should have at least some nighttime hours that get converted
+                assert len(night_forecasts) > 0, "Should have some hours before 6 AM"
+
+                for i, forecast in night_forecasts:
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_CLEAR_NIGHT,
+                        ATTR_CONDITION_CLOUDY,
+                    ], f"Expected clear_night or cloudy at night with missing attributes, got {forecast['condition']} at hour {i} ({forecast['datetime']})"
+
+    async def test_async_forecast_hourly_daytime_conditions_conversion(
+        self, weather_entity, coordinator
+    ):
+        """Test conversion of various daytime conditions to nighttime equivalents."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time to be 2 AM (nighttime)
+        mock_now = datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc)
+
+        with patch("datetime.datetime") as mock_dt_class:
+            mock_dt_class.now.return_value = mock_now
+            mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
+                s.replace("Z", "+00:00")
+            )
+
+            # Mock sun.sun entity
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {
+                "next_rising": "2024-01-02T07:00:00Z",
+                "next_setting": "2024-01-02T18:00:00Z",
+            }
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                # Test different daytime conditions
+                test_conditions = [
+                    (ATTR_CONDITION_SUNNY, ATTR_CONDITION_CLEAR_NIGHT),
+                    (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY),
+                    (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_CLOUDY),
+                    (ATTR_CONDITION_RAINY, ATTR_CONDITION_RAINY),
+                ]
+
+                for input_condition, expected_night_condition in test_conditions:
+                    coordinator.data = {
+                        "temperature": 20.0,
+                        "condition": input_condition,
+                        "humidity": 50,
+                        "wind_speed": 5.0,
+                        "precipitation": 0.0,
+                    }
+
+                    result = await weather_entity.async_forecast_hourly()
+
+                    # Check first few hours (nighttime)
+                    night_forecasts = result[:3]
+                    for forecast in night_forecasts:
+                        assert (
+                            forecast["condition"] == expected_night_condition
+                        ), f"Expected {expected_night_condition} at night for {input_condition}, got {forecast['condition']}"
+
+    async def test_async_forecast_hourly_sunrise_sunset_boundary(
+        self, weather_entity, coordinator
+    ):
+        """Test behavior exactly at sunrise and sunset times."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time to be exactly at sunrise (7 AM)
+        mock_now = datetime(2024, 1, 2, 7, 0, 0, tzinfo=timezone.utc)
+
+        with patch("datetime.datetime") as mock_dt_class:
+            mock_dt_class.now.return_value = mock_now
+            mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
+                s.replace("Z", "+00:00")
+            )
+
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {
+                "next_rising": "2024-01-02T07:00:00Z",  # Exactly now
+                "next_setting": "2024-01-02T18:00:00Z",
+            }
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                result = await weather_entity.async_forecast_hourly()
+
+                # First hour should be daytime (sunrise_time <= forecast_time)
+                first_hour = result[0]
+                assert (
+                    first_hour["condition"] == ATTR_CONDITION_SUNNY
+                ), f"Expected sunny at sunrise boundary, got {first_hour['condition']}"
+
+                # Test exactly at sunset
+                mock_now_sunset = datetime(2024, 1, 2, 18, 0, 0, tzinfo=timezone.utc)
+                mock_dt_class.now.return_value = mock_now_sunset
+
+                result_sunset = await weather_entity.async_forecast_hourly()
+
+                # First hour should be nighttime (forecast_time < sunset_time fails)
+                first_hour_sunset = result_sunset[0]
+                assert (
+                    first_hour_sunset["condition"] == ATTR_CONDITION_CLEAR_NIGHT
+                ), f"Expected clear_night at sunset boundary, got {first_hour_sunset['condition']}"
+
+    async def test_async_forecast_hourly_polar_regions(
+        self, weather_entity, coordinator
+    ):
+        """Test behavior in polar regions with extreme sunrise/sunset times."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Test midnight sun scenario - sunset is very late (11 PM next day)
+        mock_now = datetime(
+            2024, 6, 21, 12, 0, 0, tzinfo=timezone.utc
+        )  # Summer solstice
+
+        with patch("datetime.datetime") as mock_dt_class:
+            mock_dt_class.now.return_value = mock_now
+            mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
+                s.replace("Z", "+00:00")
+            )
+
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {
+                "next_rising": "2024-06-21T03:00:00Z",  # Sunrise today (already passed)
+                "next_setting": "2024-06-22T23:00:00Z",  # Sunset very late tomorrow
+            }
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                result = await weather_entity.async_forecast_hourly()
+
+                # During midnight sun, all forecast hours should be daytime
+                # Check that no nighttime condition conversion occurs
+
+                for i, forecast in enumerate(result):
+                    assert (
+                        forecast["condition"] != ATTR_CONDITION_CLEAR_NIGHT
+                    ), f"Should not have clear_night during midnight sun, got {forecast['condition']} at hour {i}"
+
+                # At least some hours should maintain the original sunny condition
+                sunny_forecasts = [
+                    f for f in result if f["condition"] == ATTR_CONDITION_SUNNY
+                ]
+                assert (
+                    len(sunny_forecasts) > 0
+                ), "Should have some sunny conditions during extended daytime"
+
+    async def test_async_forecast_hourly_datetime_parsing_error(
+        self, weather_entity, coordinator
+    ):
+        """Test graceful handling of malformed datetime strings."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time
+        mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
+
+        with patch("datetime.datetime") as mock_dt_class:
+            mock_dt_class.now.return_value = mock_now
+            # Make fromisoformat raise an exception
+            mock_dt_class.fromisoformat.side_effect = ValueError(
+                "Invalid datetime format"
+            )
+
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {
+                "next_rising": "invalid-datetime-string",
+                "next_setting": "2024-01-02T18:00:00Z",
+            }
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                # Should not raise exception, should fall back to hardcoded times
+                result = await weather_entity.async_forecast_hourly()
+
+                assert result is not None
+                assert len(result) == 24
+
+                # Should fall back to hardcoded times - 22:00 should be nighttime
+                night_forecasts = result[:7]
+                for forecast in night_forecasts:
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_CLEAR_NIGHT,
+                        ATTR_CONDITION_CLOUDY,
+                    ], f"Expected clear_night or cloudy with datetime parsing error, got {forecast['condition']}"
+
+    async def test_is_forecast_hour_daytime_edge_cases(self, weather_entity):
+        """Test the _is_forecast_hour_daytime helper method with edge cases."""
+        from datetime import datetime, timezone
+
+        # Test with None sunrise/sunset (should use hardcoded fallback)
+        result = weather_entity._is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 8, 0, 0, tzinfo=timezone.utc), None, None  # 8 AM
+        )
+        assert result is True, "Should be daytime at 8 AM with None sunrise/sunset"
+
+        result = weather_entity._is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc), None, None  # 2 AM
+        )
+        assert result is False, "Should be nighttime at 2 AM with None sunrise/sunset"
+
+        # Test with actual sunrise/sunset times
+        sunrise = datetime(2024, 1, 1, 7, 0, 0, tzinfo=timezone.utc)
+        sunset = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
+
+        # Before sunrise
+        result = weather_entity._is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is False, "Should be nighttime before sunrise"
+
+        # At sunrise
+        result = weather_entity._is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 7, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is True, "Should be daytime at sunrise"
+
+        # During day
+        result = weather_entity._is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is True, "Should be daytime during day"
+
+        # At sunset
+        result = weather_entity._is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is False, "Should be nighttime at sunset"
+
+        # After sunset
+        result = weather_entity._is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 20, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is False, "Should be nighttime after sunset"
 
 
 class TestAsyncSetupEntry:

@@ -1,10 +1,14 @@
 """Weather entity for Micro Weather Station."""
 
+from datetime import datetime
+
 from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SUNNY,
     Forecast,
     WeatherEntity,
 )
@@ -159,9 +163,29 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         return None
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
-        """Return the hourly forecast."""
-        if not self.coordinator.data:
-            return None
+        """Return hourly weather forecast for the next 24 hours."""
+        # Get sunrise/sunset times from sun.sun entity for accurate daytime detection
+        sunrise_time = None
+        sunset_time = None
+
+        try:
+            sun_entity = self.coordinator.hass.states.get("sun.sun")
+            if sun_entity and sun_entity.attributes:
+                # Get next sunrise and sunset times
+                next_rising = sun_entity.attributes.get("next_rising")
+                next_setting = sun_entity.attributes.get("next_setting")
+
+                if next_rising and next_setting:
+                    # Parse ISO datetime strings to datetime objects
+                    sunrise_time = datetime.fromisoformat(
+                        next_rising.replace("Z", "+00:00")
+                    )
+                    sunset_time = datetime.fromisoformat(
+                        next_setting.replace("Z", "+00:00")
+                    )
+        except Exception:
+            # If anything fails with sun.sun, we'll fall back to hardcoded times
+            pass
 
         # Generate hourly forecast for next 24 hours based on current conditions
         hourly_data = []
@@ -173,12 +197,17 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         current_wind = self.coordinator.data.get("wind_speed", 5)
 
         for i in range(24):  # 24 hours
-            from datetime import datetime, timedelta
+            from datetime import timedelta, timezone
 
-            hour_time = datetime.now() + timedelta(hours=i + 1)
+            hour_time = datetime.now(timezone.utc) + timedelta(hours=i + 1)
+
+            # Determine if this forecast hour is daytime using sunrise/sunset data
+            is_daytime = self._is_forecast_hour_daytime(
+                hour_time, sunrise_time, sunset_time
+            )
 
             # Simple hourly temperature variation (diurnal cycle)
-            if 6 <= hour_time.hour <= 18:  # Daytime
+            if is_daytime:
                 temp_variation = 2 * (1 - abs(hour_time.hour - 12) / 6)  # Peak at noon
             else:  # Nighttime
                 temp_variation = -2
@@ -196,6 +225,16 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                     ATTR_CONDITION_CLOUDY,
                     current_condition,
                 ][i % 3]
+
+            # Adjust condition for nighttime hours
+            # Convert daytime conditions to nighttime equivalents
+            if not is_daytime:
+                if hour_condition == ATTR_CONDITION_SUNNY:
+                    hour_condition = ATTR_CONDITION_CLEAR_NIGHT
+                elif hour_condition == ATTR_CONDITION_PARTLYCLOUDY:
+                    hour_condition = (
+                        ATTR_CONDITION_CLOUDY  # Partly cloudy at night becomes cloudy
+                    )
 
             # Calculate precipitation based on condition and current precipitation rate
             current_precipitation = self.coordinator.data.get("precipitation", 0)
@@ -246,3 +285,28 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             )
 
         return hourly_data
+
+    def _is_forecast_hour_daytime(
+        self,
+        forecast_time: datetime,
+        sunrise_time: datetime | None,
+        sunset_time: datetime | None,
+    ) -> bool:
+        """Determine if a forecast hour is daytime using sunrise/sunset data.
+
+        Falls back to hardcoded 6 AM/6 PM times if sunrise/sunset data is unavailable.
+
+        Args:
+            forecast_time: The datetime of the forecast hour
+            sunrise_time: Sunrise time from sun.sun entity (can be None)
+            sunset_time: Sunset time from sun.sun entity (can be None)
+
+        Returns:
+            bool: True if the forecast hour is daytime, False if nighttime
+        """
+        if sunrise_time and sunset_time:
+            # Use actual sunrise/sunset times
+            return sunrise_time <= forecast_time < sunset_time
+        else:
+            # Fallback to hardcoded times (6 AM to 6 PM)
+            return 6 <= forecast_time.hour < 18
