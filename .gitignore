@@ -154,6 +154,7 @@ htmlcov/
 .pytest_cache/
 test-results/
 .tox/
+bandit-report.json
 
 # Temporary files
 *.tmp

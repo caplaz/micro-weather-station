@@ -164,6 +164,10 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
         """Return hourly weather forecast for the next 24 hours."""
+        # Check if we have coordinator data
+        if not self.coordinator.data:
+            return None
+
         # Get sunrise/sunset times from sun.sun entity for accurate daytime detection
         sunrise_time = None
         sunset_time = None
@@ -183,8 +187,8 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                     sunset_time = datetime.fromisoformat(
                         next_setting.replace("Z", "+00:00")
                     )
-        except Exception:
-            # If anything fails with sun.sun, we'll fall back to hardcoded times
+        except (KeyError, ValueError, TypeError):
+            # If sun.sun entity is missing or has invalid data, fall back to hardcoded times
             pass
 
         # Generate hourly forecast for next 24 hours based on current conditions

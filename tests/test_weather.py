@@ -346,7 +346,7 @@ class TestMicroWeatherEntity:
         # Mock current time to be 10 PM (nighttime) - timezone aware
         mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
 
-        with patch("datetime.datetime") as mock_dt_class:
+        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
             mock_dt_class.now.return_value = mock_now
             # Mock fromisoformat to return proper timezone-aware datetime objects
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -408,7 +408,7 @@ class TestMicroWeatherEntity:
         # Mock current time to be 10 PM (nighttime) - timezone aware
         mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
 
-        with patch("datetime.datetime") as mock_dt_class:
+        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
             mock_dt_class.now.return_value = mock_now
 
             # Mock sun.sun entity as None (unavailable)
@@ -455,7 +455,7 @@ class TestMicroWeatherEntity:
         # Mock current time to be 2 AM (nighttime) - timezone aware
         mock_now = datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc)
 
-        with patch("datetime.datetime") as mock_dt_class:
+        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
             mock_dt_class.now.return_value = mock_now
 
             # Mock sun.sun entity with missing attributes
@@ -508,7 +508,7 @@ class TestMicroWeatherEntity:
         # Mock current time to be 2 AM (nighttime)
         mock_now = datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc)
 
-        with patch("datetime.datetime") as mock_dt_class:
+        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
                 s.replace("Z", "+00:00")
@@ -562,7 +562,7 @@ class TestMicroWeatherEntity:
         # Mock current time to be exactly at sunrise (7 AM)
         mock_now = datetime(2024, 1, 2, 7, 0, 0, tzinfo=timezone.utc)
 
-        with patch("datetime.datetime") as mock_dt_class:
+        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
                 s.replace("Z", "+00:00")
@@ -597,15 +597,20 @@ class TestMicroWeatherEntity:
 
                 # Test exactly at sunset
                 mock_now_sunset = datetime(2024, 1, 2, 18, 0, 0, tzinfo=timezone.utc)
-                mock_dt_class.now.return_value = mock_now_sunset
+                with patch(
+                    "custom_components.micro_weather.weather.datetime"
+                ) as mock_dt_class_sunset:
+                    mock_dt_class_sunset.now.return_value = mock_now_sunset
+                    mock_dt_class_sunset.fromisoformat.side_effect = (
+                        lambda s: datetime.fromisoformat(s.replace("Z", "+00:00"))
+                    )
+                    result_sunset = await weather_entity.async_forecast_hourly()
 
-                result_sunset = await weather_entity.async_forecast_hourly()
-
-                # First hour should be nighttime (forecast_time < sunset_time fails)
-                first_hour_sunset = result_sunset[0]
-                assert (
-                    first_hour_sunset["condition"] == ATTR_CONDITION_CLEAR_NIGHT
-                ), f"Expected clear_night at sunset boundary, got {first_hour_sunset['condition']}"
+                    # First hour should be nighttime (forecast_time < sunset_time fails)
+                    first_hour_sunset = result_sunset[0]
+                    assert (
+                        first_hour_sunset["condition"] == ATTR_CONDITION_CLEAR_NIGHT
+                    ), f"Expected clear_night at sunset boundary, got {first_hour_sunset['condition']}"
 
     async def test_async_forecast_hourly_polar_regions(
         self, weather_entity, coordinator
@@ -619,7 +624,7 @@ class TestMicroWeatherEntity:
             2024, 6, 21, 12, 0, 0, tzinfo=timezone.utc
         )  # Summer solstice
 
-        with patch("datetime.datetime") as mock_dt_class:
+        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
                 s.replace("Z", "+00:00")
@@ -672,12 +677,15 @@ class TestMicroWeatherEntity:
         # Mock current time
         mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
 
-        with patch("datetime.datetime") as mock_dt_class:
+        with (
+            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather.datetime.fromisoformat"
+            ) as mock_fromisoformat,
+        ):
             mock_dt_class.now.return_value = mock_now
             # Make fromisoformat raise an exception
-            mock_dt_class.fromisoformat.side_effect = ValueError(
-                "Invalid datetime format"
-            )
+            mock_fromisoformat.side_effect = ValueError("Invalid datetime format")
 
             mock_sun_state = MagicMock()
             mock_sun_state.attributes = {
