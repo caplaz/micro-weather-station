@@ -1,5 +1,44 @@
 # Changelog
 
+## 2.3.1 (2025-10-13)
+
+### Major Features
+
+- **Pressure Trend Integration**: Enhanced cloud detection with pressure trends for more accurate weather forecasting
+
+  - Integrate pressure trends into cloud detection algorithms (falling pressure = more clouds)
+  - Add pressure-based cloud cover adjustments for meteorological accuracy
+  - Enhance forecast system to use cloud cover analysis for near-term predictions (days 0-1)
+  - Add comprehensive sensor unavailability testing (None values, missing keys, complete failure)
+  - Improve error handling for missing solar, wind, and historical data
+  - Add graceful fallbacks to pressure-based estimation when sensors unavailable
+
+- **Dynamic Sunrise/Sunset Detection**: Replace hardcoded sunrise/sunset times with dynamic data from sun.sun entity
+
+  - Add dynamic sunrise/sunset detection using Home Assistant's sun.sun entity
+  - Implement fallback to hardcoded 6 AM/6 PM when sun.sun entity unavailable
+  - Add condition conversion for nighttime hours (sunny→clear_night, partlycloudy→cloudy)
+  - Ensure timezone-aware datetime handling for accurate comparisons
+
+### Technical Improvements
+
+- **Enhanced Error Handling**: Narrow exception handling from generic Exception to specific types (KeyError, ValueError, TypeError)
+- **Test Infrastructure**: Fix datetime mocking in tests by patching module-specific datetime
+- **Code Quality**: Add bandit-report.json to .gitignore for security scanning
+- **Test Coverage**: Achieve 96% test coverage for forecast module with 30 comprehensive tests
+
+### Bug Fixes
+
+- **Datetime Mocking**: Fixed datetime mocking issues in test suite for proper timezone handling
+- **Coordinator Data Validation**: Add coordinator data check in async_forecast_hourly method
+
+### Changes
+
+- More accurate weather forecasting through pressure trend integration
+- Dynamic astronomical timing using Home Assistant's sun entity
+- Improved robustness with comprehensive sensor failure handling
+- Enhanced test coverage and error handling throughout the codebase
+
 ## 2.3.0 (2025-10-12)
 
 ### Major Features
