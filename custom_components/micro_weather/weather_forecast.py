@@ -167,8 +167,10 @@ class WeatherForecast:
         pressure_analysis: Dict[str, Any],
         sensor_data: Dict[str, Any],
     ) -> str:
-        """Enhanced condition forecasting using pressure trends,
-        historical patterns, and wind direction analysis.
+        """Enhanced condition forecasting using cloud cover analysis with pressure trends.
+
+        Uses the same cloud cover calculation methodology as current conditions,
+        but adapted for forecast days with pressure trend projections.
 
         Args:
             day: Day ahead to forecast (0-4)
@@ -179,35 +181,30 @@ class WeatherForecast:
         Returns:
             str: Forecasted weather condition
         """
+        # For near-term forecasts (day 0-1), use enhanced cloud cover analysis
+        if day <= 1:
+            return self._forecast_condition_with_cloud_cover(
+                day, pressure_analysis, sensor_data
+            )
+
+        # For longer-term forecasts, fall back to pressure-based rules
+        # but with cloud cover influence
         pressure_system = pressure_analysis.get("pressure_system", "normal")
         storm_probability = pressure_analysis.get("storm_probability", 0)
 
         # Get wind direction analysis for enhanced prediction
         wind_direction_analysis = self.analysis.analyze_wind_direction_trends()
-        direction_stability = wind_direction_analysis.get("direction_stability", 0.5)
-        significant_shift = wind_direction_analysis.get("significant_shift", False)
+        if wind_direction_analysis is None:
+            direction_stability = 0.5
+            significant_shift = False
+        else:
+            direction_stability = wind_direction_analysis.get(
+                "direction_stability", 0.5
+            )
+            significant_shift = wind_direction_analysis.get("significant_shift", False)
 
-        # High confidence predictions for near-term
-        if day == 0:
-            if storm_probability > 80:
-                return ATTR_CONDITION_POURING
-            elif storm_probability > 60:
-                return ATTR_CONDITION_LIGHTNING_RAINY
-            elif storm_probability > 30:
-                return ATTR_CONDITION_RAINY
-            elif sensor_data.get("wind_speed", 5) >= 25:  # mph threshold for windy
-                return ATTR_CONDITION_WINDY
-            elif pressure_system == "high_pressure" and direction_stability > 0.7:
-                # Stable high pressure with consistent winds = clear weather
-                return ATTR_CONDITION_SUNNY
-            elif significant_shift and storm_probability > 20:
-                # Wind direction change with some storm probability = approaching change
-                return ATTR_CONDITION_CLOUDY
-            else:
-                return current_condition
-
-        # Medium-term predictions (1-2 days)
-        elif day <= 2:
+        # Medium-term predictions (2 days)
+        if day == 2:
             if storm_probability > 70:
                 return ATTR_CONDITION_POURING
             elif storm_probability > 40:
@@ -216,87 +213,21 @@ class WeatherForecast:
                     if storm_probability < 70
                     else ATTR_CONDITION_LIGHTNING_RAINY
                 )
-            elif (
-                sensor_data.get("wind_speed", 5) >= 25 and day == 1
-            ):  # Check wind for day 1
-                return ATTR_CONDITION_WINDY
             elif pressure_system == "high_pressure":
                 if direction_stability > 0.8:
-                    # Very stable winds with high pressure = excellent conditions
-                    return ATTR_CONDITION_SUNNY if day == 1 else ATTR_CONDITION_SUNNY
+                    return ATTR_CONDITION_SUNNY
                 else:
-                    return (
-                        ATTR_CONDITION_PARTLYCLOUDY
-                        if day == 1
-                        else ATTR_CONDITION_SUNNY
-                    )
+                    return ATTR_CONDITION_PARTLYCLOUDY
             elif pressure_system == "low_pressure":
                 if significant_shift:
-                    # Wind shifting with low pressure = unsettled weather
-                    return ATTR_CONDITION_RAINY if day == 1 else ATTR_CONDITION_CLOUDY
+                    return ATTR_CONDITION_RAINY
                 else:
-                    return ATTR_CONDITION_CLOUDY if day == 1 else ATTR_CONDITION_RAINY
+                    return ATTR_CONDITION_CLOUDY
             else:
-                # Default to improving conditions, but consider wind stability
-                if direction_stability < 0.3:
-                    # Unstable winds = variable conditions
-                    return ATTR_CONDITION_PARTLYCLOUDY
-                else:
-                    # Default progression
-                    condition_progression = {
-                        ATTR_CONDITION_LIGHTNING_RAINY: [
-                            ATTR_CONDITION_RAINY,
-                            ATTR_CONDITION_CLOUDY,
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                        ],
-                        ATTR_CONDITION_RAINY: [
-                            ATTR_CONDITION_CLOUDY,
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                            ATTR_CONDITION_SUNNY,
-                        ],
-                        ATTR_CONDITION_POURING: [
-                            ATTR_CONDITION_RAINY,
-                            ATTR_CONDITION_CLOUDY,
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                        ],
-                        ATTR_CONDITION_WINDY: [
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                            ATTR_CONDITION_SUNNY,
-                            ATTR_CONDITION_SUNNY,
-                        ],
-                        ATTR_CONDITION_CLOUDY: [
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                            ATTR_CONDITION_SUNNY,
-                            ATTR_CONDITION_SUNNY,
-                        ],
-                        ATTR_CONDITION_PARTLYCLOUDY: [
-                            ATTR_CONDITION_SUNNY,
-                            ATTR_CONDITION_SUNNY,
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                        ],
-                        ATTR_CONDITION_SUNNY: [
-                            ATTR_CONDITION_SUNNY,
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                            ATTR_CONDITION_SUNNY,
-                        ],
-                        ATTR_CONDITION_FOG: [
-                            ATTR_CONDITION_CLOUDY,
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                            ATTR_CONDITION_SUNNY,
-                        ],
-                        ATTR_CONDITION_SNOWY: [
-                            ATTR_CONDITION_CLOUDY,
-                            ATTR_CONDITION_PARTLYCLOUDY,
-                            ATTR_CONDITION_SUNNY,
-                        ],
-                    }
-                    progression = condition_progression.get(
-                        current_condition, [ATTR_CONDITION_PARTLYCLOUDY]
-                    )
-                    return progression[min(day, len(progression) - 1)]
+                # Default progression with some cloud cover influence
+                return self._get_progressive_condition(current_condition, day)
 
-        # Long-term predictions (3-4 days)
-        # - return to average conditions
+        # Long-term predictions (3-4 days) - return to average conditions
         else:
             if pressure_system == "high_pressure" and direction_stability > 0.6:
                 return ATTR_CONDITION_SUNNY
@@ -304,6 +235,203 @@ class WeatherForecast:
                 return ATTR_CONDITION_CLOUDY
             else:
                 return ATTR_CONDITION_PARTLYCLOUDY
+
+    def _forecast_condition_with_cloud_cover(
+        self,
+        day: int,
+        pressure_analysis: Dict[str, Any],
+        sensor_data: Dict[str, Any],
+    ) -> str:
+        """Forecast condition using cloud cover analysis with pressure trend projections.
+
+        Projects pressure trends forward and uses cloud cover calculations
+        similar to current condition determination.
+
+        Args:
+            day: Day ahead to forecast (0-1 for near-term)
+            pressure_analysis: Current pressure trend analysis
+            sensor_data: Current sensor data
+
+        Returns:
+            str: Forecasted weather condition based on projected cloud cover
+        """
+        # Project pressure trends forward for forecast day
+        projected_pressure_trends = self._project_pressure_trends_for_forecast(
+            day, pressure_analysis
+        )
+
+        # Use current solar data but adjust for forecast day
+        solar_radiation = sensor_data.get("solar_radiation", 0.0)
+        solar_lux = sensor_data.get("solar_lux", 0.0)
+        uv_index = sensor_data.get("uv_index", 0.0)
+
+        # Check if solar data is available - if not, fall back to pressure-based estimation
+        if solar_radiation is None or solar_lux is None or uv_index is None:
+            cloud_cover = self._estimate_cloud_cover_from_pressure(pressure_analysis)
+        else:
+            # Adjust solar data for forecast day (less reliable further out)
+            solar_reliability = max(0.3, 1.0 - (day * 0.3))  # Day 0: 100%, Day 1: 70%
+            solar_radiation *= solar_reliability
+            solar_lux *= solar_reliability
+            uv_index *= solar_reliability
+
+            # Estimate solar elevation for forecast time (simplified)
+            # For day 0, use current elevation; for day 1, assume similar conditions
+            solar_elevation = sensor_data.get("solar_elevation", 45.0)
+
+            # Calculate projected cloud cover using enhanced analysis
+            try:
+                cloud_cover = self.analysis.analyze_cloud_cover(
+                    solar_radiation,
+                    solar_lux,
+                    uv_index,
+                    solar_elevation,
+                    projected_pressure_trends,
+                )
+            except Exception:
+                # Fallback to pressure-based estimation if cloud analysis fails
+                cloud_cover = self._estimate_cloud_cover_from_pressure(
+                    pressure_analysis
+                )
+
+        # Convert cloud cover to condition using same logic as current conditions
+        return self.analysis._map_cloud_cover_to_condition(cloud_cover)
+
+    def _project_pressure_trends_for_forecast(
+        self,
+        day: int,
+        current_pressure_analysis: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Project pressure trends forward for forecast days.
+
+        Extrapolates current pressure trends to estimate future pressure systems.
+
+        Args:
+            day: Days ahead to project (0-1)
+            current_pressure_analysis: Current pressure trend analysis
+
+        Returns:
+            dict: Projected pressure trends for forecast day
+        """
+        # For near-term forecasts, pressure trends are relatively stable
+        # but we can project some decay in trend strength
+
+        projected_trends = current_pressure_analysis.copy()
+
+        # Reduce trend magnitudes for future days (less certainty)
+        trend_decay = max(0.5, 1.0 - (day * 0.2))  # Day 0: 100%, Day 1: 80%
+
+        if "current_trend" in projected_trends:
+            projected_trends["current_trend"] *= trend_decay
+        if "long_term_trend" in projected_trends:
+            projected_trends["long_term_trend"] *= trend_decay
+
+        # Storm probability also decays with time
+        if "storm_probability" in projected_trends:
+            projected_trends["storm_probability"] *= trend_decay
+
+        return projected_trends
+
+    def _estimate_cloud_cover_from_pressure(
+        self,
+        pressure_analysis: Dict[str, Any],
+    ) -> float:
+        """Estimate cloud cover percentage from pressure analysis alone.
+
+        Fallback method when solar data is insufficient for full cloud analysis.
+
+        Args:
+            pressure_analysis: Pressure trend analysis
+
+        Returns:
+            float: Estimated cloud cover percentage (0-100)
+        """
+        pressure_system = pressure_analysis.get("pressure_system", "normal")
+        storm_probability = pressure_analysis.get("storm_probability", 0)
+
+        # Base cloud cover by pressure system
+        if pressure_system == "high_pressure":
+            base_cloud_cover = 20.0  # Clear skies with high pressure
+        elif pressure_system == "low_pressure":
+            base_cloud_cover = 70.0  # Cloudy with low pressure
+        else:
+            base_cloud_cover = 40.0  # Partly cloudy normal pressure
+
+        # Adjust by storm probability
+        if storm_probability > 70:
+            base_cloud_cover = min(95.0, base_cloud_cover + 25.0)
+        elif storm_probability > 40:
+            base_cloud_cover = min(85.0, base_cloud_cover + 15.0)
+        elif storm_probability > 20:
+            base_cloud_cover = min(75.0, base_cloud_cover + 10.0)
+
+        return base_cloud_cover
+
+    def _get_progressive_condition(self, current_condition: str, day: int) -> str:
+        """Get progressive condition change for medium-term forecasts.
+
+        Args:
+            current_condition: Current weather condition
+            day: Days ahead (2-4)
+
+        Returns:
+            str: Progressed weather condition
+        """
+        # Condition progression patterns (improving weather over time)
+        condition_progression = {
+            ATTR_CONDITION_LIGHTNING_RAINY: [
+                ATTR_CONDITION_RAINY,
+                ATTR_CONDITION_CLOUDY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+            ],
+            ATTR_CONDITION_RAINY: [
+                ATTR_CONDITION_CLOUDY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+                ATTR_CONDITION_SUNNY,
+            ],
+            ATTR_CONDITION_POURING: [
+                ATTR_CONDITION_RAINY,
+                ATTR_CONDITION_CLOUDY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+            ],
+            ATTR_CONDITION_WINDY: [
+                ATTR_CONDITION_PARTLYCLOUDY,
+                ATTR_CONDITION_SUNNY,
+                ATTR_CONDITION_SUNNY,
+            ],
+            ATTR_CONDITION_CLOUDY: [
+                ATTR_CONDITION_PARTLYCLOUDY,
+                ATTR_CONDITION_SUNNY,
+                ATTR_CONDITION_SUNNY,
+            ],
+            ATTR_CONDITION_PARTLYCLOUDY: [
+                ATTR_CONDITION_SUNNY,
+                ATTR_CONDITION_SUNNY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+            ],
+            ATTR_CONDITION_SUNNY: [
+                ATTR_CONDITION_SUNNY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+                ATTR_CONDITION_SUNNY,
+            ],
+            ATTR_CONDITION_FOG: [
+                ATTR_CONDITION_CLOUDY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+                ATTR_CONDITION_SUNNY,
+            ],
+            ATTR_CONDITION_SNOWY: [
+                ATTR_CONDITION_CLOUDY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+                ATTR_CONDITION_SUNNY,
+            ],
+        }
+
+        progression = condition_progression.get(
+            current_condition, [ATTR_CONDITION_PARTLYCLOUDY]
+        )
+        # For days 2-4, use indices 0-2 of the progression
+        progression_index = min(day - 2, len(progression) - 1)
+        return progression[progression_index]
 
     def forecast_precipitation_enhanced(
         self,

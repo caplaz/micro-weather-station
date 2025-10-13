@@ -249,8 +249,11 @@ class WeatherAnalysis:
                     else:
                         return ATTR_CONDITION_PARTLYCLOUDY
 
+            # Analyze pressure trends for meteorological accuracy
+            pressure_trends = self.analyze_pressure_trends(altitude)
+
             cloud_cover = self.analyze_cloud_cover(
-                solar_radiation, solar_lux, uv_index, solar_elevation
+                solar_radiation, solar_lux, uv_index, solar_elevation, pressure_trends
             )
 
             # Apply hysteresis to prevent rapid condition changes
@@ -590,12 +593,91 @@ class WeatherAnalysis:
 
         return None
 
+    def _calculate_pressure_trend_cloud_adjustment(
+        self, pressure_trends: Dict[str, Any] | None
+    ) -> float:
+        """
+        Calculate cloud cover adjustment based on pressure trends.
+
+        Falling pressure indicates approaching weather systems and increased cloud cover.
+        Rising pressure indicates clearing conditions and decreased cloud cover.
+
+        Args:
+            pressure_trends: Pressure trend analysis from analyze_pressure_trends()
+
+        Returns:
+            float: Cloud cover adjustment percentage (-50 to +50)
+        """
+        if not pressure_trends:
+            return 0.0
+
+        # Extract trend data
+        current_trend = pressure_trends.get(
+            "current_trend", 0.0
+        )  # 3-hour change in hPa
+        long_term_trend = pressure_trends.get(
+            "long_term_trend", 0.0
+        )  # 24-hour change in hPa
+        pressure_system = pressure_trends.get("pressure_system", "normal")
+
+        # Base adjustment from short-term trend (3-hour change)
+        # Falling pressure = more clouds, rising pressure = fewer clouds
+        short_term_adjustment = 0.0
+        if current_trend < -1.0:  # Falling >1 hPa in 3 hours
+            # Scale adjustment based on magnitude (capped at -20% for very rapid drops)
+            short_term_adjustment = max(-20.0, current_trend * 5.0)
+        elif current_trend > 1.0:  # Rising >1 hPa in 3 hours
+            # Scale adjustment based on magnitude (capped at +15% for rapid rises)
+            short_term_adjustment = min(15.0, current_trend * 3.0)
+
+        # Long-term trend adjustment (24-hour change)
+        long_term_adjustment = 0.0
+        if long_term_trend < -3.0:  # Falling >3 hPa in 24 hours
+            # Sustained pressure drop indicates approaching weather system
+            long_term_adjustment = max(-25.0, long_term_trend * 4.0)
+        elif long_term_trend > 3.0:  # Rising >3 hPa in 24 hours
+            # Sustained pressure rise indicates clearing
+            long_term_adjustment = min(20.0, long_term_trend * 3.0)
+
+        # Pressure system adjustment
+        system_adjustment = 0.0
+        if pressure_system == "low_pressure":
+            system_adjustment = 10.0  # Low pressure systems tend to be cloudier
+        elif pressure_system == "high_pressure":
+            system_adjustment = -5.0  # High pressure systems tend to be clearer
+
+        # Combine adjustments with weighting
+        # Short-term trends are more immediate but long-term trends are more reliable
+        total_adjustment = (
+            short_term_adjustment * 0.4  # 40% weight to recent changes
+            + long_term_adjustment * 0.5  # 50% weight to sustained trends
+            + system_adjustment * 0.1  # 10% weight to pressure system
+        )
+
+        # Ensure reasonable bounds
+        total_adjustment = max(-40.0, min(30.0, total_adjustment))
+
+        _LOGGER.debug(
+            "Pressure trend cloud adjustment: %.1f%% "
+            "(short: %.1f%%, long: %.1f%%, system: %.1f%%, "
+            "current_trend: %.2f hPa/3h, long_trend: %.2f hPa/24h)",
+            total_adjustment,
+            short_term_adjustment,
+            long_term_adjustment,
+            system_adjustment,
+            current_trend,
+            long_term_trend,
+        )
+
+        return total_adjustment
+
     def analyze_cloud_cover(
         self,
         solar_radiation: float,
         solar_lux: float,
         uv_index: float,
         solar_elevation: float = 45.0,
+        pressure_trends: Dict[str, Any] | None = None,
     ) -> float:
         """
         Estimate cloud cover percentage using solar radiation analysis.
@@ -605,6 +687,7 @@ class WeatherAnalysis:
         - Air mass correction for atmospheric path length
         - Atmospheric extinction (Rayleigh scattering, ozone absorption)
         - Elevation-based scaling with scientific accuracy
+        - Pressure trend integration for meteorological accuracy
 
         Args:
             solar_radiation: Current solar radiation in W/m²
@@ -612,6 +695,7 @@ class WeatherAnalysis:
             uv_index: Current UV index value
             solar_elevation: Solar elevation angle in degrees from sun.sun sensor
                            (defaults to 45° if not configured)
+            pressure_trends: Optional pressure trend analysis from analyze_pressure_trends()
 
         Returns:
             float: Estimated cloud cover percentage (0-100)
@@ -718,6 +802,21 @@ class WeatherAnalysis:
             cloud_cover = 100
         else:
             cloud_cover = 50.0  # Unknown - assume partly cloudy
+
+        # Apply pressure trend adjustment to cloud cover estimation
+        # Falling pressure indicates approaching weather systems (more clouds)
+        # Rising pressure indicates clearing conditions (fewer clouds)
+        pressure_adjustment = self._calculate_pressure_trend_cloud_adjustment(
+            pressure_trends
+        )
+        cloud_cover = max(0.0, min(100.0, cloud_cover + pressure_adjustment))
+
+        _LOGGER.debug(
+            "Final cloud cover: %.1f%% (solar-based: %.1f%%, pressure adjustment: %.1f%%)",
+            cloud_cover,
+            cloud_cover - pressure_adjustment,
+            pressure_adjustment,
+        )
 
         return cloud_cover
 
