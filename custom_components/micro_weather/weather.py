@@ -1,6 +1,6 @@
 """Weather entity for Micro Weather Station."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
@@ -183,10 +183,10 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                     # Parse ISO datetime strings to datetime objects
                     sunrise_time = datetime.fromisoformat(
                         next_rising.replace("Z", "+00:00")
-                    )
+                    ).replace(tzinfo=None)
                     sunset_time = datetime.fromisoformat(
                         next_setting.replace("Z", "+00:00")
-                    )
+                    ).replace(tzinfo=None)
         except (KeyError, ValueError, TypeError):
             # If sun.sun entity is missing or has invalid data, fall back to hardcoded times
             pass
@@ -201,9 +201,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         current_wind = self.coordinator.data.get("wind_speed", 5)
 
         for i in range(24):  # 24 hours
-            from datetime import timedelta, timezone
-
-            hour_time = datetime.now(timezone.utc) + timedelta(hours=i + 1)
+            hour_time = (datetime.now() + timedelta(hours=i + 1)).replace(tzinfo=None)
 
             # Determine if this forecast hour is daytime using sunrise/sunset data
             is_daytime = self._is_forecast_hour_daytime(
