@@ -887,6 +887,396 @@ class TestMicroWeatherEntity:
                 assert isinstance(daily_parsed, datetime)
                 assert isinstance(hourly_parsed, datetime)
 
+    async def test_async_forecast_hourly_missing_temperature_sensor(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when temperature sensor is missing."""
+        coordinator.data = {
+            # No temperature sensor
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 50,
+            "wind_speed": 5.0,
+            "precipitation": 0.0,
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should use default temperature (20.0) and still generate forecast
+        for forecast in result:
+            assert isinstance(forecast["native_temperature"], float)
+            assert forecast["native_temperature"] > 0  # Should have reasonable values
+
+    async def test_async_forecast_hourly_missing_humidity_sensor(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when humidity sensor is missing."""
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            # No humidity sensor
+            "wind_speed": 5.0,
+            "precipitation": 0.0,
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should use default humidity (50) and still generate forecast
+        for forecast in result:
+            assert isinstance(forecast["humidity"], (int, float))
+            assert 0 <= forecast["humidity"] <= 100
+
+    async def test_async_forecast_hourly_missing_wind_sensor(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when wind speed sensor is missing."""
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 50,
+            # No wind_speed sensor
+            "precipitation": 0.0,
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should use default wind speed and still generate forecast
+        for forecast in result:
+            assert isinstance(forecast["native_wind_speed"], float)
+            assert forecast["native_wind_speed"] >= 0
+
+    async def test_async_forecast_hourly_missing_precipitation_sensor(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when precipitation sensor is missing."""
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 50,
+            "wind_speed": 5.0,
+            # No precipitation sensor
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should use default precipitation (0.0) and still generate forecast
+        for forecast in result:
+            assert isinstance(forecast["native_precipitation"], float)
+            assert forecast["native_precipitation"] >= 0
+
+    async def test_async_forecast_hourly_missing_solar_sensors(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when solar sensors (UV, radiation, lux) are missing."""
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 50,
+            "wind_speed": 5.0,
+            "precipitation": 0.0,
+            # No solar sensors: uv_index, solar_radiation, lux
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should still generate forecast using defaults for solar data
+        for forecast in result:
+            assert isinstance(forecast["native_temperature"], float)
+            assert isinstance(forecast["condition"], str)
+
+    async def test_async_forecast_hourly_missing_pressure_sensor(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when pressure sensor is missing."""
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 50,
+            "wind_speed": 5.0,
+            "precipitation": 0.0,
+            # No pressure sensor
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should use default pressure and still generate forecast
+        for forecast in result:
+            assert isinstance(forecast["native_temperature"], float)
+
+    async def test_async_forecast_hourly_missing_visibility_sensor(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when visibility sensor is missing."""
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 50,
+            "wind_speed": 5.0,
+            "precipitation": 0.0,
+            # No visibility sensor
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should still generate forecast without visibility data
+        for forecast in result:
+            assert isinstance(forecast["native_temperature"], float)
+
+    async def test_async_forecast_hourly_missing_wind_direction_sensor(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when wind direction sensor is missing."""
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 50,
+            "wind_speed": 5.0,
+            "precipitation": 0.0,
+            # No wind_direction sensor
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should still generate forecast without wind direction data
+        for forecast in result:
+            assert isinstance(forecast["native_temperature"], float)
+
+    async def test_async_forecast_hourly_multiple_missing_sensors(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when multiple sensors are missing."""
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            # Missing: humidity, wind_speed, precipitation, pressure, visibility, wind_direction
+            # Missing solar sensors: uv_index, solar_radiation, lux
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should use defaults for all missing sensors and still generate forecast
+        for forecast in result:
+            assert isinstance(forecast["native_temperature"], float)
+            assert isinstance(forecast["condition"], str)
+            assert isinstance(forecast["native_precipitation"], float)
+            assert isinstance(forecast["native_wind_speed"], float)
+            assert isinstance(forecast["humidity"], (int, float))
+
+    async def test_async_forecast_hourly_none_sensor_values(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when sensor values are explicitly None."""
+        coordinator.data = {
+            "temperature": None,  # Temperature sensor returns None
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": None,  # Humidity sensor returns None
+            "wind_speed": None,  # Wind sensor returns None
+            "precipitation": None,  # Precipitation sensor returns None
+            "pressure": None,  # Pressure sensor returns None
+            "visibility": None,  # Visibility sensor returns None
+            "wind_direction": None,  # Wind direction sensor returns None
+            "uv_index": None,  # UV sensor returns None
+            "solar_radiation": None,  # Solar radiation sensor returns None
+            "lux": None,  # Lux sensor returns None
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should use defaults for all None values and still generate forecast
+        for forecast in result:
+            assert isinstance(forecast["native_temperature"], float)
+            assert isinstance(forecast["condition"], str)
+            assert isinstance(forecast["native_precipitation"], float)
+            assert isinstance(forecast["native_wind_speed"], float)
+            assert isinstance(forecast["humidity"], (int, float))
+
+    async def test_async_forecast_hourly_minimal_sensor_data(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast with only the bare minimum sensor data."""
+        coordinator.data = {
+            # Only temperature and condition - the most basic required data
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+        }
+
+        result = await weather_entity.async_forecast_hourly()
+
+        assert result is not None
+        assert len(result) == 24
+
+        # Should generate complete forecast using defaults for missing sensors
+        for forecast in result:
+            assert isinstance(forecast["native_temperature"], float)
+            assert isinstance(forecast["condition"], str)
+            assert isinstance(forecast["native_precipitation"], float)
+            assert isinstance(forecast["native_wind_speed"], float)
+            assert isinstance(forecast["humidity"], (int, float))
+            assert "datetime" in forecast
+
+    async def test_async_forecast_hourly_empty_sensor_data(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly forecast when coordinator data is empty dict."""
+        coordinator.data = {}  # Completely empty data
+
+        result = await weather_entity.async_forecast_hourly()
+
+        # Empty dict is falsy, so forecast returns None
+        assert result is None
+
+    def test_weather_properties_with_missing_sensors(self, weather_entity, coordinator):
+        """Test weather entity properties when various sensors are missing."""
+        # Test with partial sensor data
+        coordinator.data = {
+            "temperature": 25.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 60,
+            # Missing: pressure, wind_speed, wind_direction, visibility, precipitation
+        }
+
+        # Properties that have data should return values
+        assert weather_entity.native_temperature == 25.0
+        assert weather_entity.condition == ATTR_CONDITION_SUNNY
+        assert weather_entity.humidity == 60
+
+        # Properties that are missing should return None
+        assert weather_entity.native_pressure is None
+        assert weather_entity.native_wind_speed is None
+        assert weather_entity.wind_bearing is None
+        assert weather_entity.native_visibility is None
+        assert weather_entity.native_precipitation is None
+        assert weather_entity.native_precipitation_unit is None
+
+    def test_weather_properties_with_none_values(self, weather_entity, coordinator):
+        """Test weather entity properties when sensors return None values."""
+        coordinator.data = {
+            "temperature": None,
+            "condition": None,
+            "humidity": None,
+            "pressure": None,
+            "wind_speed": None,
+            "wind_direction": None,
+            "visibility": None,
+            "precipitation": None,
+            "precipitation_unit": None,
+        }
+
+        # All properties should return None when sensors return None
+        assert weather_entity.native_temperature is None
+        assert weather_entity.condition is None
+        assert weather_entity.humidity is None
+        assert weather_entity.native_pressure is None
+        assert weather_entity.native_wind_speed is None
+        assert weather_entity.wind_bearing is None
+        assert weather_entity.native_visibility is None
+        assert weather_entity.native_precipitation is None
+        assert weather_entity.native_precipitation_unit is None
+
+    def test_weather_properties_with_empty_data(self, weather_entity, coordinator):
+        """Test weather entity properties when coordinator data is empty."""
+        coordinator.data = {}  # Empty dict
+
+        # All properties should return None when no data
+        assert weather_entity.native_temperature is None
+        assert weather_entity.condition is None
+        assert weather_entity.humidity is None
+        assert weather_entity.native_pressure is None
+        assert weather_entity.native_wind_speed is None
+        assert weather_entity.wind_bearing is None
+        assert weather_entity.native_visibility is None
+        assert weather_entity.native_precipitation is None
+        assert weather_entity.native_precipitation_unit is None
+
+    def test_weather_properties_with_no_data(self, weather_entity, coordinator):
+        """Test weather entity properties when coordinator data is None."""
+        coordinator.data = None
+
+        # All properties should return None when no coordinator data
+        assert weather_entity.native_temperature is None
+        assert weather_entity.condition is None
+        assert weather_entity.humidity is None
+        assert weather_entity.native_pressure is None
+        assert weather_entity.native_wind_speed is None
+        assert weather_entity.wind_bearing is None
+        assert weather_entity.native_visibility is None
+        assert weather_entity.native_precipitation is None
+        assert weather_entity.native_precipitation_unit is None
+
+    async def test_daily_forecast_with_missing_data(self, weather_entity, coordinator):
+        """Test daily forecast when forecast data is missing or incomplete."""
+        # Test with no forecast data
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+        }
+
+        result = await weather_entity.async_forecast_daily()
+        assert result is None
+
+        # Test with empty forecast list
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "forecast": [],
+        }
+
+        result = await weather_entity.async_forecast_daily()
+        assert result == []
+
+        # Test with incomplete forecast data
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "forecast": [
+                {
+                    "datetime": "2024-01-01T00:00:00",
+                    "temperature": 22.0,
+                    # Missing templow, condition, etc.
+                }
+            ],
+        }
+
+        result = await weather_entity.async_forecast_daily()
+        assert result is not None
+        assert len(result) == 1
+        assert result[0]["native_temperature"] == 22.0
+        # Should use defaults for missing fields
+        assert result[0]["native_templow"] == 19.0  # temperature - 3.0
+        assert result[0]["condition"] == ATTR_CONDITION_SUNNY  # Should have default
+        assert result[0]["native_precipitation"] == 0  # Default
+        assert result[0]["native_wind_speed"] == 0  # Default
+        assert result[0]["humidity"] == 50  # Default
+
 
 class TestAsyncSetupEntry:
     """Test the async_setup_entry function."""

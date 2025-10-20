@@ -5,6 +5,7 @@ from typing import Any, Dict
 
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_SUNNY,
     Forecast,
     WeatherEntity,
 )
@@ -170,8 +171,10 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 Forecast(
                     datetime=day_data["datetime"],
                     native_temperature=day_data["temperature"],
-                    native_templow=day_data["templow"],
-                    condition=day_data["condition"],
+                    native_templow=day_data.get(
+                        "templow", day_data["temperature"] - 3.0
+                    ),
+                    condition=day_data.get("condition", ATTR_CONDITION_SUNNY),
                     native_precipitation=day_data.get("precipitation", 0),
                     native_wind_speed=day_data.get("wind_speed", 0),
                     humidity=day_data.get("humidity", 50),

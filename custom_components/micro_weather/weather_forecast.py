@@ -1449,6 +1449,9 @@ class AdvancedWeatherForecast:
         micro_evolution: Dict[str, Any],
     ) -> float:
         """Comprehensive hourly temperature forecasting."""
+        # Ensure current_temp is not None
+        if current_temp is None:
+            current_temp = 20.0
         forecast_temp = current_temp
 
         # Astronomical diurnal variation (dampened for distant forecasts)
@@ -1566,6 +1569,9 @@ class AdvancedWeatherForecast:
         micro_evolution: Dict[str, Any],
     ) -> str:
         """Comprehensive hourly condition forecasting."""
+        # Ensure current_condition is not None
+        if current_condition is None:
+            current_condition = ATTR_CONDITION_CLOUDY
         forecast_condition = current_condition
 
         # Daytime/nighttime adjustments
@@ -1694,6 +1700,9 @@ class AdvancedWeatherForecast:
         condition: str,
     ) -> float:
         """Comprehensive hourly humidity forecasting."""
+        # Ensure current_humidity is not None
+        if current_humidity is None:
+            current_humidity = 50.0
         humidity = current_humidity
 
         # Diurnal humidity pattern
