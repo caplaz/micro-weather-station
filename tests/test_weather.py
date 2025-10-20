@@ -352,7 +352,9 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             # Mock fromisoformat to return proper timezone-aware datetime objects
@@ -421,7 +423,9 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
 
@@ -475,7 +479,9 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
 
@@ -531,7 +537,9 @@ class TestMicroWeatherEntity:
 
         with (
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -592,7 +600,9 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -637,7 +647,7 @@ class TestMicroWeatherEntity:
                     ),
                     patch("homeassistant.util.dt.now", return_value=mock_now_sunset),
                     patch(
-                        "custom_components.micro_weather.weather.datetime"
+                        "custom_components.micro_weather.weather_forecast.datetime"
                     ) as mock_dt_class_sunset,
                 ):
                     mock_dt_class_sunset.now.return_value = mock_now_sunset
@@ -670,7 +680,9 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -730,9 +742,11 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
             patch(
-                "custom_components.micro_weather.weather.datetime.fromisoformat"
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime.fromisoformat"
             ) as mock_fromisoformat,
         ):
             mock_dt_class.now.return_value = mock_now
@@ -791,7 +805,9 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(

@@ -419,7 +419,7 @@ class WeatherAnalysis:
 
         return adjusted_thresholds
 
-    def calculate_dewpoint(self, temp_f: float, humidity: float) -> float:
+    def calculate_dewpoint(self, temp_f: float, humidity: float | None) -> float:
         """Calculate dewpoint using Magnus formula (meteorologically accurate).
 
         The dewpoint is the temperature at which air becomes saturated with
@@ -428,15 +428,15 @@ class WeatherAnalysis:
 
         Args:
             temp_f: Temperature in Fahrenheit
-            humidity: Relative humidity as percentage (0-100)
+            humidity: Relative humidity as percentage (0-100), or None
 
         Returns:
             float: Dewpoint temperature in Fahrenheit
 
         Note:
-            Falls back to approximation for very dry conditions (humidity <= 0)
+            Falls back to approximation for very dry conditions (humidity <= 0) or None
         """
-        if humidity <= 0:
+        if humidity is None or humidity <= 0:
             return temp_f - 50  # Approximate for very dry conditions
 
         # Convert to Celsius for calculation

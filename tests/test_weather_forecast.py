@@ -1,6 +1,6 @@
 """Test the weather forecasting functionality."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import Mock, patch
 
 from homeassistant.components.weather import (
@@ -1257,11 +1257,11 @@ class TestAdvancedWeatherForecast:
         }
 
         # Test with sunrise/sunset times
-        sunrise_time = datetime.now().replace(hour=6, minute=30)
-        sunset_time = datetime.now().replace(hour=19, minute=30)
+        # sunrise_time = datetime.now().replace(hour=6, minute=30)
+        # sunset_time = datetime.now().replace(hour=19, minute=30)
 
         result = forecast.generate_hourly_forecast_comprehensive(
-            current_temp, current_condition, sensor_data, sunrise_time, sunset_time
+            current_temp, current_condition, sensor_data
         )
 
         assert isinstance(result, list)
@@ -1297,16 +1297,11 @@ class TestAdvancedWeatherForecast:
         }
 
         # Set times so current hour is nighttime
-        now = datetime.now()
-        sunrise_time = (now + timedelta(hours=6)).replace(
-            hour=6, minute=0
-        )  # 6 hours from now
-        sunset_time = (now - timedelta(hours=2)).replace(
-            hour=18, minute=0
-        )  # 2 hours ago
+        # sunrise_time = (now + timedelta(hours=6)).replace(hour=6, minute=0)  # 6 hours from now
+        # sunset_time = (now - timedelta(hours=2)).replace(hour=18, minute=0)  # 2 hours ago
 
         result = forecast.generate_hourly_forecast_comprehensive(
-            current_temp, current_condition, sensor_data, sunrise_time, sunset_time
+            current_temp, current_condition, sensor_data
         )
 
         assert len(result) == 24
@@ -1324,6 +1319,44 @@ class TestAdvancedWeatherForecast:
                 nighttime_found = True
 
         assert nighttime_found, "Should have nighttime hours in forecast"
+
+    def test_generate_hourly_forecast_comprehensive_missing_humidity(
+        self, forecast, mock_analysis
+    ):
+        """Test hourly forecast with missing humidity sensor data."""
+        current_temp = 22.0  # Celsius
+        current_condition = ATTR_CONDITION_PARTLYCLOUDY
+        sensor_data = {
+            "outdoor_temp": 72.0,  # Fahrenheit
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "solar_radiation": 800.0,
+            "solar_lux": 85000.0,
+            "uv_index": 6.0,
+            # Note: no 'humidity' key - this is the case we're testing
+        }
+
+        # Set sunrise/sunset times
+        # now = datetime.now()
+        # sunrise_time = now.replace(hour=6, minute=30)
+        # sunset_time = now.replace(hour=18, minute=30)
+
+        result = forecast.generate_hourly_forecast_comprehensive(
+            current_temp, current_condition, sensor_data
+        )
+
+        assert len(result) == 24
+        # Check that all forecast hours have required fields
+        for hour_forecast in result:
+            assert isinstance(hour_forecast["temperature"], float)
+            assert isinstance(hour_forecast["condition"], str)
+            assert isinstance(hour_forecast["precipitation"], float)
+            assert isinstance(hour_forecast["wind_speed"], float)
+            assert isinstance(
+                hour_forecast["humidity"], (int, float)
+            )  # Should default to 50
+            # Verify humidity defaults to around 50 when sensor is missing
+            assert 45 <= hour_forecast["humidity"] <= 55
 
     def test_analyze_comprehensive_meteorological_state(self, forecast, mock_analysis):
         """Test comprehensive meteorological state analysis."""

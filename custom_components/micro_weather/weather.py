@@ -68,10 +68,15 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             self._forecast = AdvancedWeatherForecast(coordinator.analysis)
         else:
             # Fallback if analysis is not available
+            from .const import CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
             from .weather_analysis import WeatherAnalysis
 
+            # Get zenith max radiation from config, default to 1000.0
+            zenith_max_radiation = config_entry.options.get(
+                CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
+            )
             self._forecast = AdvancedWeatherForecast(
-                WeatherAnalysis(coordinator.hass, config_entry.options)
+                WeatherAnalysis(zenith_max_radiation=zenith_max_radiation)
             )
 
     async def async_added_to_hass(self) -> None:
