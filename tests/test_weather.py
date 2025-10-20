@@ -769,6 +769,98 @@ class TestMicroWeatherEntity:
         )
         assert result is False, "Should be nighttime after sunset"
 
+    async def test_datetime_format_consistency(self, weather_entity, coordinator):
+        """Test that daily and hourly forecasts use consistent datetime formats.
+
+        Both should use naive ISO datetime strings for consistent UI display.
+        This test covers the fix for issue #16 where inconsistent datetime formats
+        caused empty hourly data in the weather card.
+        """
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time for reproducible testing
+        mock_now = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
+            mock_dt_class.now.return_value = mock_now
+            mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
+                s.replace("Z", "+00:00")
+            )
+
+            # Mock sun.sun entity for sunrise/sunset data
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {
+                "next_rising": "2024-01-02T07:00:00Z",
+                "next_setting": "2024-01-02T18:00:00Z",
+            }
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                # Set up coordinator data with both current conditions and forecast
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                    "forecast": [
+                        {
+                            "datetime": "2024-01-02T00:00:00",  # Naive datetime string
+                            "temperature": 22.0,
+                            "templow": 16.0,
+                            "condition": ATTR_CONDITION_SUNNY,
+                            "precipitation": 0.0,
+                            "wind_speed": 10.0,
+                            "humidity": 60,
+                        }
+                    ],
+                }
+
+                # Get both daily and hourly forecasts
+                daily_forecast = await weather_entity.async_forecast_daily()
+                hourly_forecast = await weather_entity.async_forecast_hourly()
+
+                assert daily_forecast is not None
+                assert hourly_forecast is not None
+
+                # Check daily forecast datetime format
+                daily_datetime = daily_forecast[0]["datetime"]
+                assert isinstance(daily_datetime, str)
+                # Should be naive ISO format (no timezone info)
+                assert "Z" not in daily_datetime
+                assert "+" not in daily_datetime
+                assert "-" in daily_datetime  # Should contain date separators
+
+                # Check hourly forecast datetime format
+                for forecast in hourly_forecast:
+                    hourly_datetime = forecast["datetime"]
+                    assert isinstance(hourly_datetime, str)
+                    # Should be naive ISO format (no timezone info)
+                    assert "Z" not in hourly_datetime
+                    assert "+" not in hourly_datetime
+                    assert "-" in hourly_datetime  # Should contain date separators
+
+                    # Verify it's a valid ISO format that can be parsed
+                    parsed = datetime.fromisoformat(hourly_datetime)
+                    assert parsed.tzinfo is None  # Should be naive
+
+                # Verify that both formats are consistent by checking they can be compared
+                # Parse one datetime from each to ensure format compatibility
+                daily_parsed = datetime.fromisoformat(daily_datetime)
+                hourly_parsed = datetime.fromisoformat(hourly_forecast[0]["datetime"])
+
+                # Both should be naive datetimes
+                assert daily_parsed.tzinfo is None
+                assert hourly_parsed.tzinfo is None
+
+                # Should be able to compare them (same type)
+                assert isinstance(daily_parsed, datetime)
+                assert isinstance(hourly_parsed, datetime)
+
 
 class TestAsyncSetupEntry:
     """Test the async_setup_entry function."""

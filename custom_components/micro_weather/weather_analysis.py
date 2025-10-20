@@ -718,6 +718,35 @@ class WeatherAnalysis:
             and uv_index < 1
             and solar_elevation < 15  # Only apply fallback when sun is very low
         ):  # Only apply fallback when astronomical calculations are less reliable
+            # Get historical weather bias to avoid false cloudy readings at sunrise/sunset
+            historical_bias = self.get_historical_weather_bias(hours=6)
+
+            # If skies have been predominantly clear and pressure supports clear conditions,
+            # significantly reduce the cloud cover estimate
+            bias_adjustment = 0.0
+            if historical_bias["bias_strength"] > 0.7:  # Strong clear bias
+                # Reduce cloud cover by up to 50% based on bias strength
+                bias_adjustment = -50.0 * historical_bias["bias_strength"]
+                _LOGGER.debug(
+                    "Applying strong clear bias at sunrise/sunset: %.1f%% reduction "
+                    "(clear history: %.1f%%, bias: %.2f, morning: %s)",
+                    bias_adjustment,
+                    historical_bias["clear_percentage"],
+                    historical_bias["bias_strength"],
+                    historical_bias["is_morning"],
+                )
+            elif historical_bias["bias_strength"] > 0.5:  # Moderate clear bias
+                # Reduce cloud cover by up to 30%
+                bias_adjustment = -30.0 * historical_bias["bias_strength"]
+                _LOGGER.debug(
+                    "Applying moderate clear bias at sunrise/sunset: %.1f%% reduction "
+                    "(clear history: %.1f%%, bias: %.2f, morning: %s)",
+                    bias_adjustment,
+                    historical_bias["clear_percentage"],
+                    historical_bias["bias_strength"],
+                    historical_bias["is_morning"],
+                )
+
             # If all solar measurements are extremely low relative to expectations,
             # it indicates heavy clouds
             if (
@@ -728,14 +757,17 @@ class WeatherAnalysis:
                 and (solar_lux < 5000 or solar_lux < max_solar_radiation * 6)
                 and uv_index == 0
             ):
-                return 85.0  # Heavy overcast conditions
+                cloud_cover = 85.0  # Heavy overcast conditions
             elif (
                 avg_solar_radiation < max_solar_radiation * 0.2
                 or avg_solar_radiation < 100
             ) and solar_lux < 10000:
-                return 70.0  # Mostly cloudy conditions
+                cloud_cover = 70.0  # Mostly cloudy conditions
             else:
-                return 40.0  # Partly cloudy when data is inconclusive
+                cloud_cover = 40.0  # Partly cloudy when data is inconclusive
+
+            # Apply historical bias adjustment
+            cloud_cover = max(0.0, cloud_cover + bias_adjustment)
 
         # Calculate lux maximum (roughly 100-150 lux per W/m² depending on spectrum)
         # Use 120 lx/W/m² as a reasonable average
@@ -1682,3 +1714,116 @@ class WeatherAnalysis:
         # Return the sector with the most observations
         prevailing = max(sectors, key=lambda k: sectors[k])
         return prevailing
+
+    def get_historical_weather_bias(self, hours: int = 6) -> Dict[str, Any]:
+        """Calculate historical weather bias for low-elevation cloud cover adjustment.
+
+        Analyzes recent weather conditions to determine if skies have been
+        predominantly clear. This helps prevent false cloudy readings at sunrise
+        and sunset when solar radiation naturally drops but atmospheric conditions
+        remain clear. Applies more conservative bias in the morning when only
+        nighttime data is available.
+
+        Args:
+            hours: Number of hours to look back for historical analysis
+
+        Returns:
+            dict: Bias analysis including:
+                - clear_percentage: Percentage of time with clear/sunny conditions
+                - bias_strength: Strength of bias toward clear conditions (0-1)
+                - recent_conditions: List of recent weather conditions
+                - pressure_trend: Recent pressure trend analysis
+                - is_morning: Whether the analysis is for morning conditions
+        """
+        if "weather_condition" not in self._sensor_history:
+            return {
+                "clear_percentage": 0.0,
+                "bias_strength": 0.0,
+                "recent_conditions": [],
+                "pressure_trend": None,
+                "is_morning": False,
+            }
+
+        # Determine if we're in morning conditions (more conservative bias)
+        current_hour = datetime.now().hour
+        is_morning = current_hour < 12  # Before noon = morning
+
+        # Get weather conditions from the last N hours
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        recent_conditions = [
+            entry["value"]
+            for entry in self._sensor_history["weather_condition"]
+            if entry["timestamp"] > cutoff_time
+        ]
+
+        if not recent_conditions:
+            return {
+                "clear_percentage": 0.0,
+                "bias_strength": 0.0,
+                "recent_conditions": [],
+                "pressure_trend": None,
+                "is_morning": is_morning,
+            }
+
+        # Count clear/sunny conditions
+        clear_conditions = [ATTR_CONDITION_SUNNY, ATTR_CONDITION_CLEAR_NIGHT]
+        clear_count = sum(
+            1 for condition in recent_conditions if condition in clear_conditions
+        )
+        total_count = len(recent_conditions)
+        clear_percentage = (clear_count / total_count) * 100 if total_count > 0 else 0.0
+
+        # Get recent pressure trends for additional context
+        pressure_trends = self.analyze_pressure_trends()
+
+        # Calculate bias strength based on clear percentage and pressure trends
+        # Higher clear percentage = stronger bias toward clear
+        # High pressure systems also support clear bias
+        base_bias = min(1.0, clear_percentage / 100.0)
+
+        # Boost bias if pressure system is high (clear skies more likely)
+        pressure_boost = 0.0
+        if pressure_trends.get("pressure_system") == "high_pressure":
+            pressure_boost = 0.2
+        elif pressure_trends.get("pressure_system") == "normal":
+            pressure_boost = 0.1
+
+        # Boost bias if pressure is rising (clearing conditions)
+        trend_boost = 0.0
+        long_term_trend = pressure_trends.get("long_term_trend", 0.0)
+        if long_term_trend > 1.0:  # Rising pressure over 24 hours
+            trend_boost = 0.15
+
+        bias_strength = min(1.0, base_bias + pressure_boost + trend_boost)
+
+        # Apply morning conservatism: reduce bias strength in morning
+        # since we only have nighttime data and no daytime confirmation yet
+        if is_morning and bias_strength > 0.5:
+            # Reduce strong bias to moderate in morning (require stronger evidence)
+            bias_strength = max(0.5, bias_strength * 0.8)
+            _LOGGER.debug(
+                "Morning conservatism applied: reduced bias from %.2f to %.2f "
+                "(only nighttime data available)",
+                (base_bias + pressure_boost + trend_boost),
+                bias_strength,
+            )
+
+        _LOGGER.debug(
+            "Historical weather bias: %.1f%% clear conditions, bias strength: %.2f "
+            "(pressure system: %s, trend: %.2f hPa/24h, morning: %s)",
+            clear_percentage,
+            bias_strength,
+            pressure_trends.get("pressure_system", "unknown"),
+            long_term_trend,
+            is_morning,
+        )
+
+        return {
+            "clear_percentage": clear_percentage,
+            "bias_strength": bias_strength,
+            "recent_conditions": recent_conditions[
+                -10:
+            ],  # Last 10 conditions for context
+            "pressure_trend": pressure_trends,
+            "is_morning": is_morning,
+        }
