@@ -1589,7 +1589,9 @@ class AdvancedWeatherForecast:
         # Add some random variation (±20%)
         import random
 
-        variation = random.uniform(0.8, 1.2)
+        variation = random.uniform(
+            0.8, 1.2
+        )  # nosec B311 - Used for weather simulation, not security
         precipitation *= variation
 
         # Ensure minimum values for rainy conditions
