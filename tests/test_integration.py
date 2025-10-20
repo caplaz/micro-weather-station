@@ -2,6 +2,12 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.components.weather import (
+    ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_PARTLYCLOUDY,
+    ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SUNNY,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
@@ -26,7 +32,7 @@ class TestIntegrationSetup:
         """Test successful setup of the integration."""
         # Mock the weather detector to return valid data
         mock_weather_data = {
-            "condition": "sunny",
+            "condition": ATTR_CONDITION_SUNNY,
             "temperature": 22.5,
             "humidity": 65.0,
             "pressure": 1013.25,
@@ -83,7 +89,7 @@ class TestIntegrationSetup:
     ):
         """Test successful unload of the integration."""
         # First set up the integration
-        mock_weather_data = {"condition": "cloudy", "temperature": 20.0}
+        mock_weather_data = {"condition": ATTR_CONDITION_CLOUDY, "temperature": 20.0}
 
         with (
             patch(
@@ -121,7 +127,7 @@ class TestIntegrationSetup:
     ):
         """Test unload failure when platform unload fails."""
         # First set up the integration
-        mock_weather_data = {"condition": "rainy", "temperature": 18.0}
+        mock_weather_data = {"condition": ATTR_CONDITION_RAINY, "temperature": 18.0}
 
         with (
             patch(
@@ -156,7 +162,7 @@ class TestIntegrationSetup:
     ):
         """Test options update triggers coordinator refresh."""
         # First set up the integration
-        mock_weather_data = {"condition": "sunny", "temperature": 25.0}
+        mock_weather_data = {"condition": ATTR_CONDITION_SUNNY, "temperature": 25.0}
 
         with (
             patch(
@@ -192,7 +198,7 @@ class TestCoordinatorIntegration:
     ):
         """Test successful data update by coordinator."""
         mock_weather_data = {
-            "condition": "partlycloudy",
+            "condition": ATTR_CONDITION_PARTLYCLOUDY,
             "temperature": 23.5,
             "humidity": 70.0,
             "pressure": 1015.0,
@@ -202,7 +208,7 @@ class TestCoordinatorIntegration:
                     "datetime": "2025-09-30T12:00:00",
                     "temperature": 24.0,
                     "templow": 18.0,
-                    "condition": "sunny",
+                    "condition": ATTR_CONDITION_SUNNY,
                     "precipitation": 0.0,
                     "wind_speed": 4.0,
                     "humidity": 65.0,

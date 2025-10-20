@@ -49,7 +49,7 @@ from .const import (
     DEFAULT_ZENITH_MAX_RADIATION,
 )
 from .weather_analysis import WeatherAnalysis
-from .weather_forecast import WeatherForecast
+from .weather_forecast import AdvancedWeatherForecast
 from .weather_utils import (
     convert_altitude_to_meters,
     convert_to_celsius,
@@ -114,7 +114,7 @@ class WeatherDetector:
             sensor_history=self._sensor_history,
             zenith_max_radiation=zenith_max_radiation,
         )
-        self.forecast = WeatherForecast(self.analysis)
+        self.forecast = AdvancedWeatherForecast(self.analysis)
 
         # Sensor entity IDs mapping
         self.sensors = {

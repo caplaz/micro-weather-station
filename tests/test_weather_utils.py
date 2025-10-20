@@ -1,11 +1,14 @@
 """Test the weather utility functions."""
 
+from datetime import datetime, timezone
+
 from custom_components.micro_weather.weather_utils import (
     convert_altitude_to_meters,
     convert_precipitation_rate,
     convert_to_celsius,
     convert_to_hpa,
     convert_to_kmh,
+    is_forecast_hour_daytime,
 )
 
 
@@ -132,3 +135,50 @@ class TestWeatherUtils:
 
         # Test unknown unit (assume mm/h)
         assert convert_precipitation_rate(5.0, "unknown") == 5.0
+
+    def test_is_forecast_hour_daytime_edge_cases(self):
+        """Test the is_forecast_hour_daytime function with edge cases."""
+        # Test with None sunrise/sunset (should use hardcoded fallback)
+        result = is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 8, 0, 0, tzinfo=timezone.utc), None, None  # 8 AM
+        )
+        assert result is True, "Should be daytime at 8 AM with None sunrise/sunset"
+
+        result = is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc), None, None  # 2 AM
+        )
+        assert result is False, "Should be nighttime at 2 AM with None sunrise/sunset"
+
+        # Test with actual sunrise/sunset times
+        sunrise = datetime(2024, 1, 1, 7, 0, 0, tzinfo=timezone.utc)
+        sunset = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
+
+        # Before sunrise
+        result = is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is False, "Should be nighttime before sunrise"
+
+        # At sunrise
+        result = is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 7, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is True, "Should be daytime at sunrise"
+
+        # During day
+        result = is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is True, "Should be daytime during day"
+
+        # At sunset
+        result = is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is False, "Should be nighttime at sunset"
+
+        # After sunset
+        result = is_forecast_hour_daytime(
+            datetime(2024, 1, 1, 20, 0, 0, tzinfo=timezone.utc), sunrise, sunset
+        )
+        assert result is False, "Should be nighttime after sunset"

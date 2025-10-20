@@ -346,7 +346,14 @@ class TestMicroWeatherEntity:
         # Mock current time to be 10 PM (nighttime) - timezone aware
         mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
 
-        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
+        with (
+            patch(
+                "homeassistant.util.dt.parse_datetime",
+                side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+            ),
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+        ):
             mock_dt_class.now.return_value = mock_now
             # Mock fromisoformat to return proper timezone-aware datetime objects
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -408,7 +415,14 @@ class TestMicroWeatherEntity:
         # Mock current time to be 10 PM (nighttime) - timezone aware
         mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
 
-        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
+        with (
+            patch(
+                "homeassistant.util.dt.parse_datetime",
+                side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+            ),
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+        ):
             mock_dt_class.now.return_value = mock_now
 
             # Mock sun.sun entity as None (unavailable)
@@ -455,7 +469,14 @@ class TestMicroWeatherEntity:
         # Mock current time to be 2 AM (nighttime) - timezone aware
         mock_now = datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc)
 
-        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
+        with (
+            patch(
+                "homeassistant.util.dt.parse_datetime",
+                side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+            ),
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+        ):
             mock_dt_class.now.return_value = mock_now
 
             # Mock sun.sun entity with missing attributes
@@ -508,7 +529,10 @@ class TestMicroWeatherEntity:
         # Mock current time to be 2 AM (nighttime)
         mock_now = datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc)
 
-        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
+        with (
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+        ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
                 s.replace("Z", "+00:00")
@@ -562,7 +586,14 @@ class TestMicroWeatherEntity:
         # Mock current time to be exactly at sunrise (7 AM)
         mock_now = datetime(2024, 1, 2, 7, 0, 0, tzinfo=timezone.utc)
 
-        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
+        with (
+            patch(
+                "homeassistant.util.dt.parse_datetime",
+                side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+            ),
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+        ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
                 s.replace("Z", "+00:00")
@@ -597,9 +628,18 @@ class TestMicroWeatherEntity:
 
                 # Test exactly at sunset
                 mock_now_sunset = datetime(2024, 1, 2, 18, 0, 0, tzinfo=timezone.utc)
-                with patch(
-                    "custom_components.micro_weather.weather.datetime"
-                ) as mock_dt_class_sunset:
+                with (
+                    patch(
+                        "homeassistant.util.dt.parse_datetime",
+                        side_effect=lambda s: datetime.fromisoformat(
+                            s.replace("Z", "+00:00")
+                        ),
+                    ),
+                    patch("homeassistant.util.dt.now", return_value=mock_now_sunset),
+                    patch(
+                        "custom_components.micro_weather.weather.datetime"
+                    ) as mock_dt_class_sunset,
+                ):
                     mock_dt_class_sunset.now.return_value = mock_now_sunset
                     mock_dt_class_sunset.fromisoformat.side_effect = (
                         lambda s: datetime.fromisoformat(s.replace("Z", "+00:00"))
@@ -624,7 +664,14 @@ class TestMicroWeatherEntity:
             2024, 6, 21, 12, 0, 0, tzinfo=timezone.utc
         )  # Summer solstice
 
-        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
+        with (
+            patch(
+                "homeassistant.util.dt.parse_datetime",
+                side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+            ),
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+        ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
                 s.replace("Z", "+00:00")
@@ -678,6 +725,11 @@ class TestMicroWeatherEntity:
         mock_now = datetime(2024, 1, 1, 22, 0, 0, tzinfo=timezone.utc)
 
         with (
+            patch(
+                "homeassistant.util.dt.parse_datetime",
+                side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+            ),
+            patch("homeassistant.util.dt.now", return_value=mock_now),
             patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
             patch(
                 "custom_components.micro_weather.weather.datetime.fromisoformat"
@@ -720,55 +772,6 @@ class TestMicroWeatherEntity:
                         ATTR_CONDITION_CLOUDY,
                     ], f"Expected clear_night or cloudy with datetime parsing error, got {forecast['condition']}"
 
-    async def test_is_forecast_hour_daytime_edge_cases(self, weather_entity):
-        """Test the _is_forecast_hour_daytime helper method with edge cases."""
-        from datetime import datetime, timezone
-
-        # Test with None sunrise/sunset (should use hardcoded fallback)
-        result = weather_entity._is_forecast_hour_daytime(
-            datetime(2024, 1, 1, 8, 0, 0, tzinfo=timezone.utc), None, None  # 8 AM
-        )
-        assert result is True, "Should be daytime at 8 AM with None sunrise/sunset"
-
-        result = weather_entity._is_forecast_hour_daytime(
-            datetime(2024, 1, 1, 2, 0, 0, tzinfo=timezone.utc), None, None  # 2 AM
-        )
-        assert result is False, "Should be nighttime at 2 AM with None sunrise/sunset"
-
-        # Test with actual sunrise/sunset times
-        sunrise = datetime(2024, 1, 1, 7, 0, 0, tzinfo=timezone.utc)
-        sunset = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
-
-        # Before sunrise
-        result = weather_entity._is_forecast_hour_daytime(
-            datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc), sunrise, sunset
-        )
-        assert result is False, "Should be nighttime before sunrise"
-
-        # At sunrise
-        result = weather_entity._is_forecast_hour_daytime(
-            datetime(2024, 1, 1, 7, 0, 0, tzinfo=timezone.utc), sunrise, sunset
-        )
-        assert result is True, "Should be daytime at sunrise"
-
-        # During day
-        result = weather_entity._is_forecast_hour_daytime(
-            datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc), sunrise, sunset
-        )
-        assert result is True, "Should be daytime during day"
-
-        # At sunset
-        result = weather_entity._is_forecast_hour_daytime(
-            datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc), sunrise, sunset
-        )
-        assert result is False, "Should be nighttime at sunset"
-
-        # After sunset
-        result = weather_entity._is_forecast_hour_daytime(
-            datetime(2024, 1, 1, 20, 0, 0, tzinfo=timezone.utc), sunrise, sunset
-        )
-        assert result is False, "Should be nighttime after sunset"
-
     async def test_datetime_format_consistency(self, weather_entity, coordinator):
         """Test that daily and hourly forecasts use consistent datetime formats.
 
@@ -782,7 +785,14 @@ class TestMicroWeatherEntity:
         # Mock current time for reproducible testing
         mock_now = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
-        with patch("custom_components.micro_weather.weather.datetime") as mock_dt_class:
+        with (
+            patch(
+                "homeassistant.util.dt.parse_datetime",
+                side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
+            ),
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch("custom_components.micro_weather.weather.datetime") as mock_dt_class,
+        ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
                 s.replace("Z", "+00:00")

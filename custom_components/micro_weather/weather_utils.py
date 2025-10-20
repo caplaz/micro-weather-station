@@ -1,6 +1,9 @@
 """Weather utility functions for unit conversions and calculations."""
 
+from datetime import datetime
 from typing import Optional
+
+from homeassistant.core import HomeAssistant
 
 
 def convert_to_celsius(temp_f: Optional[float]) -> Optional[float]:
@@ -59,3 +62,78 @@ def convert_precipitation_rate(
     else:
         # Unknown unit, assume mm/h
         return round(rain_rate, 1)
+
+
+def get_sun_times(hass: HomeAssistant) -> tuple[datetime | None, datetime | None]:
+    """Get sunrise and sunset times from the sun.sun entity.
+
+    Args:
+        hass: Home Assistant instance
+
+    Returns:
+        tuple: (sunrise_time, sunset_time) as datetime objects, or (None, None) if unavailable
+    """
+    try:
+        sun_state = hass.states.get("sun.sun")
+        if sun_state and sun_state.attributes:
+            next_rising = sun_state.attributes.get("next_rising")
+            next_setting = sun_state.attributes.get("next_setting")
+
+            sunrise_time = None
+            sunset_time = None
+
+            if next_rising:
+                try:
+                    sunrise_time = datetime.fromisoformat(
+                        next_rising.replace("Z", "+00:00")
+                    )
+                except (ValueError, AttributeError):
+                    pass
+
+            if next_setting:
+                try:
+                    sunset_time = datetime.fromisoformat(
+                        next_setting.replace("Z", "+00:00")
+                    )
+                except (ValueError, AttributeError):
+                    pass
+
+            return sunrise_time, sunset_time
+    except (AttributeError, KeyError, TypeError):
+        pass
+
+    return None, None
+
+
+def is_forecast_hour_daytime(
+    forecast_time: datetime,
+    sunrise_time: datetime | None,
+    sunset_time: datetime | None,
+) -> bool:
+    """Determine if a forecast hour is daytime using sunrise/sunset data.
+
+    Falls back to hardcoded 6 AM/6 PM times if sunrise/sunset data is unavailable.
+
+    Args:
+        forecast_time: The datetime of the forecast hour
+        sunrise_time: Sunrise time from sun.sun entity (can be None)
+        sunset_time: Sunset time from sun.sun entity (can be None)
+
+    Returns:
+        bool: True if the forecast hour is daytime, False if nighttime
+    """
+    if sunrise_time and sunset_time:
+        # Use actual sunrise/sunset times
+        # Handle timezone awareness mismatches
+        if forecast_time.tzinfo is None and sunrise_time.tzinfo is not None:
+            # Make forecast_time timezone-aware to match sunrise/sunset
+            forecast_time = forecast_time.replace(tzinfo=sunrise_time.tzinfo)
+        elif forecast_time.tzinfo is not None and sunrise_time.tzinfo is None:
+            # Make sunrise/sunset timezone-aware to match forecast_time
+            sunrise_time = sunrise_time.replace(tzinfo=forecast_time.tzinfo)
+            sunset_time = sunset_time.replace(tzinfo=forecast_time.tzinfo)
+        # If both are offset-naive or both are offset-aware, compare directly
+        return sunrise_time <= forecast_time < sunset_time
+    else:
+        # Fallback to hardcoded times (6 AM to 6 PM)
+        return 6 <= forecast_time.hour < 18
