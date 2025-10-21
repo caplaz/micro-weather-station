@@ -1576,10 +1576,17 @@ class AdvancedWeatherForecast:
 
         # Daytime/nighttime adjustments
         if not astronomical_context["is_daytime"]:
+            # Nighttime: change daytime conditions to nighttime equivalents
             if forecast_condition == ATTR_CONDITION_SUNNY:
                 forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
             elif forecast_condition == ATTR_CONDITION_PARTLYCLOUDY:
                 forecast_condition = ATTR_CONDITION_CLOUDY
+        else:
+            # Daytime: change nighttime conditions to daytime equivalents
+            if forecast_condition == ATTR_CONDITION_CLEAR_NIGHT:
+                forecast_condition = ATTR_CONDITION_SUNNY
+            elif forecast_condition == ATTR_CONDITION_CLOUDY:
+                forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
 
         # Micro-evolution changes
         micro_changes = micro_evolution.get("micro_changes", {})
@@ -1662,7 +1669,21 @@ class AdvancedWeatherForecast:
         from homeassistant.util import dt as dt_util
 
         hour = (dt_util.now() + timedelta(hours=hour_idx + 1)).hour
-        diurnal_patterns = hourly_patterns["diurnal_patterns"]["wind"]
+        diurnal_patterns = hourly_patterns.get("diurnal_patterns", {}).get("wind", {})
+
+        # Default wind patterns
+        default_wind_patterns = {
+            "dawn": -1.0,
+            "morning": 0.5,
+            "noon": 1.0,
+            "afternoon": 1.5,
+            "evening": 0.5,
+            "night": -0.5,
+            "midnight": -1.0,
+        }
+
+        # Merge provided patterns with defaults
+        diurnal_patterns = {**default_wind_patterns, **diurnal_patterns}
 
         if 5 <= hour < 7:
             diurnal_factor = diurnal_patterns["dawn"]
@@ -1709,7 +1730,23 @@ class AdvancedWeatherForecast:
         from homeassistant.util import dt as dt_util
 
         hour = (dt_util.now() + timedelta(hours=hour_idx + 1)).hour
-        diurnal_patterns = hourly_patterns["diurnal_patterns"]["humidity"]
+        diurnal_patterns = hourly_patterns.get("diurnal_patterns", {}).get(
+            "humidity", {}
+        )
+
+        # Default humidity patterns
+        default_humidity_patterns = {
+            "dawn": 5,
+            "morning": -5,
+            "noon": -10,
+            "afternoon": -5,
+            "evening": 5,
+            "night": 10,
+            "midnight": 5,
+        }
+
+        # Merge provided patterns with defaults
+        diurnal_patterns = {**default_humidity_patterns, **diurnal_patterns}
 
         if 5 <= hour < 7:
             diurnal_change = diurnal_patterns["dawn"]
