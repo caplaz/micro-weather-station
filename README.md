@@ -757,7 +757,7 @@ See [CHANGELOG](CHANGELOG.md) for the complete changelog.
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[ci-shield]: https://github.com/caplaz/micro-weather-station/actions/workflows/ci.yml/badge.svg
+[ci-shield]: https://github.com/caplaz/micro-weather-station/actions/workflows/ci.yml/badge.svg?style=for-the-badge
 [ci]: https://github.com/caplaz/micro-weather-station/actions/workflows/ci.yml
 [commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=2.3.1
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
