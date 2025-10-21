@@ -21,7 +21,19 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_WINDY,
 )
 
-from .const import DEFAULT_ZENITH_MAX_RADIATION
+from .const import (
+    DEFAULT_ZENITH_MAX_RADIATION,
+    KEY_DEWPOINT,
+    KEY_HUMIDITY,
+    KEY_OUTDOOR_TEMP,
+    KEY_PRESSURE,
+    KEY_RAIN_RATE,
+    KEY_SOLAR_LUX_INTERNAL,
+    KEY_SOLAR_RADIATION,
+    KEY_UV_INDEX,
+    KEY_WIND_GUST,
+    KEY_WIND_SPEED,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,23 +75,23 @@ class WeatherAnalysis:
         """
 
         # Extract sensor values with better defaults
-        rain_rate = sensor_data.get("rain_rate", 0.0)
+        rain_rate = sensor_data.get(KEY_RAIN_RATE, 0.0)
         rain_state = sensor_data.get("rain_state", "dry").lower()
-        wind_speed = sensor_data.get("wind_speed", 0.0)
-        wind_gust = sensor_data.get("wind_gust", 0.0)
-        solar_radiation = sensor_data.get("solar_radiation", 0.0)
-        solar_lux = sensor_data.get("solar_lux", 0.0)
-        uv_index = sensor_data.get("uv_index", 0.0)
-        outdoor_temp = sensor_data.get("outdoor_temp", 70.0)
-        humidity = sensor_data.get("humidity", 50.0)
-        pressure = sensor_data.get("pressure", 29.92)
+        wind_speed = sensor_data.get(KEY_WIND_SPEED, 0.0)
+        wind_gust = sensor_data.get(KEY_WIND_GUST, 0.0)
+        solar_radiation = sensor_data.get(KEY_SOLAR_RADIATION, 0.0)
+        solar_lux = sensor_data.get(KEY_SOLAR_LUX_INTERNAL, 0.0)
+        uv_index = sensor_data.get(KEY_UV_INDEX, 0.0)
+        outdoor_temp = sensor_data.get(KEY_OUTDOOR_TEMP, 70.0)
+        humidity = sensor_data.get(KEY_HUMIDITY, 50.0)
+        pressure = sensor_data.get(KEY_PRESSURE, 29.92)
 
         # Default altitude to 0.0 if None
         altitude = altitude or 0.0
 
         # Calculate derived meteorological parameters
         # Use dewpoint sensor if available, otherwise calculate from temp/humidity
-        dewpoint_raw = sensor_data.get("dewpoint")
+        dewpoint_raw = sensor_data.get(KEY_DEWPOINT)
         if dewpoint_raw is not None:
             dewpoint = float(dewpoint_raw)
         else:
@@ -701,6 +713,14 @@ class WeatherAnalysis:
             float: Estimated cloud cover percentage (0-100)
         """
 
+        # Handle None values by defaulting to 0.0
+        if solar_radiation is None:
+            solar_radiation = 0.0
+        if solar_lux is None:
+            solar_lux = 0.0
+        if uv_index is None:
+            uv_index = 0.0
+
         # Use moving average of solar radiation to filter temporary fluctuations
         # like passing clouds, while still responding to genuine weather changes
         avg_solar_radiation = self._get_solar_radiation_average(solar_radiation)
@@ -1020,6 +1040,9 @@ class WeatherAnalysis:
         Returns:
             float: Averaged solar radiation value
         """
+        if current_radiation is None:
+            current_radiation = 0.0
+
         if "solar_radiation" not in self._sensor_history:
             return current_radiation
 
@@ -1224,13 +1247,13 @@ class WeatherAnalysis:
         - Storms: Variable based on precipitation and wind
         - Clear: Excellent visibility based on atmospheric clarity
         """
-        solar_lux = sensor_data.get("solar_lux", 0)
-        solar_radiation = sensor_data.get("solar_radiation", 0)
-        rain_rate = sensor_data.get("rain_rate", 0)
-        wind_speed = sensor_data.get("wind_speed", 0)
-        wind_gust = sensor_data.get("wind_gust", 0)
-        humidity = sensor_data.get("humidity", 50)
-        outdoor_temp = sensor_data.get("outdoor_temp", 70)
+        solar_lux = sensor_data.get(KEY_SOLAR_LUX_INTERNAL, 0)
+        solar_radiation = sensor_data.get(KEY_SOLAR_RADIATION, 0)
+        rain_rate = sensor_data.get(KEY_RAIN_RATE, 0)
+        wind_speed = sensor_data.get(KEY_WIND_SPEED, 0)
+        wind_gust = sensor_data.get(KEY_WIND_GUST, 0)
+        humidity = sensor_data.get(KEY_HUMIDITY, 50)
+        outdoor_temp = sensor_data.get(KEY_OUTDOOR_TEMP, 70)
 
         # Calculate dewpoint for more accurate fog assessment
         dewpoint = self.calculate_dewpoint(outdoor_temp, humidity)
@@ -1472,12 +1495,22 @@ class WeatherAnalysis:
         short_trend = self.get_historical_trends("pressure", hours=3)  # 3-hour trend
         long_trend = self.get_historical_trends("pressure", hours=24)  # 24-hour trend
 
-        if not short_trend or not long_trend:
-            return {"pressure_system": "unknown", "storm_probability": 0.0}
+        if (
+            not short_trend
+            or not long_trend
+            or "trend" not in short_trend
+            or "trend" not in long_trend
+        ):
+            return {
+                "pressure_system": "unknown",
+                "storm_probability": 0.0,
+                "current_trend": 0,
+                "long_term_trend": 0,
+            }
 
-        current_pressure = long_trend["current"]
-        short_term_change = short_trend["trend"] * 3  # 3-hour change
-        long_term_change = long_trend["trend"] * 24  # 24-hour change
+        current_pressure = long_trend.get("current", 29.92)
+        short_term_change = short_trend.get("trend", 0) * 3  # 3-hour change
+        long_term_change = long_trend.get("trend", 0) * 24  # 24-hour change
 
         # Get altitude-adjusted pressure thresholds
         pressure_thresholds = self.get_altitude_adjusted_pressure_thresholds_hpa(
@@ -1563,7 +1596,12 @@ class WeatherAnalysis:
             "wind_direction", hours=24
         )  # 24-hour trend
 
-        if not short_trend or not long_trend:
+        if (
+            not short_trend
+            or not long_trend
+            or "trend" not in short_trend
+            or "trend" not in long_trend
+        ):
             return {
                 "average_direction": None,
                 "direction_stability": 0.0,
@@ -1582,7 +1620,7 @@ class WeatherAnalysis:
 
         if len(recent_data) < 3:
             return {
-                "average_direction": long_trend["current"],
+                "average_direction": long_trend.get("current"),
                 "direction_stability": 0.0,
                 "direction_change_rate": 0.0,
                 "significant_shift": False,

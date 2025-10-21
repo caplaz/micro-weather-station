@@ -2,6 +2,7 @@
 
 from unittest.mock import Mock
 
+from custom_components.micro_weather.const import KEY_PRECIPITATION
 from custom_components.micro_weather.weather_detector import WeatherDetector
 from custom_components.micro_weather.weather_utils import convert_precipitation_rate
 
@@ -118,4 +119,4 @@ class TestPrecipitationSupport:
         weather_data = detector.get_weather_data()
 
         # Verify precipitation is None when no sensor configured
-        assert weather_data.get("precipitation") is None
+        assert weather_data.get(KEY_PRECIPITATION) is None

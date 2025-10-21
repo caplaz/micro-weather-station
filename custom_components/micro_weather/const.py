@@ -35,40 +35,34 @@ DEFAULT_WIND_SPEED_RANGE = (0, 25)  # km/h
 DEFAULT_UPDATE_INTERVAL = 5  # minutes
 DEFAULT_ZENITH_MAX_RADIATION = 1000.0  # W/m² at zenith
 
-# Sensor types
-SENSOR_TYPES = {
-    "temperature": {
-        "name": "Temperature",
-        "device_class": "temperature",
-        "unit": "°C",
-        "icon": "mdi:thermometer",
-    },
-    "humidity": {
-        "name": "Humidity",
-        "device_class": "humidity",
-        "unit": "%",
-        "icon": "mdi:water-percent",
-    },
-    "pressure": {
-        "name": "Pressure",
-        "device_class": "pressure",
-        "unit": "hPa",
-        "icon": "mdi:gauge",
-    },
-    "wind_speed": {
-        "name": "Wind Speed",
-        "device_class": "wind_speed",
-        "unit": "km/h",
-        "icon": "mdi:weather-windy",
-    },
-    "wind_direction": {
-        "name": "Wind Direction",
-        "unit": "°",
-        "icon": "mdi:compass",
-    },
-    "visibility": {
-        "name": "Visibility",
-        "unit": "km",
-        "icon": "mdi:eye",
-    },
-}
+# Sensor data keys
+KEY_TEMPERATURE = "temperature"
+KEY_HUMIDITY = "humidity"
+KEY_PRESSURE = "pressure"
+KEY_WIND_SPEED = "wind_speed"
+KEY_WIND_DIRECTION = "wind_direction"
+KEY_PRECIPITATION = "precipitation"
+KEY_VISIBILITY = "visibility"
+KEY_UV_INDEX = "uv_index"
+KEY_SOLAR_RADIATION = "solar_radiation"
+KEY_SOLAR_LUX = "lux"
+KEY_CONDITION = "condition"
+KEY_FORECAST = "forecast"
+KEY_DEWPOINT = "dewpoint"
+KEY_PRECIPITATION_UNIT = "precipitation_unit"
+KEY_LAST_UPDATED = "last_updated"
+
+# Internal sensor data keys (used in sensor_history and analysis)
+KEY_OUTDOOR_TEMP = "outdoor_temp"
+KEY_RAIN_RATE = "rain_rate"
+KEY_WIND_GUST = "wind_gust"
+KEY_DEWPOINT = "dewpoint"
+KEY_SOLAR_LUX_INTERNAL = "solar_lux"
+
+# Sensor unit keys
+KEY_TEMPERATURE_UNIT = "outdoor_temp_unit"
+KEY_HUMIDITY_UNIT = "humidity_unit"
+KEY_PRESSURE_UNIT = "pressure_unit"
+KEY_WIND_SPEED_UNIT = "wind_speed_unit"
+KEY_WIND_GUST_UNIT = "wind_gust_unit"
+KEY_RAIN_RATE_UNIT = "rain_rate_unit"

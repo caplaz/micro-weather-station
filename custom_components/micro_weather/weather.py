@@ -20,7 +20,22 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    KEY_CONDITION,
+    KEY_DEWPOINT,
+    KEY_FORECAST,
+    KEY_HUMIDITY,
+    KEY_PRECIPITATION,
+    KEY_PRESSURE,
+    KEY_SOLAR_LUX,
+    KEY_SOLAR_RADIATION,
+    KEY_TEMPERATURE,
+    KEY_UV_INDEX,
+    KEY_VISIBILITY,
+    KEY_WIND_DIRECTION,
+    KEY_WIND_SPEED,
+)
 from .version import __version__
 from .weather_forecast import AdvancedWeatherForecast
 from .weather_utils import get_sun_times
@@ -94,9 +109,9 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
 
     @property
     def condition(self) -> str | None:
-        """Return the current condition."""
+        """Return the condition."""
         if self.coordinator.data:
-            condition = self.coordinator.data.get("condition")
+            condition = self.coordinator.data.get(KEY_CONDITION)
             return condition
         # Return None until we have data - don't show default partly cloudy
         return None
@@ -105,50 +120,49 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
     def native_temperature(self) -> float | None:
         """Return the temperature."""
         if self.coordinator.data:
-            return self.coordinator.data.get("temperature")
+            return self.coordinator.data.get(KEY_TEMPERATURE)
         return None
 
     @property
     def humidity(self) -> float | None:
         """Return the humidity."""
         if self.coordinator.data:
-            return self.coordinator.data.get("humidity")
+            return self.coordinator.data.get(KEY_HUMIDITY)
         return None
 
     @property
     def native_pressure(self) -> float | None:
         """Return the pressure."""
         if self.coordinator.data:
-            return self.coordinator.data.get("pressure")
+            return self.coordinator.data.get(KEY_PRESSURE)
         return None
 
     @property
     def native_wind_speed(self) -> float | None:
         """Return the wind speed."""
         if self.coordinator.data:
-            return self.coordinator.data.get("wind_speed")
+            return self.coordinator.data.get(KEY_WIND_SPEED)
         return None
 
     @property
     def wind_bearing(self) -> float | None:
         """Return the wind bearing."""
         if self.coordinator.data:
-            return self.coordinator.data.get("wind_direction")
+            return self.coordinator.data.get(KEY_WIND_DIRECTION)
         return None
 
     @property
     def native_visibility(self) -> float | None:
         """Return the visibility."""
         if self.coordinator.data:
-            return self.coordinator.data.get("visibility")
+            return self.coordinator.data.get(KEY_VISIBILITY)
         return None
 
     @property
     def native_precipitation(self) -> float | None:
-        """Return the current precipitation rate."""
+        """Return the precipitation."""
         if self.coordinator.data:
-            return self.coordinator.data.get("precipitation")
-        return None
+            return self.coordinator.data.get(KEY_PRECIPITATION)
 
     @property
     def native_precipitation_unit(self) -> str | None:
@@ -159,28 +173,120 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 return unit
         return None
 
-    async def async_forecast_daily(self) -> list[Forecast] | None:
-        """Return the daily forecast using comprehensive meteorological analysis."""
-        if not self.coordinator.data or "forecast" not in self.coordinator.data:
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes including dewpoint."""
+        if not self.coordinator.data:
             return None
 
-        # Use the provided forecast data directly
-        fallback_forecast = []
-        for day_data in self.coordinator.data["forecast"]:
-            fallback_forecast.append(
-                Forecast(
-                    datetime=day_data["datetime"],
-                    native_temperature=day_data["temperature"],
-                    native_templow=day_data.get(
-                        "templow", day_data["temperature"] - 3.0
-                    ),
-                    condition=day_data.get("condition", ATTR_CONDITION_SUNNY),
-                    native_precipitation=day_data.get("precipitation", 0),
-                    native_wind_speed=day_data.get("wind_speed", 0),
-                    humidity=day_data.get("humidity", 50),
+        attributes = {}
+
+        # Add dewpoint if available
+        dewpoint = self.coordinator.data.get(KEY_DEWPOINT)
+        if dewpoint is not None and not hasattr(dewpoint, "_mock_name"):
+            attributes["dewpoint"] = round(dewpoint, 1)
+
+        return attributes if attributes else None
+
+    async def async_forecast_daily(self) -> list[Forecast] | None:
+        """Return the daily forecast using comprehensive meteorological analysis."""
+        # First try to use external forecast data if available
+        if self.coordinator.data and KEY_FORECAST in self.coordinator.data:
+            # Use the provided forecast data directly
+            fallback_forecast = []
+            for day_data in self.coordinator.data[KEY_FORECAST]:
+                fallback_forecast.append(
+                    Forecast(
+                        datetime=day_data["datetime"],
+                        native_temperature=day_data[KEY_TEMPERATURE],
+                        native_templow=day_data.get(
+                            "templow", day_data[KEY_TEMPERATURE] - 3.0
+                        ),
+                        condition=day_data.get(KEY_CONDITION, ATTR_CONDITION_SUNNY),
+                        native_precipitation=day_data.get(KEY_PRECIPITATION, 0),
+                        native_wind_speed=day_data.get(KEY_WIND_SPEED, 0),
+                        humidity=day_data.get(KEY_HUMIDITY, 50),
+                    )
                 )
+            return fallback_forecast
+
+        # If no external forecast data, generate comprehensive forecast from sensors
+        if not self.coordinator.data:
+            return None
+
+        try:
+            # Extract actual sensor values, converting MagicMock objects to None
+            sensor_data: Dict[str, Any] = {}
+            for key in [
+                KEY_TEMPERATURE,
+                KEY_HUMIDITY,
+                KEY_PRESSURE,
+                KEY_WIND_SPEED,
+                KEY_WIND_DIRECTION,
+                KEY_PRECIPITATION,
+                KEY_VISIBILITY,
+                KEY_UV_INDEX,
+                KEY_SOLAR_RADIATION,
+                KEY_SOLAR_LUX,
+            ]:
+                value = self.coordinator.data.get(key)
+                # Convert MagicMock objects to None to avoid comparison errors
+                if hasattr(value, "_mock_name"):  # Check if it's a MagicMock
+                    sensor_data[key] = None
+                else:
+                    sensor_data[key] = value
+
+            # Get current condition
+            current_condition_value = self.coordinator.data.get(
+                KEY_CONDITION, ATTR_CONDITION_CLOUDY
             )
-        return fallback_forecast
+            current_condition = (
+                current_condition_value
+                if not hasattr(current_condition_value, "_mock_name")
+                and isinstance(current_condition_value, str)
+                else ATTR_CONDITION_CLOUDY
+            )
+
+            # Get altitude for astronomical calculations
+            altitude_value = 0.0
+            if hasattr(self.coordinator, "entry") and self.coordinator.entry:
+                if (
+                    hasattr(self.coordinator.entry, "options")
+                    and self.coordinator.entry.options
+                ):
+                    if not hasattr(
+                        self.coordinator.entry.options, "_mock_name"
+                    ):  # Not a MagicMock
+                        altitude_value = float(
+                            getattr(self.coordinator.entry.options, "altitude", 0.0)
+                        )
+            altitude = altitude_value
+
+            forecast_data = self._forecast.generate_comprehensive_forecast(
+                current_condition=current_condition,
+                sensor_data=sensor_data,
+                altitude=altitude,
+            )
+
+            # Convert to Forecast objects
+            forecast_list = []
+            for day_data in forecast_data:
+                forecast_list.append(
+                    Forecast(
+                        datetime=day_data["datetime"],
+                        native_temperature=day_data[KEY_TEMPERATURE],
+                        native_templow=day_data["templow"],
+                        condition=day_data[KEY_CONDITION],
+                        native_precipitation=day_data[KEY_PRECIPITATION],
+                        native_wind_speed=day_data[KEY_WIND_SPEED],
+                        humidity=day_data[KEY_HUMIDITY],
+                    )
+                )
+            return forecast_list
+        except Exception as e:
+            # Log error and return None if comprehensive forecasting fails
+            _LOGGER.warning("Comprehensive daily forecast failed: %s", e)
+            return None
 
     async def async_forecast_hourly(self) -> list[Forecast] | None:
         """Return hourly weather forecast using comprehensive meteorological analysis."""
@@ -189,7 +295,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
 
         try:
             # Use the comprehensive hourly forecasting algorithm
-            current_temp_value = self.coordinator.data.get("temperature", 20)
+            current_temp_value = self.coordinator.data.get(KEY_TEMPERATURE, 20)
             current_temp = (
                 float(current_temp_value)
                 if not hasattr(current_temp_value, "_mock_name")
@@ -198,7 +304,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             )
 
             current_condition_value = self.coordinator.data.get(
-                "condition", ATTR_CONDITION_CLOUDY
+                KEY_CONDITION, ATTR_CONDITION_CLOUDY
             )
             current_condition = (
                 current_condition_value
@@ -209,16 +315,16 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             # Extract actual sensor values, converting MagicMock objects to None
             sensor_data: Dict[str, Any] = {}
             for key in [
-                "temperature",
-                "humidity",
-                "pressure",
-                "wind_speed",
-                "wind_direction",
-                "precipitation",
-                "visibility",
-                "uv_index",
-                "solar_radiation",
-                "lux",
+                KEY_TEMPERATURE,
+                KEY_HUMIDITY,
+                KEY_PRESSURE,
+                KEY_WIND_SPEED,
+                KEY_WIND_DIRECTION,
+                KEY_PRECIPITATION,
+                KEY_VISIBILITY,
+                KEY_UV_INDEX,
+                KEY_SOLAR_RADIATION,
+                KEY_SOLAR_LUX,
             ]:
                 value = self.coordinator.data.get(key)
                 # Convert MagicMock objects to None to avoid comparison errors
@@ -264,13 +370,13 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 forecast_list.append(
                     Forecast(
                         datetime=hour_data["datetime"],
-                        native_temperature=hour_data["temperature"],
-                        native_templow=hour_data["temperature"]
+                        native_temperature=hour_data[KEY_TEMPERATURE],
+                        native_templow=hour_data[KEY_TEMPERATURE]
                         - 3.0,  # Not used in hourly
-                        condition=hour_data["condition"],
-                        native_precipitation=hour_data.get("precipitation", 0),
-                        native_wind_speed=hour_data.get("wind_speed", 0),
-                        humidity=hour_data.get("humidity", 50),
+                        condition=hour_data[KEY_CONDITION],
+                        native_precipitation=hour_data.get(KEY_PRECIPITATION, 0),
+                        native_wind_speed=hour_data.get(KEY_WIND_SPEED, 0),
+                        humidity=hour_data.get(KEY_HUMIDITY, 50),
                     )
                 )
             return forecast_list

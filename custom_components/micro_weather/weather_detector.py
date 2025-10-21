@@ -10,8 +10,8 @@ accurate weather conditions based on real sensor readings. It analyzes:
 - Temperature and humidity for fog detection
 - Dewpoint analysis for precipitation potential
 
-The detector uses scientific weather analysis principles to provide more accurate
-local weather conditions than external weather services.
+The detector uses scientific weather analysis principles to provide more
+accurate local weather conditions than external weather services.
 
 Classes:
     WeatherDetector: Main weather analysis engine
@@ -47,6 +47,25 @@ from .const import (
     CONF_WIND_SPEED_SENSOR,
     CONF_ZENITH_MAX_RADIATION,
     DEFAULT_ZENITH_MAX_RADIATION,
+    KEY_CONDITION,
+    KEY_DEWPOINT,
+    KEY_FORECAST,
+    KEY_HUMIDITY,
+    KEY_LAST_UPDATED,
+    KEY_OUTDOOR_TEMP,
+    KEY_PRECIPITATION,
+    KEY_PRESSURE,
+    KEY_PRESSURE_UNIT,
+    KEY_RAIN_RATE,
+    KEY_SOLAR_RADIATION,
+    KEY_TEMPERATURE,
+    KEY_TEMPERATURE_UNIT,
+    KEY_VISIBILITY,
+    KEY_WIND_DIRECTION,
+    KEY_WIND_GUST,
+    KEY_WIND_GUST_UNIT,
+    KEY_WIND_SPEED,
+    KEY_WIND_SPEED_UNIT,
 )
 from .weather_analysis import WeatherAnalysis
 from .weather_forecast import AdvancedWeatherForecast
@@ -91,22 +110,24 @@ class WeatherDetector:
         self._last_condition = "partly_cloudy"
         self._condition_start_time = datetime.now()
 
-        # Historical data storage (last 48 hours, 15-minute intervals = ~192 readings)
+        # Historical data storage (last 48 hours, 15-minute intervals =
+        # ~192 readings)
         self._history_maxlen = 192  # 48 hours * 4 readings per hour
         self._sensor_history: Dict[str, deque[Dict[str, Any]]] = {
-            "outdoor_temp": deque(maxlen=self._history_maxlen),
-            "humidity": deque(maxlen=self._history_maxlen),
-            "pressure": deque(maxlen=self._history_maxlen),
-            "wind_speed": deque(maxlen=self._history_maxlen),
-            "wind_direction": deque(maxlen=self._history_maxlen),
-            "solar_radiation": deque(maxlen=self._history_maxlen),
-            "rain_rate": deque(maxlen=self._history_maxlen),
+            KEY_OUTDOOR_TEMP: deque(maxlen=self._history_maxlen),
+            KEY_HUMIDITY: deque(maxlen=self._history_maxlen),
+            KEY_PRESSURE: deque(maxlen=self._history_maxlen),
+            KEY_WIND_SPEED: deque(maxlen=self._history_maxlen),
+            KEY_WIND_DIRECTION: deque(maxlen=self._history_maxlen),
+            KEY_SOLAR_RADIATION: deque(maxlen=self._history_maxlen),
+            KEY_RAIN_RATE: deque(maxlen=self._history_maxlen),
         }
         self._condition_history: deque[Dict[str, Any]] = deque(
             maxlen=self._history_maxlen
         )
 
-        # Initialize weather analysis and forecast modules with shared sensor history
+        # Initialize weather analysis and forecast modules with shared
+        # sensor history
         zenith_max_radiation = options.get(
             CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
         )
@@ -200,29 +221,45 @@ class WeatherDetector:
             _LOGGER.error("Forecast generation failed: %s", e)
             forecast_data = []
 
-        # Convert units and prepare data
+        # Get or calculate dewpoint
+        dewpoint_value = sensor_data.get(KEY_DEWPOINT)
+        if not dewpoint_value:
+            # Calculate dewpoint as fallback using temperature and humidity
+            temp_f = sensor_data.get(KEY_OUTDOOR_TEMP) or sensor_data.get(
+                KEY_TEMPERATURE
+            )
+            humidity = sensor_data.get("humidity")
+            if temp_f is not None and humidity is not None:
+                dewpoint_value = self.analysis.calculate_dewpoint(temp_f, humidity)
+                _LOGGER.debug(
+                    "Dewpoint calculated: %.1f°F", dewpoint_value
+                )  # Convert units and prepare data
         weather_data = {
-            "temperature": self._convert_temperature(
-                sensor_data.get("outdoor_temp"), sensor_data.get("outdoor_temp_unit")
+            KEY_TEMPERATURE: self._convert_temperature(
+                sensor_data.get(KEY_OUTDOOR_TEMP), sensor_data.get(KEY_TEMPERATURE_UNIT)
             ),
-            "humidity": sensor_data.get("humidity"),
-            "pressure": self._convert_pressure(
-                sensor_data.get("pressure"), sensor_data.get("pressure_unit")
+            KEY_HUMIDITY: sensor_data.get("humidity"),
+            KEY_PRESSURE: self._convert_pressure(
+                sensor_data.get("pressure"), sensor_data.get(KEY_PRESSURE_UNIT)
             ),
-            "wind_speed": self._convert_wind_speed(
-                sensor_data.get("wind_speed"), sensor_data.get("wind_speed_unit")
+            KEY_WIND_SPEED: self._convert_wind_speed(
+                sensor_data.get("wind_speed"), sensor_data.get(KEY_WIND_SPEED_UNIT)
             ),
-            "wind_direction": sensor_data.get("wind_direction"),
-            "visibility": self.analysis.estimate_visibility(
+            KEY_WIND_DIRECTION: sensor_data.get("wind_direction"),
+            KEY_VISIBILITY: self.analysis.estimate_visibility(
                 condition, self._prepare_analysis_sensor_data(sensor_data)
             ),
-            "precipitation": sensor_data.get("rain_rate"),
-            "condition": condition,
-            "forecast": forecast_data,
-            "last_updated": datetime.now().isoformat(),
+            KEY_PRECIPITATION: sensor_data.get(KEY_RAIN_RATE),
+            KEY_DEWPOINT: self._convert_temperature(
+                dewpoint_value, "F"
+            ),  # Convert dewpoint from Fahrenheit to Celsius per HA standards
+            KEY_CONDITION: condition,
+            KEY_FORECAST: forecast_data,
+            KEY_LAST_UPDATED: datetime.now().isoformat(),
         }
 
-        # Set precipitation_unit based on rain_rate_unit, mapping rate units to distance units
+        # Set precipitation_unit based on rain_rate_unit, mapping rate units
+        # to distance units
         rain_rate_unit = sensor_data.get("rain_rate_unit")
         if rain_rate_unit:
             rain_rate_unit_lower = rain_rate_unit.lower()
@@ -260,7 +297,8 @@ class WeatherDetector:
 
             state = self.hass.states.get(entity_id)
             if state and state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-                # Additional validation: check if state is not None and not empty
+                # Additional validation: check if state is not None and not
+                # empty
                 if state.state is None or state.state == "":
                     _LOGGER.warning(
                         "Sensor %s has empty or None state, skipping", entity_id
@@ -309,7 +347,8 @@ class WeatherDetector:
                             sun_entity_id,
                         )
         else:
-            # Don't set a default - let the analysis handle missing solar elevation
+            # Don't set a default - let the analysis handle missing
+            # solar elevation
             pass
 
         return sensor_data
@@ -401,28 +440,31 @@ class WeatherDetector:
     def _prepare_forecast_sensor_data(
         self, sensor_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Prepare sensor data for forecast module by converting to imperial units.
+        """Prepare sensor data for forecast module by converting to
+        imperial units.
 
-        The forecast module expects imperial units (Fahrenheit, mph, inHg) for its
-        calculations, so we need to convert metric sensor data back to imperial.
+        The forecast module expects imperial units (Fahrenheit, mph, inHg)
+        for its calculations, so we need to convert metric sensor data back
+        to imperial.
 
         Args:
             sensor_data: Raw sensor data with units stored in {key}_unit fields
 
         Returns:
-            dict: Sensor data converted to imperial units for forecast compatibility
+            dict: Sensor data converted to imperial units for forecast
+                  compatibility
         """
         forecast_data = sensor_data.copy()
 
         # Convert temperature back to Fahrenheit if it was in Celsius
-        temp_unit = sensor_data.get("outdoor_temp_unit")
+        temp_unit = sensor_data.get(KEY_TEMPERATURE_UNIT)
         if temp_unit in ["°C", "C", "celsius"]:
-            temp_c = sensor_data.get("outdoor_temp")
+            temp_c = sensor_data.get(KEY_OUTDOOR_TEMP)
             if temp_c is not None:
-                forecast_data["outdoor_temp"] = round(temp_c * 9 / 5 + 32, 1)
+                forecast_data[KEY_OUTDOOR_TEMP] = round(temp_c * 9 / 5 + 32, 1)
 
         # Convert wind speed back to mph if it was in km/h or m/s
-        wind_unit = sensor_data.get("wind_speed_unit")
+        wind_unit = sensor_data.get(KEY_WIND_SPEED_UNIT)
         if wind_unit in ["km/h", "kmh", "kph"]:
             wind_kmh = sensor_data.get("wind_speed")
             if wind_kmh is not None:
@@ -433,50 +475,52 @@ class WeatherDetector:
                 forecast_data["wind_speed"] = round(wind_ms / 0.44704, 1)  # m/s to mph
 
         # Convert pressure back to inHg if it was in hPa
-        pressure_unit = sensor_data.get("pressure_unit")
+        pressure_unit = sensor_data.get(KEY_PRESSURE_UNIT)
         if pressure_unit in ["hPa", "mbar", "mb"]:
             pressure_hpa = sensor_data.get("pressure")
             if pressure_hpa is not None:
                 forecast_data["pressure"] = round(pressure_hpa / 33.8639, 2)
 
         # Wind gust also needs conversion if present
-        gust_unit = sensor_data.get("wind_gust_unit")
+        gust_unit = sensor_data.get(KEY_WIND_GUST_UNIT)
         if gust_unit in ["km/h", "kmh", "kph"]:
-            gust_kmh = sensor_data.get("wind_gust")
+            gust_kmh = sensor_data.get(KEY_WIND_GUST)
             if gust_kmh is not None:
-                forecast_data["wind_gust"] = round(gust_kmh / 1.60934, 1)
+                forecast_data[KEY_WIND_GUST] = round(gust_kmh / 1.60934, 1)
         elif gust_unit in ["m/s", "ms"]:
-            gust_ms = sensor_data.get("wind_gust")
+            gust_ms = sensor_data.get(KEY_WIND_GUST)
             if gust_ms is not None:
-                forecast_data["wind_gust"] = round(gust_ms / 0.44704, 1)
+                forecast_data[KEY_WIND_GUST] = round(gust_ms / 0.44704, 1)
 
         return forecast_data
 
     def _prepare_analysis_sensor_data(
         self, sensor_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Prepare sensor data for analysis module by converting to imperial units.
+        """Prepare sensor data for analysis module by converting to
+        imperial units.
 
-        The analysis module expects imperial units (Fahrenheit, mph, inHg) for its
-        calculations, so we need to convert metric sensor data to imperial.
+        The analysis module expects imperial units (Fahrenheit, mph, inHg) for
+        its calculations, so we need to convert metric sensor data to imperial.
 
         Args:
             sensor_data: Raw sensor data with units stored in {key}_unit fields
 
         Returns:
-            dict: Sensor data converted to imperial units for analysis compatibility
+            dict: Sensor data converted to imperial units for analysis
+                  compatibility
         """
         analysis_data = sensor_data.copy()
 
         # Convert temperature to Fahrenheit if it was in Celsius
-        temp_unit = sensor_data.get("outdoor_temp_unit")
+        temp_unit = sensor_data.get(KEY_TEMPERATURE_UNIT)
         if temp_unit in ["°C", "C", "celsius"]:
-            temp_c = sensor_data.get("outdoor_temp")
+            temp_c = sensor_data.get(KEY_OUTDOOR_TEMP)
             if temp_c is not None:
-                analysis_data["outdoor_temp"] = round(temp_c * 9 / 5 + 32, 1)
+                analysis_data[KEY_OUTDOOR_TEMP] = round(temp_c * 9 / 5 + 32, 1)
 
         # Convert wind speed to mph if it was in km/h or m/s
-        wind_unit = sensor_data.get("wind_speed_unit")
+        wind_unit = sensor_data.get(KEY_WIND_SPEED_UNIT)
         if wind_unit in ["km/h", "kmh", "kph"]:
             wind_kmh = sensor_data.get("wind_speed")
             if wind_kmh is not None:
@@ -487,28 +531,28 @@ class WeatherDetector:
                 analysis_data["wind_speed"] = round(wind_ms / 0.44704, 1)  # m/s to mph
 
         # Convert pressure to inHg if it was in hPa
-        pressure_unit = sensor_data.get("pressure_unit")
+        pressure_unit = sensor_data.get(KEY_PRESSURE_UNIT)
         if pressure_unit in ["hPa", "mbar", "mb"]:
             pressure_hpa = sensor_data.get("pressure")
             if pressure_hpa is not None:
                 analysis_data["pressure"] = round(pressure_hpa / 33.8639, 2)
 
         # Wind gust also needs conversion if present
-        gust_unit = sensor_data.get("wind_gust_unit")
+        gust_unit = sensor_data.get(KEY_WIND_GUST_UNIT)
         if gust_unit in ["km/h", "kmh", "kph"]:
-            gust_kmh = sensor_data.get("wind_gust")
+            gust_kmh = sensor_data.get(KEY_WIND_GUST)
             if gust_kmh is not None:
-                analysis_data["wind_gust"] = round(gust_kmh / 1.60934, 1)
+                analysis_data[KEY_WIND_GUST] = round(gust_kmh / 1.60934, 1)
         elif gust_unit in ["m/s", "ms"]:
-            gust_ms = sensor_data.get("wind_gust")
+            gust_ms = sensor_data.get(KEY_WIND_GUST)
             if gust_ms is not None:
-                analysis_data["wind_gust"] = round(gust_ms / 0.44704, 1)
+                analysis_data[KEY_WIND_GUST] = round(gust_ms / 0.44704, 1)
 
         # Convert dewpoint to Fahrenheit if it was in Celsius
         dewpoint_unit = sensor_data.get("dewpoint_unit")
         if dewpoint_unit in ["°C", "C", "celsius"]:
-            dewpoint_c = sensor_data.get("dewpoint")
+            dewpoint_c = sensor_data.get(KEY_DEWPOINT)
             if dewpoint_c is not None:
-                analysis_data["dewpoint"] = round(dewpoint_c * 9 / 5 + 32, 1)
+                analysis_data[KEY_DEWPOINT] = round(dewpoint_c * 9 / 5 + 32, 1)
 
         return analysis_data

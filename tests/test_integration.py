@@ -19,7 +19,7 @@ from custom_components.micro_weather import (
     async_unload_entry,
     async_update_options,
 )
-from custom_components.micro_weather.const import DOMAIN
+from custom_components.micro_weather.const import DOMAIN, KEY_CONDITION
 
 
 @pytest.mark.integration
@@ -89,7 +89,7 @@ class TestIntegrationSetup:
     ):
         """Test successful unload of the integration."""
         # First set up the integration
-        mock_weather_data = {"condition": ATTR_CONDITION_CLOUDY, "temperature": 20.0}
+        mock_weather_data = {KEY_CONDITION: ATTR_CONDITION_CLOUDY, "temperature": 20.0}
 
         with (
             patch(
@@ -127,7 +127,7 @@ class TestIntegrationSetup:
     ):
         """Test unload failure when platform unload fails."""
         # First set up the integration
-        mock_weather_data = {"condition": ATTR_CONDITION_RAINY, "temperature": 18.0}
+        mock_weather_data = {KEY_CONDITION: ATTR_CONDITION_RAINY, "temperature": 18.0}
 
         with (
             patch(
@@ -162,7 +162,7 @@ class TestIntegrationSetup:
     ):
         """Test options update triggers coordinator refresh."""
         # First set up the integration
-        mock_weather_data = {"condition": ATTR_CONDITION_SUNNY, "temperature": 25.0}
+        mock_weather_data = {KEY_CONDITION: ATTR_CONDITION_SUNNY, "temperature": 25.0}
 
         with (
             patch(
