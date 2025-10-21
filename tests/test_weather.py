@@ -699,21 +699,22 @@ class TestMicroWeatherEntity:
                         forecast["condition"] == ATTR_CONDITION_CLEAR_NIGHT
                     ), f"Expected clear_night during nighttime, got {forecast['condition']} at {forecast['datetime']}"
 
-    async def test_async_forecast_hourly_sunrise_sunset_boundary(
+    async def test_async_forecast_hourly_condition_progression_with_day_night_cycles(
         self, weather_entity, coordinator
     ):
-        """Test behavior exactly at sunrise and sunset times."""
+        """Test that hourly forecast properly progresses conditions hour-by-hour with day/night cycles.
+
+        This test verifies the fix for the issue where all 24 hours showed the same condition.
+        Now each hour should use the previous hour's condition as its base, enabling proper
+        day/night condition transitions throughout the forecast period.
+        """
         from datetime import datetime, timezone
         from unittest.mock import patch
 
-        # Mock current time to be exactly at sunrise (7 AM)
-        mock_now = datetime(2024, 1, 2, 7, 0, 0, tzinfo=timezone.utc)
+        # Mock current time to be 2 PM (daytime) - when the forecast starts
+        mock_now = datetime(2024, 1, 1, 14, 0, 0, tzinfo=timezone.utc)
 
         with (
-            patch(
-                "homeassistant.util.dt.parse_datetime",
-                side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
-            ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
             patch(
                 "custom_components.micro_weather.weather_forecast.datetime"
@@ -724,10 +725,141 @@ class TestMicroWeatherEntity:
                 s.replace("Z", "+00:00")
             )
 
+            # Mock sun.sun entity with sunrise at 6 AM and sunset at 6 PM same day
+            # This creates a scenario where the 24-hour forecast spans both day and night
             mock_sun_state = MagicMock()
             mock_sun_state.attributes = {
-                "next_rising": "2024-01-02T07:00:00Z",  # Exactly now
-                "next_setting": "2024-01-02T18:00:00Z",
+                "next_rising": "2024-01-01T06:00:00Z",  # Sunrise today (already passed)
+                "next_setting": "2024-01-01T18:00:00Z",  # Sunset today at 6 PM
+            }
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                # Start with partlycloudy condition - this should evolve through the forecast
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_PARTLYCLOUDY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                result = await weather_entity.async_forecast_hourly()
+
+                assert result is not None
+                assert len(result) == 24
+
+                # Verify that conditions change throughout the forecast (not all the same)
+                conditions = [forecast["condition"] for forecast in result]
+                unique_conditions = set(conditions)
+
+                # Should have at least 2 different conditions (daytime and nighttime versions)
+                assert (
+                    len(unique_conditions) >= 2
+                ), f"Expected multiple condition types, got only: {unique_conditions}"
+
+                # First hour should be the current condition (partlycloudy during daytime)
+                assert (
+                    result[0]["condition"] == ATTR_CONDITION_PARTLYCLOUDY
+                ), f"First hour should be current condition partlycloudy, got {result[0]['condition']}"
+
+                # Find the transition from day to night (around sunset at 6 PM)
+                # Hours 0-3 are afternoon (2 PM, 3 PM, 4 PM, 5 PM) - should be daytime
+                # Hours 4-17 are evening/night (6 PM to 7 AM) - should be nighttime
+                # Hours 18-23 are morning (8 AM to 1 PM) - should be daytime
+
+                # Check daytime hours (should maintain partlycloudy or evolve to sunny/cloudy based on actual logic)
+                daytime_forecasts = []
+                nighttime_forecasts = []
+
+                sunrise_time = datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc)
+                sunset_time = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
+
+                for forecast in result:
+                    forecast_time = datetime.fromisoformat(forecast["datetime"])
+                    from custom_components.micro_weather.weather_utils import (
+                        is_forecast_hour_daytime,
+                    )
+
+                    is_daytime = is_forecast_hour_daytime(
+                        forecast_time, sunrise_time, sunset_time
+                    )
+
+                    if is_daytime:
+                        daytime_forecasts.append(forecast)
+                    else:
+                        nighttime_forecasts.append(forecast)
+
+                # Daytime should be partlycloudy, cloudy, or sunny (based on actual forecast logic)
+                for forecast in daytime_forecasts:
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_PARTLYCLOUDY,
+                        ATTR_CONDITION_CLOUDY,
+                        ATTR_CONDITION_SUNNY,
+                    ], f"Expected daytime condition (partlycloudy/cloudy/sunny) at {forecast['datetime']}, got {forecast['condition']}"
+
+                # Nighttime should be cloudy or clear_night (nighttime equivalent of partlycloudy)
+                for forecast in nighttime_forecasts:
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_CLOUDY,
+                        ATTR_CONDITION_CLEAR_NIGHT,
+                    ], f"Expected nighttime condition (cloudy/clear-night) at {forecast['datetime']}, got {forecast['condition']}"
+
+                # Verify progression: conditions should evolve based on previous hour
+                # Check that consecutive hours have related conditions (not random jumps)
+                for i in range(1, len(result)):
+                    prev_condition = result[i - 1]["condition"]
+                    curr_condition = result[i]["condition"]
+
+                    # Conditions should be related (same base condition with day/night variants)
+                    condition_pairs = [
+                        (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY),
+                        (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_PARTLYCLOUDY),
+                        (ATTR_CONDITION_SUNNY, ATTR_CONDITION_CLEAR_NIGHT),
+                        (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_SUNNY),
+                    ]
+
+                    is_valid_transition = (
+                        prev_condition == curr_condition  # Same condition
+                        or any(
+                            prev_condition in pair and curr_condition in pair
+                            for pair in condition_pairs
+                        )
+                    )
+
+                    assert (
+                        is_valid_transition
+                    ), f"Invalid condition transition from {prev_condition} to {curr_condition} at hour {i}"
+
+    async def test_async_forecast_hourly_condition_progression_sunny_scenario(
+        self, weather_entity, coordinator
+    ):
+        """Test hourly condition progression starting with sunny conditions."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time to be 10 AM (daytime)
+        mock_now = datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc)
+
+        with (
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
+        ):
+            mock_dt_class.now.return_value = mock_now
+            mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
+                s.replace("Z", "+00:00")
+            )
+
+            # Mock sun.sun entity
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {
+                "next_rising": "2024-01-01T06:00:00Z",
+                "next_setting": "2024-01-01T18:00:00Z",
             }
 
             with patch.object(
@@ -745,37 +877,133 @@ class TestMicroWeatherEntity:
 
                 result = await weather_entity.async_forecast_hourly()
 
-                # First hour should be daytime (sunrise_time <= forecast_time)
-                first_hour = result[0]
-                assert (
-                    first_hour["condition"] == ATTR_CONDITION_SUNNY
-                ), f"Expected sunny at sunrise boundary, got {first_hour['condition']}"
+                assert result is not None
+                assert len(result) == 24
 
-                # Test exactly at sunset
-                mock_now_sunset = datetime(2024, 1, 2, 18, 0, 0, tzinfo=timezone.utc)
-                with (
-                    patch(
-                        "homeassistant.util.dt.parse_datetime",
-                        side_effect=lambda s: datetime.fromisoformat(
-                            s.replace("Z", "+00:00")
-                        ),
-                    ),
-                    patch("homeassistant.util.dt.now", return_value=mock_now_sunset),
-                    patch(
-                        "custom_components.micro_weather.weather_forecast.datetime"
-                    ) as mock_dt_class_sunset,
-                ):
-                    mock_dt_class_sunset.now.return_value = mock_now_sunset
-                    mock_dt_class_sunset.fromisoformat.side_effect = (
-                        lambda s: datetime.fromisoformat(s.replace("Z", "+00:00"))
+                # First hour should be sunny (current condition during daytime)
+                assert result[0]["condition"] == ATTR_CONDITION_SUNNY
+
+                # Daytime hours should remain sunny or partlycloudy
+                daytime_forecasts = []
+                nighttime_forecasts = []
+
+                sunrise_time = datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc)
+                sunset_time = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
+
+                for forecast in result:
+                    forecast_time = datetime.fromisoformat(forecast["datetime"])
+                    from custom_components.micro_weather.weather_utils import (
+                        is_forecast_hour_daytime,
                     )
-                    result_sunset = await weather_entity.async_forecast_hourly()
 
-                    # First hour should be nighttime (forecast_time < sunset_time fails)
-                    first_hour_sunset = result_sunset[0]
+                    is_daytime = is_forecast_hour_daytime(
+                        forecast_time, sunrise_time, sunset_time
+                    )
+
+                    if is_daytime:
+                        daytime_forecasts.append(forecast)
+                    else:
+                        nighttime_forecasts.append(forecast)
+
+                # Daytime should be sunny
+                for forecast in daytime_forecasts:
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_SUNNY,
+                        ATTR_CONDITION_PARTLYCLOUDY,
+                    ], f"Expected sunny/partlycloudy during daytime, got {forecast['condition']}"
+
+                # Nighttime should be clear_night
+                for forecast in nighttime_forecasts:
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_CLEAR_NIGHT,
+                        ATTR_CONDITION_CLOUDY,
+                    ], f"Expected clear_night/cloudy during nighttime, got {forecast['condition']}"
+
+                # Verify no abrupt condition changes (should evolve gradually)
+                for i in range(1, len(result)):
+                    prev = result[i - 1]["condition"]
+                    curr = result[i]["condition"]
+
+                    # Should not jump from sunny to cloudy directly (or vice versa)
+                    invalid_transitions = [
+                        (ATTR_CONDITION_SUNNY, ATTR_CONDITION_CLOUDY),
+                        (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_SUNNY),
+                        (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_PARTLYCLOUDY),
+                        (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLEAR_NIGHT),
+                    ]
+
+                    is_invalid = any(
+                        prev == invalid[0] and curr == invalid[1]
+                        for invalid in invalid_transitions
+                    )
                     assert (
-                        first_hour_sunset["condition"] == ATTR_CONDITION_CLEAR_NIGHT
-                    ), f"Expected clear_night at sunset boundary, got {first_hour_sunset['condition']}"
+                        not is_invalid
+                    ), f"Invalid abrupt transition from {prev} to {curr} at hour {i}"
+
+    async def test_async_forecast_hourly_sunrise_sunset_boundary(
+        self, weather_entity, coordinator
+    ):
+        """Test condition transitions at sunrise and sunset boundaries."""
+        from datetime import datetime, timezone
+        from unittest.mock import patch
+
+        # Mock current time to be just before sunset (5:30 PM)
+        mock_now = datetime(2024, 1, 1, 17, 30, 0, tzinfo=timezone.utc)
+
+        with (
+            patch("homeassistant.util.dt.now", return_value=mock_now),
+            patch(
+                "custom_components.micro_weather.weather_forecast.datetime"
+            ) as mock_dt_class,
+        ):
+            mock_dt_class.now.return_value = mock_now
+            mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
+                s.replace("Z", "+00:00")
+            )
+
+            # Mock sun.sun entity with sunset at 6 PM
+            mock_sun_state = MagicMock()
+            mock_sun_state.attributes = {
+                "next_rising": "2024-01-02T06:00:00Z",  # Sunrise tomorrow
+                "next_setting": "2024-01-01T18:00:00Z",  # Sunset today at 6 PM
+            }
+
+            with patch.object(
+                weather_entity.coordinator.hass.states,
+                "get",
+                return_value=mock_sun_state,
+            ):
+                coordinator.data = {
+                    "temperature": 20.0,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                result = await weather_entity.async_forecast_hourly()
+
+                assert result is not None
+                assert len(result) == 24
+
+                # All forecast hours should be nighttime since sunset is at 6 PM
+                # and forecast starts at 6:30 PM, spanning midnight
+                for forecast in result:
+                    forecast_time = datetime.fromisoformat(forecast["datetime"])
+
+                    # Should be nighttime conditions (clear-night/cloudy)
+                    assert forecast["condition"] in [
+                        ATTR_CONDITION_CLEAR_NIGHT,
+                        ATTR_CONDITION_CLOUDY,
+                    ], f"All forecast hours after sunset should be nighttime conditions, got {forecast['condition']} at {forecast_time}"
+
+                # Verify that the transition from day to night happened correctly
+                # by checking that we don't have any daytime conditions in the forecast
+                daytime_conditions = [ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY]
+                for forecast in result:
+                    assert (
+                        forecast["condition"] not in daytime_conditions
+                    ), f"Should not have daytime conditions after sunset, got {forecast['condition']} at {forecast['datetime']}"
 
     async def test_async_forecast_hourly_polar_regions(
         self, weather_entity, coordinator

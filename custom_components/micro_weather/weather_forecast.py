@@ -210,9 +210,14 @@ class AdvancedWeatherForecast:
                 )
 
                 # Advanced hourly condition with micro-evolution
+                # Use previous hour's condition as base for current hour (except first hour)
+                base_condition = current_condition
+                if hour_idx > 0:
+                    base_condition = hourly_forecast[hour_idx - 1]["condition"]
+
                 forecast_condition = self._forecast_hourly_condition_comprehensive(
                     hour_idx,
-                    current_condition,
+                    base_condition,
                     astronomical_context,
                     meteorological_state,
                     hourly_patterns,
@@ -271,11 +276,32 @@ class AdvancedWeatherForecast:
             )
             for hour_idx in range(24):
                 forecast_time = dt_util.now() + timedelta(hours=hour_idx + 1)
+
+                # Use previous hour's condition as base for current hour (except first hour)
+                forecast_condition = base_condition
+                if hour_idx > 0:
+                    forecast_condition = hourly_forecast[hour_idx - 1]["condition"]
+
+                # Apply day/night conversion to fallback forecast too
+                astronomical_context = self._calculate_astronomical_context(
+                    forecast_time, sunrise_time, sunset_time, hour_idx
+                )
+                if not astronomical_context["is_daytime"]:
+                    if forecast_condition == ATTR_CONDITION_SUNNY:
+                        forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
+                    elif forecast_condition == ATTR_CONDITION_PARTLYCLOUDY:
+                        forecast_condition = ATTR_CONDITION_CLOUDY
+                else:
+                    if forecast_condition == ATTR_CONDITION_CLEAR_NIGHT:
+                        forecast_condition = ATTR_CONDITION_SUNNY
+                    elif forecast_condition == ATTR_CONDITION_CLOUDY:
+                        forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+
                 hourly_forecast.append(
                     {
                         "datetime": forecast_time.isoformat(),
                         "temperature": base_temp,
-                        "condition": base_condition,
+                        "condition": forecast_condition,
                         "precipitation": 0.0,
                         "wind_speed": 5.0,
                         "humidity": 50,
