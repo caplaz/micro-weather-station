@@ -466,20 +466,22 @@ class WeatherDetector:
         # Convert wind speed back to mph if it was in km/h or m/s
         wind_unit = sensor_data.get(KEY_WIND_SPEED_UNIT)
         if wind_unit in ["km/h", "kmh", "kph"]:
-            wind_kmh = sensor_data.get("wind_speed")
+            wind_kmh = sensor_data.get(KEY_WIND_SPEED)
             if wind_kmh is not None:
-                forecast_data["wind_speed"] = round(wind_kmh / 1.60934, 1)
+                forecast_data[KEY_WIND_SPEED] = round(wind_kmh / 1.60934, 1)
         elif wind_unit in ["m/s", "ms"]:
-            wind_ms = sensor_data.get("wind_speed")
+            wind_ms = sensor_data.get(KEY_WIND_SPEED)
             if wind_ms is not None:
-                forecast_data["wind_speed"] = round(wind_ms / 0.44704, 1)  # m/s to mph
+                forecast_data[KEY_WIND_SPEED] = round(
+                    wind_ms / 0.44704, 1
+                )  # m/s to mph
 
         # Convert pressure back to inHg if it was in hPa
         pressure_unit = sensor_data.get(KEY_PRESSURE_UNIT)
         if pressure_unit in ["hPa", "mbar", "mb"]:
-            pressure_hpa = sensor_data.get("pressure")
+            pressure_hpa = sensor_data.get(KEY_PRESSURE)
             if pressure_hpa is not None:
-                forecast_data["pressure"] = round(pressure_hpa / 33.8639, 2)
+                forecast_data[KEY_PRESSURE] = round(pressure_hpa / 33.8639, 2)
 
         # Wind gust also needs conversion if present
         gust_unit = sensor_data.get(KEY_WIND_GUST_UNIT)
@@ -522,20 +524,22 @@ class WeatherDetector:
         # Convert wind speed to mph if it was in km/h or m/s
         wind_unit = sensor_data.get(KEY_WIND_SPEED_UNIT)
         if wind_unit in ["km/h", "kmh", "kph"]:
-            wind_kmh = sensor_data.get("wind_speed")
+            wind_kmh = sensor_data.get(KEY_WIND_SPEED)
             if wind_kmh is not None:
-                analysis_data["wind_speed"] = round(wind_kmh / 1.60934, 1)
+                analysis_data[KEY_WIND_SPEED] = round(wind_kmh / 1.60934, 1)
         elif wind_unit in ["m/s", "ms"]:
-            wind_ms = sensor_data.get("wind_speed")
+            wind_ms = sensor_data.get(KEY_WIND_SPEED)
             if wind_ms is not None:
-                analysis_data["wind_speed"] = round(wind_ms / 0.44704, 1)  # m/s to mph
+                analysis_data[KEY_WIND_SPEED] = round(
+                    wind_ms / 0.44704, 1
+                )  # m/s to mph
 
         # Convert pressure to inHg if it was in hPa
         pressure_unit = sensor_data.get(KEY_PRESSURE_UNIT)
         if pressure_unit in ["hPa", "mbar", "mb"]:
-            pressure_hpa = sensor_data.get("pressure")
+            pressure_hpa = sensor_data.get(KEY_PRESSURE)
             if pressure_hpa is not None:
-                analysis_data["pressure"] = round(pressure_hpa / 33.8639, 2)
+                analysis_data[KEY_PRESSURE] = round(pressure_hpa / 33.8639, 2)
 
         # Wind gust also needs conversion if present
         gust_unit = sensor_data.get(KEY_WIND_GUST_UNIT)

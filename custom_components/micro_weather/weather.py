@@ -163,6 +163,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         """Return the precipitation."""
         if self.coordinator.data:
             return self.coordinator.data.get(KEY_PRECIPITATION)
+        return None
 
     @property
     def native_precipitation_unit(self) -> str | None:

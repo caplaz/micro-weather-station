@@ -1,9 +1,10 @@
 # Micro Weather Station for Home Assistant
 
+[![hacs][hacsbadge]][hacs]
 [![GitHub Release][releases-shield]][releases]
+[![CI][ci-shield]][ci]
 [![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]](LICENSE)
-[![hacs][hacsbadge]][hacs]
 
 A Home Assistant custom integration that creates a smart weather station by analyzing your existing sensor data to determine accurate weather conditions for your specific location and microclimate. Weather station data from external services can be unreliable or not reflect your specific environment - this integration uses your actual sensor readings to provide weather conditions that truly represent what's happening at your location.
 
@@ -756,6 +757,8 @@ See [CHANGELOG](CHANGELOG.md) for the complete changelog.
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
+[ci-shield]: https://github.com/caplaz/micro-weather-station/actions/workflows/ci.yml/badge.svg
+[ci]: https://github.com/caplaz/micro-weather-station/actions/workflows/ci.yml
 [commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=2.3.1
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration

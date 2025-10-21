@@ -66,3 +66,54 @@ KEY_PRESSURE_UNIT = "pressure_unit"
 KEY_WIND_SPEED_UNIT = "wind_speed_unit"
 KEY_WIND_GUST_UNIT = "wind_gust_unit"
 KEY_RAIN_RATE_UNIT = "rain_rate_unit"
+
+# Sensor types configuration for individual sensor entities
+SENSOR_TYPES = {
+    "temperature": {
+        "name": "Temperature",
+        "unit": "°C",
+        "icon": "mdi:thermometer",
+        "device_class": "temperature",
+    },
+    "humidity": {
+        "name": "Humidity",
+        "unit": "%",
+        "icon": "mdi:water-percent",
+        "device_class": "humidity",
+    },
+    "pressure": {
+        "name": "Pressure",
+        "unit": "hPa",
+        "icon": "mdi:gauge",
+        "device_class": "pressure",
+    },
+    "wind_speed": {
+        "name": "Wind Speed",
+        "unit": "km/h",
+        "icon": "mdi:weather-windy",
+        "device_class": "wind_speed",
+    },
+    "wind_direction": {
+        "name": "Wind Direction",
+        "unit": "°",
+        "icon": "mdi:compass",
+    },
+    "visibility": {
+        "name": "Visibility",
+        "unit": "km",
+        "icon": "mdi:eye",
+        "device_class": "distance",
+    },
+    "precipitation": {
+        "name": "Precipitation",
+        "unit": "mm",
+        "icon": "mdi:weather-rainy",
+        "device_class": "precipitation",
+    },
+    "dewpoint": {
+        "name": "Dewpoint",
+        "unit": "°C",
+        "icon": "mdi:thermometer-water",
+        "device_class": "temperature",
+    },
+}

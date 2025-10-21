@@ -193,7 +193,7 @@ class AdvancedWeatherForecast:
             List[Dict[str, Any]]: 24-hour forecast with detailed hourly predictions
         """
         try:
-            hourly_forecast = []
+            hourly_forecast: List[Dict[str, Any]] = []
 
             # Get comprehensive meteorological state
             meteorological_state = self._analyze_comprehensive_meteorological_state(
@@ -282,7 +282,7 @@ class AdvancedWeatherForecast:
         except Exception as e:
             # Log error and return a simple default forecast to prevent UI issues
             _LOGGER.warning("Comprehensive hourly forecast generation failed: %s", e)
-            hourly_forecast = []
+            fallback_forecast: List[Dict[str, Any]] = []
             base_temp = current_temp if isinstance(current_temp, (int, float)) else 20.0
             base_condition = (
                 current_condition
@@ -295,7 +295,7 @@ class AdvancedWeatherForecast:
                 # Use previous hour's condition as base for current hour (except first hour)
                 forecast_condition = base_condition
                 if hour_idx > 0:
-                    forecast_condition = hourly_forecast[hour_idx - 1][KEY_CONDITION]
+                    forecast_condition = fallback_forecast[hour_idx - 1][KEY_CONDITION]
 
                 # Apply day/night conversion to fallback forecast too
                 astronomical_context = self._calculate_astronomical_context(
@@ -312,7 +312,7 @@ class AdvancedWeatherForecast:
                     elif forecast_condition == ATTR_CONDITION_CLOUDY:
                         forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
 
-                hourly_forecast.append(
+                fallback_forecast.append(
                     {
                         "datetime": forecast_time.isoformat(),
                         KEY_TEMPERATURE: base_temp,
@@ -323,7 +323,7 @@ class AdvancedWeatherForecast:
                         "is_nighttime": False,
                     }
                 )
-            return hourly_forecast
+            return fallback_forecast
 
     def _analyze_comprehensive_meteorological_state(
         self, sensor_data: Dict[str, Any], altitude: Optional[float] = 0.0
