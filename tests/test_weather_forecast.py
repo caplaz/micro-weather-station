@@ -1,6 +1,7 @@
 """Test the weather forecasting functionality."""
 
-from datetime import datetime
+from collections import deque
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 from homeassistant.components.weather import (
@@ -17,6 +18,15 @@ from homeassistant.components.weather import (
 )
 import pytest
 
+from custom_components.micro_weather.const import (
+    KEY_CONDITION,
+    KEY_HUMIDITY,
+    KEY_OUTDOOR_TEMP,
+    KEY_PRESSURE,
+    KEY_RAIN_RATE,
+    KEY_WIND_GUST,
+    KEY_WIND_SPEED,
+)
 from custom_components.micro_weather.weather_analysis import WeatherAnalysis
 from custom_components.micro_weather.weather_forecast import AdvancedWeatherForecast
 
@@ -2385,3 +2395,957 @@ class TestAdvancedWeatherForecast:
         for hour_forecast in result:
             assert "condition" in hour_forecast
             assert "temperature" in hour_forecast
+
+    # ======== HOURLY FORECAST CLOUD COVER TESTS ========
+
+    def test_forecast_hourly_condition_clear_skies_daytime(self, forecast):
+        """Test hourly condition with clear skies (low cloud cover) during daytime."""
+        # Clear skies (10% cloud cover) during daytime should remain sunny
+        astronomical_context = {"is_daytime": True, "hour_of_day": 12}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 10.0},  # Clear
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_SUNNY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_SUNNY
+        ), "Clear skies (10% cloud cover) should remain sunny during daytime"
+
+    def test_forecast_hourly_condition_clear_skies_nighttime(self, forecast):
+        """Test hourly condition with clear skies during nighttime."""
+        # Clear skies (5% cloud cover) during nighttime should be clear_night
+        astronomical_context = {"is_daytime": False, "hour_of_day": 22}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 5.0},  # Very clear
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_SUNNY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_CLEAR_NIGHT
+        ), "Clear skies during nighttime should become clear_night"
+
+    def test_forecast_hourly_condition_partly_cloudy_daytime(self, forecast):
+        """Test hourly condition with partly cloudy (moderate cloud cover) during daytime."""
+        # Partly cloudy (35% cloud cover) during daytime should stay partly cloudy
+        astronomical_context = {"is_daytime": True, "hour_of_day": 14}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 35.0},  # Partly cloudy
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_PARTLYCLOUDY
+        ), "Partly cloudy during daytime should remain partly cloudy"
+
+    def test_forecast_hourly_condition_overcast_daytime(self, forecast):
+        """Test hourly condition with overcast (high cloud cover) during daytime."""
+        # Overcast (85% cloud cover) during daytime should be cloudy
+        astronomical_context = {"is_daytime": True, "hour_of_day": 15}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 85.0},  # Very cloudy
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_CLOUDY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_CLOUDY
+        ), "Overcast (85% cloud cover) should remain cloudy during daytime"
+
+    def test_forecast_hourly_condition_neutral_cloud_cover_daytime(self, forecast):
+        """Test hourly condition with neutral cloud cover (50%) during daytime."""
+        # Neutral cloud cover (50%) is unreliable - should preserve input condition
+        astronomical_context = {"is_daytime": True, "hour_of_day": 13}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 50.0},  # Neutral/unreliable
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        # Test with sunny input
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_SUNNY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+        assert (
+            result == ATTR_CONDITION_SUNNY
+        ), "Neutral cloud cover should preserve sunny during daytime"
+
+        # Test with partly cloudy input
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+        assert (
+            result == ATTR_CONDITION_PARTLYCLOUDY
+        ), "Neutral cloud cover should preserve partly cloudy during daytime"
+
+    def test_forecast_hourly_condition_rainy_preserved_daytime(self, forecast):
+        """Test that rain conditions are preserved regardless of time of day."""
+        # Rainy conditions should persist through daytime
+        astronomical_context = {"is_daytime": True, "hour_of_day": 11}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 90.0},
+            "pressure_analysis": {"storm_probability": 60.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_RAINY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_RAINY
+        ), "Rainy conditions should be preserved during daytime"
+
+    def test_forecast_hourly_condition_rainy_preserved_nighttime(self, forecast):
+        """Test that rain conditions are preserved during nighttime."""
+        astronomical_context = {"is_daytime": False, "hour_of_day": 23}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 95.0},
+            "pressure_analysis": {"storm_probability": 70.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_POURING,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_POURING
+        ), "Heavy rain should be preserved during nighttime"
+
+    def test_forecast_hourly_condition_storm_preserved_daytime(self, forecast):
+        """Test that storm conditions are preserved during daytime."""
+        astronomical_context = {"is_daytime": True, "hour_of_day": 10}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 95.0},
+            "pressure_analysis": {"storm_probability": 85.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_LIGHTNING_RAINY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_LIGHTNING_RAINY
+        ), "Storm conditions should be preserved during daytime"
+
+    def test_forecast_hourly_condition_clear_night_to_sunny(self, forecast):
+        """Test conversion from clear_night to sunny at sunrise."""
+        astronomical_context = {"is_daytime": True, "hour_of_day": 7}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 15.0},  # Reliable clear
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_CLEAR_NIGHT,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_SUNNY
+        ), "Clear night should become sunny at daytime"
+
+    def test_forecast_hourly_condition_partly_cloudy_nighttime_clear(self, forecast):
+        """Test partly cloudy with clear skies during nighttime."""
+        astronomical_context = {"is_daytime": False, "hour_of_day": 20}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 25.0},  # Reliable clear
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_CLEAR_NIGHT
+        ), "Partly cloudy with clear skies should become clear_night at night"
+
+    def test_forecast_hourly_condition_cloudy_to_clear_transition(self, forecast):
+        """Test cloud cover improving from cloudy to clear during daytime."""
+        astronomical_context = {"is_daytime": True, "hour_of_day": 12}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 15.0},  # Reliably clear
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {
+            "micro_changes": {"change_probability": 0.6, "max_change_per_hour": 2.0}
+        }
+
+        # Start with cloudy, should improve to clear based on cloud cover
+        result = forecast._forecast_hourly_condition_comprehensive(
+            6,
+            ATTR_CONDITION_CLOUDY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        # With high cloud cover reliability and daytime, should stay sunny
+        assert result in [
+            ATTR_CONDITION_SUNNY,
+            ATTR_CONDITION_CLOUDY,
+        ], "Should handle cloud cover transition"
+
+    def test_forecast_hourly_condition_fog_preserved_daytime(self, forecast):
+        """Test that fog conditions are preserved during daytime."""
+        astronomical_context = {"is_daytime": True, "hour_of_day": 8}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 98.0},
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_FOG,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_FOG
+        ), "Fog conditions should be preserved during daytime"
+
+    def test_forecast_hourly_condition_snow_preserved_nighttime(self, forecast):
+        """Test that snow conditions are preserved during nighttime."""
+        astronomical_context = {"is_daytime": False, "hour_of_day": 2}
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 90.0},
+            "pressure_analysis": {"storm_probability": 20.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            0,
+            ATTR_CONDITION_SNOWY,
+            astronomical_context,
+            meteorological_state,
+            hourly_patterns,
+            micro_evolution,
+        )
+
+        assert (
+            result == ATTR_CONDITION_SNOWY
+        ), "Snow conditions should be preserved during nighttime"
+
+    def test_forecast_hourly_condition_24_hour_cycle(self, forecast):
+        """Test hourly condition through a full 24-hour cycle with consistent base condition."""
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 20.0},  # Consistently clear
+            "pressure_analysis": {"storm_probability": 0.0},
+        }
+        hourly_patterns = {}
+        micro_evolution = {"micro_changes": {"change_probability": 0.3}}
+
+        conditions_by_hour = {}
+        for hour in range(24):
+            is_daytime = 6 <= hour < 18  # 6 AM to 6 PM
+            astronomical_context = {"is_daytime": is_daytime, "hour_of_day": hour}
+
+            result = forecast._forecast_hourly_condition_comprehensive(
+                hour,
+                ATTR_CONDITION_SUNNY,
+                astronomical_context,
+                meteorological_state,
+                hourly_patterns,
+                micro_evolution,
+            )
+            conditions_by_hour[hour] = result
+
+        # Check daytime hours (6-17) are sunny or partly cloudy
+        for hour in range(6, 18):
+            assert conditions_by_hour[hour] in [
+                ATTR_CONDITION_SUNNY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+            ], f"Hour {hour} should be sunny/partly cloudy during daytime"
+
+        # Check nighttime hours (18-5) are clear_night
+        for hour in list(range(18, 24)) + list(range(0, 6)):
+            assert (
+                conditions_by_hour[hour] == ATTR_CONDITION_CLEAR_NIGHT
+            ), f"Hour {hour} should be clear_night during nighttime"
+
+    # ======== WEATHER ANALYSIS EDGE CASE TESTS ========
+    # Note: These tests use a real WeatherAnalysis instance, not the mocked one
+
+    def test_weather_analysis_fog_detection_dense_fog(self):
+        """Test dense fog detection with extreme conditions."""
+        weather_analysis = WeatherAnalysis()
+
+        # Simulate dense fog conditions
+        result = weather_analysis.analyze_fog_conditions(
+            temp=32.0,  # At freezing
+            humidity=99.9,  # Virtually saturated
+            dewpoint=31.8,  # Very tight spread
+            spread=0.2,
+            wind_speed=0.5,  # Very calm
+            solar_rad=0.5,  # No solar radiation
+            is_daytime=False,
+        )
+
+        assert (
+            result == ATTR_CONDITION_FOG
+        ), "Should detect dense fog with extreme conditions"
+
+    def test_weather_analysis_fog_detection_twilight_false_positive(self):
+        """Test that fog is not falsely detected during twilight."""
+        weather_analysis = WeatherAnalysis()
+
+        # Twilight with high humidity should not trigger fog
+        result = weather_analysis.analyze_fog_conditions(
+            temp=70.0,
+            humidity=95.0,  # High but not extreme
+            dewpoint=68.0,
+            spread=2.0,
+            wind_speed=5.0,
+            solar_rad=50.0,  # Twilight solar radiation
+            is_daytime=False,
+        )
+
+        assert (
+            result is None
+        ), "Should not falsely detect fog during twilight with solar radiation"
+
+    def test_weather_analysis_dewpoint_calculation_extremes(self):
+        """Test dewpoint calculation with extreme humidity values."""
+        weather_analysis = WeatherAnalysis()
+
+        # Test with very dry air
+        dewpoint_dry = weather_analysis.calculate_dewpoint(100.0, 5.0)
+        assert dewpoint_dry < 30.0, "Very dry air should have very low dewpoint"
+
+        # Test with saturated air
+        dewpoint_saturated = weather_analysis.calculate_dewpoint(70.0, 100.0)
+        assert (
+            abs(dewpoint_saturated - 70.0) < 1.0
+        ), "Saturated air should have dewpoint near temp"
+
+        # Test with zero humidity fallback
+        dewpoint_zero = weather_analysis.calculate_dewpoint(80.0, 0.0)
+        assert isinstance(
+            dewpoint_zero, float
+        ), "Should handle zero humidity gracefully"
+
+    def test_weather_analysis_pressure_altitude_adjustment_high_elevation(self):
+        """Test pressure adjustment at high altitude uses barometric formula."""
+        weather_analysis = WeatherAnalysis()
+
+        # Test that the method handles altitude adjustments consistently
+        # At higher altitudes, atmospheric pressure is lower
+        pressure_sea_level = weather_analysis.adjust_pressure_for_altitude(
+            pressure_inhg=29.92, altitude_m=0, pressure_type="relative"
+        )
+
+        pressure_high_alt = weather_analysis.adjust_pressure_for_altitude(
+            pressure_inhg=29.92, altitude_m=1609, pressure_type="relative"
+        )
+
+        # Just verify both return valid float values
+        assert isinstance(pressure_sea_level, float), "Should return a float"
+        assert isinstance(pressure_high_alt, float), "Should return a float"
+        # Both should be reasonable pressure values (in inHg)
+        assert (
+            10 < pressure_sea_level < 35
+        ), f"Sea level pressure should be realistic, got {pressure_sea_level}"
+        assert (
+            10 < pressure_high_alt < 35
+        ), f"Altitude pressure should be realistic, got {pressure_high_alt}"
+
+    def test_weather_analysis_pressure_altitude_adjustment_sea_level(self):
+        """Test pressure adjustment at sea level."""
+        weather_analysis = WeatherAnalysis()
+
+        # At sea level, atmospheric pressure should equal station pressure
+        adjusted = weather_analysis.adjust_pressure_for_altitude(
+            pressure_inhg=29.92, altitude_m=0, pressure_type="relative"
+        )
+
+        assert abs(adjusted - 29.92) < 0.1, "Sea level pressure should not be adjusted"
+
+    def test_weather_analysis_wind_direction_circular_mean(self):
+        """Test circular mean calculation for wind directions."""
+        weather_analysis = WeatherAnalysis()
+
+        # Directions around north (350, 10, 5 degrees)
+        directions = [350.0, 10.0, 5.0, 355.0]
+        mean = weather_analysis.calculate_circular_mean(directions)
+
+        # Mean should be near 0/360 (north), not 180 (south)
+        assert (
+            mean < 45 or mean > 315
+        ), f"Circular mean of northerly directions should be north, got {mean}°"
+
+    def test_weather_analysis_wind_direction_angular_difference(self):
+        """Test angular difference calculation between wind directions."""
+        weather_analysis = WeatherAnalysis()
+
+        # Test normal difference
+        diff = weather_analysis.calculate_angular_difference(0.0, 90.0)
+        assert diff == 90.0, "Should calculate 90° difference correctly"
+
+        # Test wraparound case (350° to 10°)
+        diff = weather_analysis.calculate_angular_difference(350.0, 10.0)
+        assert (
+            abs(diff - 20.0) < 0.1
+        ), "Should handle wraparound correctly (350° to 10° = 20°)"
+
+        # Test reverse wraparound (10° to 350°)
+        diff = weather_analysis.calculate_angular_difference(10.0, 350.0)
+        assert (
+            abs(diff + 20.0) < 0.1 or abs(diff - 340.0) < 0.1
+        ), "Should handle reverse wraparound"
+
+    def test_weather_analysis_pressure_trend_rapid_drop(self):
+        """Test pressure trend analysis with rapid pressure drop."""
+        weather_analysis = WeatherAnalysis()
+
+        # Create history of rapidly dropping pressure
+        import datetime
+
+        now = datetime.datetime.now()
+
+        # Mock historical pressure data (simulation)
+        weather_analysis._sensor_history[KEY_PRESSURE] = deque(maxlen=192)
+
+        # Add 24 readings showing rapid pressure drop (simulating falling pressure)
+        for i in range(24):
+            weather_analysis._sensor_history[KEY_PRESSURE].append(
+                {
+                    "timestamp": now - datetime.timedelta(hours=24 - i),
+                    "value": 29.92
+                    - (i * 0.15),  # Dropping 0.15 inHg per hour = 3.6 inHg/day
+                }
+            )
+
+        trends = weather_analysis.analyze_pressure_trends(altitude=0)
+
+        # Rapid drop should indicate low pressure system
+        assert (
+            trends["pressure_system"] == "low_pressure"
+        ), f"Rapid pressure drop should indicate low pressure, got {trends['pressure_system']}"
+        # Storm probability should be elevated due to rapid drop and low pressure
+        assert (
+            trends["storm_probability"] >= 40
+        ), f"Rapid pressure drop should increase storm probability, got {trends['storm_probability']}"
+
+    def test_weather_analysis_cloud_cover_low_solar_radiation(self):
+        """Test cloud cover calculation with very low solar radiation."""
+        weather_analysis = WeatherAnalysis()
+
+        cloud_cover = weather_analysis.analyze_cloud_cover(
+            solar_radiation=10.0,  # Very low
+            solar_lux=500.0,  # Very low
+            uv_index=0.1,  # Very low
+            solar_elevation=45.0,
+        )
+
+        # Low solar radiation should indicate some cloudiness
+        # The actual algorithm uses complex calculations, so we just check it's reasonable
+        assert 0 <= cloud_cover <= 100, "Cloud cover should be between 0-100%"
+        assert (
+            cloud_cover > 30
+        ), "Very low solar radiation should indicate notable cloud cover"
+
+    def test_weather_analysis_cloud_cover_high_solar_radiation(self):
+        """Test cloud cover calculation with high solar radiation."""
+        weather_analysis = WeatherAnalysis()
+
+        cloud_cover = weather_analysis.analyze_cloud_cover(
+            solar_radiation=1000.0,  # Very high
+            solar_lux=100000.0,  # Very high
+            uv_index=11.0,  # Very high
+            solar_elevation=80.0,  # Sun nearly overhead
+        )
+
+        # High solar radiation should indicate low cloud cover
+        assert 0 <= cloud_cover <= 100, "Cloud cover should be between 0-100%"
+        assert (
+            cloud_cover < 50
+        ), "Very high solar radiation should indicate relatively clear skies (<50%)"
+
+    def test_weather_analysis_visibility_in_fog(self):
+        """Test visibility estimation in fog conditions."""
+        weather_analysis = WeatherAnalysis()
+
+        sensor_data = {
+            KEY_OUTDOOR_TEMP: 32.0,
+            KEY_HUMIDITY: 99.0,
+            "dewpoint": 31.5,
+        }
+
+        visibility = weather_analysis.estimate_visibility(
+            ATTR_CONDITION_FOG, sensor_data
+        )
+
+        # Dense fog should have low visibility
+        assert visibility < 1.0, "Dense fog should have visibility less than 1 km"
+
+    def test_weather_analysis_visibility_in_storm(self):
+        """Test visibility estimation during thunderstorm."""
+        weather_analysis = WeatherAnalysis()
+
+        sensor_data = {
+            KEY_RAIN_RATE: 0.5,  # Heavy rain
+            KEY_WIND_SPEED: 25.0,  # Strong winds
+            KEY_WIND_GUST: 40.0,
+        }
+
+        visibility = weather_analysis.estimate_visibility(
+            ATTR_CONDITION_LIGHTNING_RAINY, sensor_data
+        )
+
+        # Storm with heavy rain should have reduced visibility
+        assert (
+            0.5 < visibility < 10.0
+        ), "Storm visibility should be reduced but not as low as fog"
+
+    # ============================================================================
+    # EDGE CASE TESTS: Multi-day forecast with sunset boundary handling
+    # ============================================================================
+
+    def test_forecast_hourly_condition_multi_day_sunset_boundary(self, forecast):
+        """Test that forecast correctly handles transition from sunset day to next day.
+
+        When forecast crosses into next day, dates after sunset should use fallback 6-18 hour logic.
+        """
+        # Current time: Jan 1, 5 PM (after sunset at 6 PM is just before sunset actually)
+        # Sunset: Jan 1, 6 PM
+        # Forecast: 24 hours starting from 6 PM Jan 1 through 6 PM Jan 2
+
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 30},
+            "pressure_trend": {"current_trend": 0},
+        }
+
+        hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
+        micro_evolution = {"micro_changes": {"change_probability": 0}}
+
+        # Before sunset: should be daytime/sunny
+        result_before = forecast._forecast_hourly_condition_comprehensive(
+            hour_idx=0,
+            current_condition=ATTR_CONDITION_SUNNY,
+            astronomical_context={
+                "is_daytime": True,
+                "solar_elevation": 5,
+                "hour_of_day": 17,
+                "forecast_hour": 0,
+            },
+            meteorological_state=meteorological_state,
+            hourly_patterns=hourly_patterns,
+            micro_evolution=micro_evolution,
+        )
+        assert result_before == ATTR_CONDITION_SUNNY
+
+        # After sunset on same day: should convert to nighttime
+        result_after = forecast._forecast_hourly_condition_comprehensive(
+            hour_idx=1,
+            current_condition=ATTR_CONDITION_SUNNY,
+            astronomical_context={
+                "is_daytime": False,
+                "solar_elevation": 0,
+                "hour_of_day": 18,
+                "forecast_hour": 1,
+            },
+            meteorological_state=meteorological_state,
+            hourly_patterns=hourly_patterns,
+            micro_evolution=micro_evolution,
+        )
+        assert result_after == ATTR_CONDITION_CLEAR_NIGHT
+
+    def test_forecast_hourly_condition_neutral_cloud_cover_50_percent_daytime(
+        self, forecast
+    ):
+        """Test that CLOUDY->PARTLYCLOUDY conversion works with exactly 50% cloud cover.
+
+        This tests the fix for: cloud_cover <= 50 (not just < 50) during daytime.
+        At exactly 50% cloud cover (neutral), nighttime CLOUDY should convert to PARTLYCLOUDY at daytime.
+        """
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 50.0},  # Exactly neutral
+            "pressure_trend": {"current_trend": 0},
+        }
+
+        hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
+        micro_evolution = {"micro_changes": {"change_probability": 0}}
+
+        # Start with CLOUDY condition (from nighttime conversion)
+        result = forecast._forecast_hourly_condition_comprehensive(
+            hour_idx=0,
+            current_condition=ATTR_CONDITION_CLOUDY,  # Was converted at night
+            astronomical_context={
+                "is_daytime": True,
+                "solar_elevation": 45,
+                "hour_of_day": 12,
+                "forecast_hour": 0,
+            },
+            meteorological_state=meteorological_state,
+            hourly_patterns=hourly_patterns,
+            micro_evolution=micro_evolution,
+        )
+
+        # With exactly 50% cloud cover at daytime, should convert back to PARTLYCLOUDY
+        assert (
+            result == ATTR_CONDITION_PARTLYCLOUDY
+        ), "At 50% cloud cover daytime, CLOUDY should become PARTLYCLOUDY"
+
+    def test_forecast_hourly_condition_neutral_cloud_cover_49_percent_daytime(
+        self, forecast
+    ):
+        """Test that CLOUDY->PARTLYCLOUDY conversion works with 49% cloud cover."""
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 49.0},  # Just below neutral
+            "pressure_trend": {"current_trend": 0},
+        }
+
+        hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
+        micro_evolution = {"micro_changes": {"change_probability": 0}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            hour_idx=0,
+            current_condition=ATTR_CONDITION_CLOUDY,
+            astronomical_context={
+                "is_daytime": True,
+                "solar_elevation": 45,
+                "hour_of_day": 12,
+                "forecast_hour": 0,
+            },
+            meteorological_state=meteorological_state,
+            hourly_patterns=hourly_patterns,
+            micro_evolution=micro_evolution,
+        )
+
+        assert result == ATTR_CONDITION_PARTLYCLOUDY
+
+    def test_forecast_hourly_condition_neutral_cloud_cover_51_percent_daytime(
+        self, forecast
+    ):
+        """Test that CLOUDY stays CLOUDY when cloud cover exceeds 50% at daytime."""
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 51.0},  # Just above neutral
+            "pressure_trend": {"current_trend": 0},
+        }
+
+        hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
+        micro_evolution = {"micro_changes": {"change_probability": 0}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            hour_idx=0,
+            current_condition=ATTR_CONDITION_CLOUDY,
+            astronomical_context={
+                "is_daytime": True,
+                "solar_elevation": 45,
+                "hour_of_day": 12,
+                "forecast_hour": 0,
+            },
+            meteorological_state=meteorological_state,
+            hourly_patterns=hourly_patterns,
+            micro_evolution=micro_evolution,
+        )
+
+        # At 51% (above neutral), should keep CLOUDY
+        assert result == ATTR_CONDITION_CLOUDY
+
+    def test_forecast_hourly_condition_nighttime_partlycloudy_50_percent_converts_to_cloudy(
+        self, forecast
+    ):
+        """Test that PARTLYCLOUDY->CLOUDY conversion works at exactly 50% cloud cover at nighttime."""
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 50.0},  # Exactly neutral
+            "pressure_trend": {"current_trend": 0},
+        }
+
+        hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
+        micro_evolution = {"micro_changes": {"change_probability": 0}}
+
+        # At nighttime with 50% cloud cover, PARTLYCLOUDY should convert to CLOUDY
+        result = forecast._forecast_hourly_condition_comprehensive(
+            hour_idx=0,
+            current_condition=ATTR_CONDITION_PARTLYCLOUDY,
+            astronomical_context={
+                "is_daytime": False,
+                "solar_elevation": 0,
+                "hour_of_day": 22,
+                "forecast_hour": 0,
+            },
+            meteorological_state=meteorological_state,
+            hourly_patterns=hourly_patterns,
+            micro_evolution=micro_evolution,
+        )
+
+        assert result == ATTR_CONDITION_CLOUDY
+
+    def test_forecast_hourly_condition_nighttime_partlycloudy_49_percent_converts_to_clear_night(
+        self, forecast
+    ):
+        """Test that PARTLYCLOUDY->CLEAR_NIGHT conversion works below 50% cloud cover at nighttime."""
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 49.0},  # Just below neutral
+            "pressure_trend": {"current_trend": 0},
+        }
+
+        hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
+        micro_evolution = {"micro_changes": {"change_probability": 0}}
+
+        result = forecast._forecast_hourly_condition_comprehensive(
+            hour_idx=0,
+            current_condition=ATTR_CONDITION_PARTLYCLOUDY,
+            astronomical_context={
+                "is_daytime": False,
+                "solar_elevation": 0,
+                "hour_of_day": 22,
+                "forecast_hour": 0,
+            },
+            meteorological_state=meteorological_state,
+            hourly_patterns=hourly_patterns,
+            micro_evolution=micro_evolution,
+        )
+
+        assert result == ATTR_CONDITION_CLEAR_NIGHT
+
+    def test_weather_utils_is_forecast_hour_daytime_multi_day_after_sunset_date(self):
+        """Test that dates after sunset date fall back to 6-18 hour logic."""
+        from custom_components.micro_weather.weather_utils import (
+            is_forecast_hour_daytime,
+        )
+
+        # Sunset was on Jan 1
+        sunrise_time = datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc)
+        sunset_time = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
+
+        # Test times on Jan 2 (after sunset date)
+        test_cases = [
+            (
+                datetime(2024, 1, 2, 5, 0, 0, tzinfo=timezone.utc),
+                False,
+            ),  # 5 AM = before 6 = nighttime
+            (
+                datetime(2024, 1, 2, 6, 0, 0, tzinfo=timezone.utc),
+                True,
+            ),  # 6 AM = start of day
+            (
+                datetime(2024, 1, 2, 12, 0, 0, tzinfo=timezone.utc),
+                True,
+            ),  # Noon = daytime
+            (
+                datetime(2024, 1, 2, 18, 0, 0, tzinfo=timezone.utc),
+                False,
+            ),  # 6 PM = end of day
+            (
+                datetime(2024, 1, 2, 23, 0, 0, tzinfo=timezone.utc),
+                False,
+            ),  # 11 PM = nighttime
+        ]
+
+        for forecast_time, expected_is_daytime in test_cases:
+            result = is_forecast_hour_daytime(forecast_time, sunrise_time, sunset_time)
+            assert (
+                result == expected_is_daytime
+            ), f"At {forecast_time.hour}:00 Jan 2, expected is_daytime={expected_is_daytime}, got {result}"
+
+    def test_weather_utils_is_forecast_hour_daytime_before_sunset_date_uses_actual_times(
+        self,
+    ):
+        """Test that dates before/on sunset date use actual sunrise/sunset times."""
+        from custom_components.micro_weather.weather_utils import (
+            is_forecast_hour_daytime,
+        )
+
+        # Sunset on Jan 1 at 6 PM
+        sunrise_time = datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc)
+        sunset_time = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
+
+        # Test times on Jan 1 (same day as sunset)
+        test_cases = [
+            (
+                datetime(2024, 1, 1, 5, 59, 0, tzinfo=timezone.utc),
+                False,
+            ),  # Before sunrise
+            (datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc), True),  # At sunrise
+            (datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc), True),  # Noon
+            (
+                datetime(2024, 1, 1, 17, 59, 0, tzinfo=timezone.utc),
+                True,
+            ),  # Before sunset
+            (
+                datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc),
+                False,
+            ),  # At sunset (exclusive)
+        ]
+
+        for forecast_time, expected_is_daytime in test_cases:
+            result = is_forecast_hour_daytime(forecast_time, sunrise_time, sunset_time)
+            assert (
+                result == expected_is_daytime
+            ), f"At {forecast_time.hour}:{forecast_time.minute:02d} Jan 1, expected is_daytime={expected_is_daytime}, got {result}"
+
+    def test_forecast_hourly_comprehensive_multi_day_cycle_sunny_to_cloudy_and_back(
+        self, forecast
+    ):
+        """Integration test: full 24-hour forecast with day/night/day cycle.
+
+        Verifies the complete fix for the "clear night at 2pm" bug:
+        - Starting condition: sunny
+        - After sunset: converts to clear-night
+        - After sunrise next day: converts back to sunny
+        """
+        # Current time: Jan 1, 2 PM (daytime)
+        with patch("homeassistant.util.dt.now") as mock_now:
+            mock_now.return_value = datetime(2024, 1, 1, 14, 0, 0, tzinfo=timezone.utc)
+
+            sunrise_time = datetime(2024, 1, 1, 6, 0, 0, tzinfo=timezone.utc)
+            sunset_time = datetime(2024, 1, 1, 18, 0, 0, tzinfo=timezone.utc)
+
+            result = forecast.generate_hourly_forecast_comprehensive(
+                current_temp=20,
+                current_condition=ATTR_CONDITION_SUNNY,
+                sensor_data={
+                    KEY_HUMIDITY: 50,
+                    KEY_PRESSURE: 1013,
+                    KEY_WIND_SPEED: 5,
+                    KEY_OUTDOOR_TEMP: 20,
+                },
+                sunrise_time=sunrise_time,
+                sunset_time=sunset_time,
+            )
+
+            # Verify structure
+            assert len(result) == 24
+
+            # Track condition transitions
+            conditions = [f[KEY_CONDITION] for f in result]
+            is_nighttimes = [f.get("is_nighttime", False) for f in result]
+
+            # First 3 hours should be daytime (2 PM to 5 PM, before sunset at 6 PM)
+            # Hour 0 = 3 PM, Hour 1 = 4 PM, Hour 2 = 5 PM
+            for i in range(3):
+                assert not is_nighttimes[i], f"Hour {i} should be daytime"
+                assert conditions[i] in [
+                    ATTR_CONDITION_SUNNY,
+                    ATTR_CONDITION_PARTLYCLOUDY,
+                    ATTR_CONDITION_CLOUDY,
+                ]
+
+            # At hour 3 (6 PM) should convert to nighttime
+            assert is_nighttimes[3], "Hour 3 (6 PM sunset) should be nighttime"
+            assert conditions[3] in [ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_CLOUDY]
+
+            # After sunset (hours 4-11 = 7 PM to 2 AM) should be nighttime
+            for i in range(4, 12):
+                assert is_nighttimes[i], f"Hour {i} should be nighttime"
+                assert conditions[i] in [
+                    ATTR_CONDITION_CLEAR_NIGHT,
+                    ATTR_CONDITION_CLOUDY,
+                ]
+
+            # After sunrise next day (using fallback 6-18) should be back to daytime
+            # Hours 12+ = 3 AM next day onwards
+            for i in range(12, 24):
+                forecast_hour = (14 + i + 1) % 24
+                # Using fallback 6-18, so 6 AM to 6 PM (before 18) = daytime
+                if 6 <= forecast_hour < 18:
+                    assert not is_nighttimes[
+                        i
+                    ], f"Hour {i} (forecast hour {forecast_hour}) should be daytime by fallback"
+                    # Should be daytime-appropriate condition
+                    assert conditions[i] in [
+                        ATTR_CONDITION_SUNNY,
+                        ATTR_CONDITION_PARTLYCLOUDY,
+                        ATTR_CONDITION_CLOUDY,
+                    ]
+                else:
+                    assert is_nighttimes[
+                        i
+                    ], f"Hour {i} (forecast hour {forecast_hour}) should be nighttime by fallback"

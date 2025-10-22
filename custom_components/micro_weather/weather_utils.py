@@ -112,7 +112,8 @@ def is_forecast_hour_daytime(
 ) -> bool:
     """Determine if a forecast hour is daytime using sunrise/sunset data.
 
-    Falls back to hardcoded 6 AM/6 PM times if sunrise/sunset data is unavailable.
+    Falls back to hardcoded 6 AM/6 PM times if sunrise/sunset data is unavailable
+    or if forecast is after the provided sunset date.
 
     Args:
         forecast_time: The datetime of the forecast hour
@@ -123,7 +124,6 @@ def is_forecast_hour_daytime(
         bool: True if the forecast hour is daytime, False if nighttime
     """
     if sunrise_time and sunset_time:
-        # Use actual sunrise/sunset times
         # Handle timezone awareness mismatches
         if forecast_time.tzinfo is None and sunrise_time.tzinfo is not None:
             # Make forecast_time timezone-aware to match sunrise/sunset
@@ -132,6 +132,16 @@ def is_forecast_hour_daytime(
             # Make sunrise/sunset timezone-aware to match forecast_time
             sunrise_time = sunrise_time.replace(tzinfo=forecast_time.tzinfo)
             sunset_time = sunset_time.replace(tzinfo=forecast_time.tzinfo)
+
+        # Check if forecast_time is on a date after sunset date
+        # If forecast is after sunset date, we don't have valid data for that day, so use fallback
+        forecast_date = forecast_time.date() if hasattr(forecast_time, "date") else None
+        sunset_date = sunset_time.date() if hasattr(sunset_time, "date") else None
+
+        if forecast_date and sunset_date and forecast_date > sunset_date:
+            # Forecast is after the provided sunset date - use fallback
+            return 6 <= forecast_time.hour < 18
+
         # If both are offset-naive or both are offset-aware, compare directly
         return sunrise_time <= forecast_time < sunset_time
     else:

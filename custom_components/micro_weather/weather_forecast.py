@@ -1689,33 +1689,58 @@ class AdvancedWeatherForecast:
             current_condition = ATTR_CONDITION_CLOUDY
         forecast_condition = current_condition
 
-        # Daytime/nighttime adjustments
-        if not astronomical_context["is_daytime"]:
-            # Nighttime: change daytime conditions to nighttime equivalents
+        # Get meteorological cloud analysis to determine actual daytime condition
+        cloud_analysis = meteorological_state.get("cloud_analysis", {})
+        cloud_cover = cloud_analysis.get("cloud_cover", 50)
+        is_daytime = astronomical_context["is_daytime"]
+
+        # Determine if we have valid/recent cloud cover data (extremes indicate reliability)
+        # Cloud cover near 50 is neutral/uncertain, extremes (<20 or >70) are more reliable
+        cloud_cover_reliable = cloud_cover < 20 or cloud_cover > 70
+
+        # Apply time-of-day conversion
+        if is_daytime:
+            # Daytime: Convert nighttime conditions to daytime equivalents
+            # Only use cloud cover for condition overrides if it's reliably extreme
+            if forecast_condition == ATTR_CONDITION_CLEAR_NIGHT:
+                # Clear night becomes sunny in daytime
+                forecast_condition = ATTR_CONDITION_SUNNY
+            elif forecast_condition == ATTR_CONDITION_CLOUDY and cloud_cover <= 50:
+                # If we had cloudy from nighttime but it's actually clearer or neutral, adjust back to partlycloudy
+                forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+            # Otherwise keep the condition - sunny, partlycloudy, and weather (rain, snow, etc.) stay as-is
+        else:
+            # Nighttime: Convert daytime conditions to nighttime equivalents
+            # But preserve actual weather conditions like rain, snow, storms, fog
             if forecast_condition == ATTR_CONDITION_SUNNY:
                 forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
             elif forecast_condition == ATTR_CONDITION_PARTLYCLOUDY:
-                forecast_condition = ATTR_CONDITION_CLOUDY
-        else:
-            # Daytime: change nighttime conditions to daytime equivalents
-            if forecast_condition == ATTR_CONDITION_CLEAR_NIGHT:
-                forecast_condition = ATTR_CONDITION_SUNNY
-            elif forecast_condition == ATTR_CONDITION_CLOUDY:
-                forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+                # Convert to clear_night or cloudy based on cloud cover
+                if cloud_cover < 50:
+                    forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
+                else:
+                    forecast_condition = ATTR_CONDITION_CLOUDY
+            # Preserve other conditions as-is (rain, snow, storms, fog)
 
-        # Micro-evolution changes
+        # Micro-evolution changes (for condition transitions every 6 hours)
         micro_changes = micro_evolution.get("micro_changes", {})
         change_probability = micro_changes.get("change_probability", 0.3)
 
         if hour_idx > 0 and (hour_idx % 6) == 0:  # Check every 6 hours
-            if change_probability > 0.5:
-                # Potential condition change
-                if forecast_condition == ATTR_CONDITION_CLOUDY:
-                    forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
-                elif (
-                    forecast_condition == ATTR_CONDITION_PARTLYCLOUDY and hour_idx > 12
-                ):
-                    forecast_condition = ATTR_CONDITION_SUNNY
+            if change_probability > 0.5 and cloud_cover_reliable:
+                # Potential condition change based on reliable cloud cover data
+                if cloud_cover < 20:
+                    forecast_condition = (
+                        ATTR_CONDITION_SUNNY
+                        if is_daytime
+                        else ATTR_CONDITION_CLEAR_NIGHT
+                    )
+                elif cloud_cover > 70 and forecast_condition not in [
+                    ATTR_CONDITION_RAINY,
+                    ATTR_CONDITION_POURING,
+                    ATTR_CONDITION_LIGHTNING_RAINY,
+                ]:
+                    forecast_condition = ATTR_CONDITION_CLOUDY
 
         return forecast_condition
 

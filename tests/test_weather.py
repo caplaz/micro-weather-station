@@ -954,7 +954,12 @@ class TestMicroWeatherEntity:
     async def test_async_forecast_hourly_sunrise_sunset_boundary(
         self, weather_entity, coordinator
     ):
-        """Test condition transitions at sunrise and sunset boundaries."""
+        """Test condition transitions at sunrise and sunset boundaries.
+
+        Note: For multi-day forecasts where we don't have tomorrow's sunset times,
+        we use the fallback 6-18 hour day/night logic after the provided sunset date.
+        This ensures reasonable behavior when actual sunrise/sunset data isn't available.
+        """
         from datetime import datetime, timezone
         from unittest.mock import patch
 
@@ -997,24 +1002,40 @@ class TestMicroWeatherEntity:
                 assert result is not None
                 assert len(result) == 24
 
-                # All forecast hours should be nighttime since sunset is at 6 PM
-                # and forecast starts at 6:30 PM, spanning midnight
-                for forecast in result:
+                # Forecast spans from 6:30 PM today through ~5:30 PM tomorrow
+                # Today's hours (1-11, 6:30 PM - 5:30 AM) should all be nighttime (after 6 PM sunset)
+                # Tomorrow's hours (12-23, 6:30 AM - 5:30 PM) use fallback 6-18 hours, so:
+                #   - 6:30 AM - 5:59 PM should be daytime
+                #   - Rest should be nighttime
+
+                for idx, forecast in enumerate(result):
                     forecast_time = datetime.fromisoformat(forecast["datetime"])
+                    condition = forecast["condition"]
 
-                    # Should be nighttime conditions (clear-night/cloudy)
-                    assert forecast["condition"] in [
-                        ATTR_CONDITION_CLEAR_NIGHT,
-                        ATTR_CONDITION_CLOUDY,
-                    ], f"All forecast hours after sunset should be nighttime conditions, got {forecast['condition']} at {forecast_time}"
-
-                # Verify that the transition from day to night happened correctly
-                # by checking that we don't have any daytime conditions in the forecast
-                daytime_conditions = [ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY]
-                for forecast in result:
-                    assert (
-                        forecast["condition"] not in daytime_conditions
-                    ), f"Should not have daytime conditions after sunset, got {forecast['condition']} at {forecast['datetime']}"
+                    # First 11 hours: 6:30 PM to 5:30 AM (all after today's sunset)
+                    if idx < 11:
+                        # Should be nighttime
+                        assert condition in [
+                            ATTR_CONDITION_CLEAR_NIGHT,
+                            ATTR_CONDITION_CLOUDY,
+                        ], f"Hours after sunset today should be nighttime, got {condition} at {forecast_time}"
+                    else:
+                        # Hours 12-23: Tomorrow 6:30 AM to 5:30 PM
+                        # Using fallback 6-18 hours for tomorrow:
+                        # 6:30 AM, 7:30 AM, ... 5:30 PM are all daytime (between 6-18)
+                        is_daytime = 6 <= forecast_time.hour < 18
+                        if is_daytime:
+                            # Should be daytime conditions
+                            assert condition in [
+                                ATTR_CONDITION_SUNNY,
+                                ATTR_CONDITION_PARTLYCLOUDY,
+                            ], f"Hours during fallback daytime should be daytime conditions, got {condition} at {forecast_time}"
+                        else:
+                            # Should be nighttime
+                            assert condition in [
+                                ATTR_CONDITION_CLEAR_NIGHT,
+                                ATTR_CONDITION_CLOUDY,
+                            ], f"Hours during fallback nighttime should be nighttime, got {condition} at {forecast_time}"
 
     async def test_async_forecast_hourly_polar_regions(
         self, weather_entity, coordinator
