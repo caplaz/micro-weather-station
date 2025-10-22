@@ -523,7 +523,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             ] = selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=400,
-                    max=1200,
+                    max=1800,
                     step=10,
                     unit_of_measurement="W/m²",
                 )

@@ -1674,6 +1674,181 @@ class AdvancedWeatherForecast:
 
         return influence
 
+    def _analyze_pressure_trend_severity(
+        self, current_trend: float, long_term_trend: float
+    ) -> Dict[str, Any]:
+        """Analyze pressure trend magnitude and classify severity.
+
+        Args:
+            current_trend: 3-hour pressure change in hPa (from analyze_pressure_trends)
+            long_term_trend: 24-hour pressure change in hPa (from analyze_pressure_trends)
+
+        Returns:
+            Dict with keys:
+                - severity: 'rapid'|'moderate'|'slow'|'stable' (magnitude classification)
+                - direction: 'falling'|'rising'|'stable' (trend direction)
+                - long_term_direction: 'falling'|'rising'|'stable' (24h direction)
+                - urgency_factor: 0.0-1.0 (how quickly conditions should evolve)
+                - confidence: 0.0-1.0 (how confident we are in this trend)
+        """
+        # Ensure valid numeric values
+        if not isinstance(current_trend, (int, float)):
+            current_trend = 0.0
+        if not isinstance(long_term_trend, (int, float)):
+            long_term_trend = 0.0
+
+        current_abs = abs(current_trend)
+
+        # Classify current trend severity
+        if current_abs < 0.2:
+            severity = "stable"
+        elif current_abs < 0.5:
+            severity = "slow"
+        elif current_abs < 1.5:
+            severity = "moderate"
+        else:
+            severity = "rapid"
+
+        # Classify direction
+        if abs(current_trend) < 0.1:
+            direction = "stable"
+        elif current_trend < 0:
+            direction = "falling"
+        else:
+            direction = "rising"
+
+        # Classify long-term direction (for forecast trajectory)
+        if abs(long_term_trend) < 0.5:
+            long_term_direction = "stable"
+        elif long_term_trend < 0:
+            long_term_direction = "falling"
+        else:
+            long_term_direction = "rising"
+
+        # Calculate urgency factor (0-1: how fast conditions should evolve)
+        urgency_factor = min(1.0, current_abs / 3.0)  # Normalize to 0-1
+
+        # Calculate confidence based on trend consistency (current + long-term agree)
+        trend_agreement = 1.0 - min(1.0, abs(current_trend - long_term_trend) / 5.0)
+        confidence = 0.5 + (trend_agreement * 0.5)  # Range 0.5-1.0
+
+        return {
+            "severity": severity,
+            "direction": direction,
+            "long_term_direction": long_term_direction,
+            "urgency_factor": urgency_factor,
+            "confidence": confidence,
+        }
+
+    def _calculate_pressure_aware_evolution_frequency(
+        self, pressure_analysis: Dict[str, Any], hour_idx: int
+    ) -> bool:
+        """Determine if conditions should evolve at this hour based on pressure trends.
+
+        Instead of fixed 6-hour evolution intervals, use pressure magnitude to determine
+        when evolution should occur:
+        - Rapid changes: evolve every 2 hours starting at hour 2
+        - Moderate changes: evolve every 3 hours starting at hour 3
+        - Stable: evolve every 6 hours starting at hour 6
+
+        Args:
+            pressure_analysis: Pressure analysis dict from analyze_pressure_trends
+            hour_idx: Current hour index (0-23)
+
+        Returns:
+            bool: True if conditions should evolve at this hour
+        """
+        current_trend = pressure_analysis.get("current_trend", 0)
+        long_term_trend = pressure_analysis.get("long_term_trend", 0)
+
+        # Analyze trend severity
+        trend_analysis = self._analyze_pressure_trend_severity(
+            current_trend, long_term_trend
+        )
+        severity = trend_analysis["severity"]
+
+        # Evolution frequency patterns based on severity
+        if severity == "rapid":
+            # Rapid changes: evolve every 2 hours (hours 2,4,6,8,10,12,14,16,18,20,22,24)
+            return hour_idx > 0 and hour_idx % 2 == 0
+        elif severity == "moderate":
+            # Moderate changes: evolve every 3 hours (hours 3,6,9,12,15,18,21,24)
+            return hour_idx > 0 and hour_idx % 3 == 0
+        else:  # slow or stable
+            # Slow/stable: evolve every 6 hours (hours 6,12,18,24)
+            return hour_idx > 0 and hour_idx % 6 == 0
+
+    def _determine_pressure_driven_condition(
+        self,
+        pressure_analysis: Dict[str, Any],
+        storm_probability: float,
+        cloud_cover: float,
+        is_daytime: bool,
+        current_condition: str,
+    ) -> Optional[str]:
+        """Determine condition based on pressure trends and storm probability.
+
+        This uses meteorological knowledge:
+        - Rapidly falling pressure → increasing clouds/storms
+        - Rapidly rising pressure → clearing/improving
+        - High storm probability → rainy/thunderstorm conditions
+        - High cloud cover + falling pressure → heavy rain/storms
+
+        Args:
+            pressure_analysis: Pressure analysis dict
+            storm_probability: 0-100 scale
+            cloud_cover: 0-100 scale
+            is_daytime: Bool for day/night
+            current_condition: Current forecast condition
+
+        Returns:
+            New condition or None if no pressure-driven override
+        """
+        current_trend = pressure_analysis.get("current_trend", 0)
+
+        # High storm probability is a strong signal
+        if storm_probability > 70:
+            # Very high storm probability
+            if cloud_cover > 60:
+                return ATTR_CONDITION_LIGHTNING_RAINY
+            else:
+                return ATTR_CONDITION_RAINY
+        elif storm_probability > 40:
+            # Moderate storm probability
+            if current_trend < -0.5 or (cloud_cover > 70):
+                return ATTR_CONDITION_RAINY
+            elif current_condition in [
+                ATTR_CONDITION_CLOUDY,
+                ATTR_CONDITION_PARTLYCLOUDY,
+            ]:
+                # Keep/increase to rainy if trending that way
+                if current_trend < -0.3:
+                    return ATTR_CONDITION_RAINY
+
+        # Rapid pressure changes (independent of storm probability)
+        if abs(current_trend) > 1.5:
+            if current_trend < -1.5:  # Rapid falling
+                # Rapid deterioration: strongly increasing clouds/rain
+                if current_condition == ATTR_CONDITION_SUNNY:
+                    return ATTR_CONDITION_PARTLYCLOUDY
+                elif current_condition == ATTR_CONDITION_PARTLYCLOUDY:
+                    return ATTR_CONDITION_CLOUDY
+                elif current_condition == ATTR_CONDITION_CLOUDY:
+                    if storm_probability > 30:
+                        return ATTR_CONDITION_RAINY
+            elif current_trend > 1.5:  # Rapid rising
+                # Rapid improvement: decreasing clouds/clearing
+                if current_condition == ATTR_CONDITION_CLOUDY:
+                    return ATTR_CONDITION_PARTLYCLOUDY
+                elif current_condition == ATTR_CONDITION_PARTLYCLOUDY:
+                    return (
+                        ATTR_CONDITION_SUNNY
+                        if is_daytime
+                        else ATTR_CONDITION_CLEAR_NIGHT
+                    )
+
+        return None
+
     def _forecast_hourly_condition_comprehensive(
         self,
         hour_idx: int,
@@ -1696,7 +1871,6 @@ class AdvancedWeatherForecast:
 
         # Determine if we have valid/recent cloud cover data (extremes indicate reliability)
         # Cloud cover near 50 is neutral/uncertain, extremes (<20 or >70) are more reliable
-        cloud_cover_reliable = cloud_cover < 20 or cloud_cover > 70
 
         # Apply time-of-day conversion
         if is_daytime:
@@ -1722,25 +1896,212 @@ class AdvancedWeatherForecast:
                     forecast_condition = ATTR_CONDITION_CLOUDY
             # Preserve other conditions as-is (rain, snow, storms, fog)
 
-        # Micro-evolution changes (for condition transitions every 6 hours)
-        micro_changes = micro_evolution.get("micro_changes", {})
-        change_probability = micro_changes.get("change_probability", 0.3)
+        # Simulate realistic diurnal condition variations
+        # This ensures weather icons vary throughout the 24-hour period even with neutral cloud cover
+        # Apply diurnal variations conservatively - preserve existing conditions when likely accurate
+        if is_daytime:
+            hour = astronomical_context["hour_of_day"]
+            # Only modify sunny/clear conditions, preserve moderately cloudy
+            # Morning (6-10): May be cloudy -> clearing trend if starting from cloudy
+            if 6 <= hour < 10:
+                if forecast_condition == ATTR_CONDITION_CLOUDY:
+                    forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+            # Late morning (10-12): Tend toward clearer if very cloudy
+            elif 10 <= hour < 12:
+                if forecast_condition == ATTR_CONDITION_CLOUDY:
+                    forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+            # Afternoon (12-15): Peak sun opportunity but don't override good data
+            elif 12 <= hour < 15:
+                pressure_analysis = meteorological_state.get("pressure_analysis", {})
+                pressure_trend = pressure_analysis.get("current_trend", 0)
+                if not isinstance(pressure_trend, (int, float)):
+                    pressure_trend = 0.0
+                # Only change from cloudy if pressure is rising (clearing trend)
+                if pressure_trend > 0.3 and forecast_condition == ATTR_CONDITION_CLOUDY:
+                    forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+            # Late afternoon (15-18): May increase clouds
+            elif 15 <= hour < 18:
+                pressure_analysis = meteorological_state.get("pressure_analysis", {})
+                pressure_trend = pressure_analysis.get("current_trend", 0)
+                if not isinstance(pressure_trend, (int, float)):
+                    pressure_trend = 0.0
+                if pressure_trend < -0.3:  # If pressure falling, more clouds
+                    if forecast_condition == ATTR_CONDITION_SUNNY:
+                        forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+            # Evening (18-21): Increasing clouds
+            elif 18 <= hour < 21:
+                if forecast_condition == ATTR_CONDITION_SUNNY:
+                    forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+        else:
+            # Nighttime - vary between clear night and cloudy based on pressure
+            hour = astronomical_context["hour_of_day"]
+            pressure_analysis = meteorological_state.get("pressure_analysis", {})
+            pressure_trend = pressure_analysis.get("current_trend", 0)
+            if not isinstance(pressure_trend, (int, float)):
+                pressure_trend = 0.0
 
-        if hour_idx > 0 and (hour_idx % 6) == 0:  # Check every 6 hours
-            if change_probability > 0.5 and cloud_cover_reliable:
-                # Potential condition change based on reliable cloud cover data
-                if cloud_cover < 20:
-                    forecast_condition = (
-                        ATTR_CONDITION_SUNNY
-                        if is_daytime
-                        else ATTR_CONDITION_CLEAR_NIGHT
+            if 22 <= hour or hour < 3:  # Late night
+                if pressure_trend > 0.5 and forecast_condition == ATTR_CONDITION_CLOUDY:
+                    # Rising pressure may clear skies
+                    forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
+
+        # Pressure-aware micro-evolution with dynamic frequency
+        # Instead of fixed 6-hour intervals, use pressure trends to determine evolution timing
+        pressure_analysis = meteorological_state.get("pressure_analysis", {})
+        storm_probability = pressure_analysis.get("storm_probability", 0)
+
+        # Check if conditions should evolve at this hour based on pressure trends
+        should_evolve = self._calculate_pressure_aware_evolution_frequency(
+            pressure_analysis, hour_idx
+        )
+
+        if should_evolve:
+            # Get pressure trend severity for this analysis
+            current_trend = pressure_analysis.get("current_trend", 0)
+            long_term_trend = pressure_analysis.get("long_term_trend", 0)
+            if not isinstance(current_trend, (int, float)):
+                current_trend = 0.0
+            if not isinstance(long_term_trend, (int, float)):
+                long_term_trend = 0.0
+
+            trend_analysis = self._analyze_pressure_trend_severity(
+                current_trend, long_term_trend
+            )
+
+            # First: Check for pressure-driven condition override (storm probability, rapid changes)
+            pressure_driven_condition = self._determine_pressure_driven_condition(
+                pressure_analysis,
+                storm_probability,
+                cloud_cover,
+                is_daytime,
+                forecast_condition,
+            )
+
+            if pressure_driven_condition:
+                forecast_condition = pressure_driven_condition
+            else:
+                # Secondary: Use long-term pressure trend for forecast trajectory
+                long_term_direction = trend_analysis["long_term_direction"]
+
+                # Get additional meteorological factors
+                micro_changes = micro_evolution.get("micro_changes", {})
+                change_probability = micro_changes.get("change_probability", 0.3)
+                weather_system = meteorological_state.get("weather_system", {})
+                system_evolution_potential = weather_system.get(
+                    "evolution_potential", "moderate_change"
+                )
+                atmospheric_stability = meteorological_state.get(
+                    "atmospheric_stability", 0.5
+                )
+
+                # Calculate evolution score from multiple factors
+                evolution_score = 0.3  # Base score for evolution
+
+                # Factor 1: Change probability from micro-evolution
+                evolution_score += change_probability
+
+                # Factor 2: Weather system evolution potential
+                if system_evolution_potential == "rapid_change":
+                    evolution_score += 0.3
+                elif system_evolution_potential == "gradual_improvement":
+                    evolution_score += 0.2
+                elif system_evolution_potential == "transitional":
+                    evolution_score += 0.25
+
+                # Factor 3: Atmospheric stability (less stable = more change)
+                evolution_score += (1.0 - atmospheric_stability) * 0.2
+
+                # Factor 4: Pressure trend urgency (use pressure analysis severity)
+                evolution_score += trend_analysis["urgency_factor"] * 0.3
+
+                # Trigger evolution based on accumulated score
+                if evolution_score > 0.35:
+                    cloud_cover_reliable_for_extremes = (
+                        cloud_cover < 20 or cloud_cover > 70
                     )
-                elif cloud_cover > 70 and forecast_condition not in [
-                    ATTR_CONDITION_RAINY,
-                    ATTR_CONDITION_POURING,
-                    ATTR_CONDITION_LIGHTNING_RAINY,
-                ]:
-                    forecast_condition = ATTR_CONDITION_CLOUDY
+
+                    if cloud_cover_reliable_for_extremes:
+                        # Use cloud cover as primary driver for extreme conditions
+                        if cloud_cover < 20:
+                            forecast_condition = (
+                                ATTR_CONDITION_SUNNY
+                                if is_daytime
+                                else ATTR_CONDITION_CLEAR_NIGHT
+                            )
+                        elif cloud_cover > 70 and forecast_condition not in [
+                            ATTR_CONDITION_RAINY,
+                            ATTR_CONDITION_POURING,
+                            ATTR_CONDITION_LIGHTNING_RAINY,
+                        ]:
+                            forecast_condition = ATTR_CONDITION_CLOUDY
+                    else:
+                        # Use long-term pressure trend for forecast direction
+                        # But: Don't override clear nighttime conditions - they're stable
+                        if forecast_condition == ATTR_CONDITION_CLEAR_NIGHT:
+                            pass  # Keep clear night conditions stable
+                        elif long_term_direction == "falling":
+                            # Falling pressure trend: conditions worsen
+                            if forecast_condition == ATTR_CONDITION_SUNNY:
+                                forecast_condition = (
+                                    ATTR_CONDITION_PARTLYCLOUDY
+                                    if is_daytime
+                                    else ATTR_CONDITION_CLOUDY
+                                )
+                            elif forecast_condition == ATTR_CONDITION_PARTLYCLOUDY:
+                                forecast_condition = ATTR_CONDITION_CLOUDY
+                        elif long_term_direction == "rising":
+                            # Rising pressure trend: conditions improve
+                            if forecast_condition == ATTR_CONDITION_CLOUDY:
+                                forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+                            elif forecast_condition == ATTR_CONDITION_PARTLYCLOUDY:
+                                forecast_condition = (
+                                    ATTR_CONDITION_SUNNY
+                                    if is_daytime
+                                    else ATTR_CONDITION_CLEAR_NIGHT
+                                )
+                        else:
+                            # Stable pressure - cycle through conditions naturally
+                            # But skip cycling if we're at a time-of-day boundary
+                            hour = astronomical_context.get("hour_of_day", 12)
+                            is_boundary = (
+                                hour == 6 or hour == 18
+                            )  # Sunrise/sunset times
+
+                            if not is_boundary:
+                                if system_evolution_potential == "gradual_improvement":
+                                    # Trend toward better conditions
+                                    if forecast_condition == ATTR_CONDITION_CLOUDY:
+                                        forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+                                    elif (
+                                        forecast_condition
+                                        == ATTR_CONDITION_PARTLYCLOUDY
+                                    ):
+                                        forecast_condition = (
+                                            ATTR_CONDITION_SUNNY
+                                            if is_daytime
+                                            else ATTR_CONDITION_CLEAR_NIGHT
+                                        )
+                                else:
+                                    # For transitional or other systems, cycle through
+                                    condition_progression = [
+                                        (
+                                            ATTR_CONDITION_SUNNY
+                                            if is_daytime
+                                            else ATTR_CONDITION_CLEAR_NIGHT
+                                        ),
+                                        ATTR_CONDITION_PARTLYCLOUDY,
+                                        ATTR_CONDITION_CLOUDY,
+                                    ]
+                                    try:
+                                        current_idx = condition_progression.index(
+                                            forecast_condition
+                                        )
+                                        forecast_condition = condition_progression[
+                                            (current_idx + 1)
+                                            % len(condition_progression)
+                                        ]
+                                    except ValueError:
+                                        pass
 
         return forecast_condition
 

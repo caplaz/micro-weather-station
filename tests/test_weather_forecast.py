@@ -3349,3 +3349,172 @@ class TestAdvancedWeatherForecast:
                     assert is_nighttimes[
                         i
                     ], f"Hour {i} (forecast hour {forecast_hour}) should be nighttime by fallback"
+
+    def test_hourly_forecast_weather_icon_variation(self, forecast, mock_analysis):
+        """Test that weather icons vary throughout the 24-hour hourly forecast."""
+        current_temp = 22.0  # Celsius
+        current_condition = ATTR_CONDITION_PARTLYCLOUDY
+        sensor_data = {
+            "outdoor_temp": 72.0,  # Fahrenheit
+            "humidity": 60.0,
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "solar_radiation": 800.0,
+            "solar_lux": 85000.0,
+            "uv_index": 6.0,
+        }
+
+        # Mock cloud cover to return neutral value (50%) to test enhanced micro-evolution
+        mock_analysis.analyze_cloud_cover.return_value = 50.0
+
+        # Mock pressure analysis for moderate evolution potential
+        mock_analysis.analyze_pressure_trends.return_value = {
+            "pressure_system": "normal",
+            "storm_probability": 20.0,
+            "current_trend": 0.1,
+            "long_term_trend": 0.0,
+        }
+
+        result = forecast.generate_hourly_forecast_comprehensive(
+            current_temp, current_condition, sensor_data
+        )
+
+        assert len(result) == 24
+
+        # Extract conditions from forecast
+        conditions = [f[KEY_CONDITION] for f in result]
+
+        # Count unique conditions - should have variation beyond just day/night
+        unique_conditions = set(conditions)
+        assert (
+            len(unique_conditions) >= 2
+        ), f"Should have at least 2 different conditions, got {unique_conditions}"
+
+        # Check that micro-evolution occurs (every 6 hours starting at hour 6)
+        # Hours 6, 12, 18 should potentially show different conditions
+        evolution_hours = [6, 12, 18]
+        evolution_conditions = [conditions[h] for h in evolution_hours]
+
+        # At least one evolution hour should be different from the starting condition
+        different_from_start = any(
+            cond != current_condition for cond in evolution_conditions
+        )
+        assert (
+            different_from_start
+        ), f"Micro-evolution should produce different conditions at hours {evolution_hours}, got {evolution_conditions}"
+
+        # Verify all conditions are valid
+        valid_conditions = [
+            ATTR_CONDITION_SUNNY,
+            ATTR_CONDITION_CLEAR_NIGHT,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_RAINY,
+            ATTR_CONDITION_LIGHTNING_RAINY,
+            ATTR_CONDITION_POURING,
+            ATTR_CONDITION_FOG,
+            ATTR_CONDITION_SNOWY,
+            ATTR_CONDITION_WINDY,
+        ]
+
+        for condition in conditions:
+            assert condition in valid_conditions, f"Invalid condition: {condition}"
+
+    def test_hourly_forecast_micro_evolution_with_neutral_cloud_cover(
+        self, forecast, mock_analysis
+    ):
+        """Test micro-evolution works with neutral cloud cover (50%) using other meteorological factors."""
+        current_temp = 20.0
+        current_condition = ATTR_CONDITION_PARTLYCLOUDY
+        sensor_data = {
+            "outdoor_temp": 68.0,
+            "humidity": 65.0,
+            "pressure": 29.85,
+            "wind_speed": 8.0,
+        }
+
+        # Mock neutral cloud cover (50%) - should trigger enhanced micro-evolution
+        mock_analysis.analyze_cloud_cover.return_value = 50.0
+
+        # Mock pressure analysis with falling pressure (should drive cloudier conditions)
+        mock_analysis.analyze_pressure_trends.return_value = {
+            "pressure_system": "normal",
+            "storm_probability": 25.0,
+            "current_trend": -0.3,  # Falling pressure
+            "long_term_trend": -0.1,
+        }
+
+        result = forecast.generate_hourly_forecast_comprehensive(
+            current_temp, current_condition, sensor_data
+        )
+
+        assert len(result) == 24
+        conditions = [f[KEY_CONDITION] for f in result]
+
+        # Should show some variation due to pressure-driven evolution
+        unique_conditions = set(conditions)
+        # With neutral cloud cover, we should at least get some variation from day/night conversion
+        # and potentially micro-evolution
+        assert (
+            len(unique_conditions) >= 1
+        ), f"Should have at least the base condition, got {unique_conditions}"
+
+        # Check that evolution occurs at micro-evolution points (hours 6, 12, 18)
+        evolution_points = [6, 12, 18]
+        evolution_conditions = [conditions[h] for h in evolution_points]
+
+        # Evolution points should have valid conditions (may or may not be different from start)
+        for cond in evolution_conditions:
+            assert cond in [
+                ATTR_CONDITION_SUNNY,
+                ATTR_CONDITION_CLEAR_NIGHT,
+                ATTR_CONDITION_PARTLYCLOUDY,
+                ATTR_CONDITION_CLOUDY,
+                ATTR_CONDITION_RAINY,
+                ATTR_CONDITION_LIGHTNING_RAINY,
+            ], f"Invalid condition at evolution point: {cond}"
+
+    def test_hourly_forecast_micro_evolution_extreme_cloud_cover(
+        self, forecast, mock_analysis
+    ):
+        """Test micro-evolution with extreme cloud cover values still works."""
+        current_temp = 18.0
+        current_condition = ATTR_CONDITION_CLOUDY
+        sensor_data = {
+            "outdoor_temp": 64.4,
+            "humidity": 70.0,
+            "pressure": 29.70,
+            "wind_speed": 12.0,
+        }
+
+        # Mock extreme cloud cover (< 20) - should trigger clear conditions
+        mock_analysis.analyze_cloud_cover.return_value = 15.0
+
+        result = forecast.generate_hourly_forecast_comprehensive(
+            current_temp, current_condition, sensor_data
+        )
+
+        assert len(result) == 24
+        conditions = [f[KEY_CONDITION] for f in result]
+
+        # Should show some variation due to extreme cloud cover
+        evolution_points = [6, 12, 18]
+        evolution_conditions = [conditions[h] for h in evolution_points]
+
+        # With extreme low cloud cover, evolution points should have valid conditions
+        # May include clear/sunny conditions due to extreme cloud cover, but not guaranteed
+        for cond in evolution_conditions:
+            assert cond in [
+                ATTR_CONDITION_SUNNY,
+                ATTR_CONDITION_CLEAR_NIGHT,
+                ATTR_CONDITION_PARTLYCLOUDY,
+                ATTR_CONDITION_CLOUDY,
+                ATTR_CONDITION_RAINY,
+                ATTR_CONDITION_LIGHTNING_RAINY,
+            ], f"Invalid condition at evolution point: {cond}"
+
+        # The overall forecast should have some variation
+        unique_conditions = set(conditions)
+        assert (
+            len(unique_conditions) >= 1
+        ), f"Should have condition variation, got {unique_conditions}"

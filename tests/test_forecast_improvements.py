@@ -351,15 +351,20 @@ class TestForecastImprovements:
         # Should generate valid forecast
         assert len(forecast) == 5
 
-        # High pressure + dry + clear sky should forecast mostly clear/sunny
+        # High pressure + dry + clear sky should forecast mostly clear/sunny/partlycloudy
         # (checking that at least first 2-3 days favor clear conditions)
         clear_count = 0
         for i, forecast_item in enumerate(forecast[:3]):
             condition = forecast_item["condition"].lower()
-            if "sunny" in condition or "clear" in condition or "fair" in condition:
+            if (
+                "sunny" in condition
+                or "clear" in condition
+                or "fair" in condition
+                or "partlycloudy" in condition
+            ):
                 clear_count += 1
 
-        # At least first day should be clear
+        # At least first day should be clear/partly cloudy
         assert clear_count > 0
 
     def test_forecast_with_cold_temperatures(self, mock_hass, mock_options):

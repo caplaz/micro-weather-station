@@ -205,23 +205,21 @@ class TestWeatherDetector:
     def test_detect_partly_cloudy_condition(
         self, mock_hass, mock_options, mock_sensor_data
     ):
-        """Test detection of partly cloudy conditions."""
-        # Set up mock states for partly cloudy conditions (moderate cloud cover)
+        """Test detection of cloudy conditions."""
+        # Set up mock states for cloudy conditions (moderate cloud cover)
         mock_states = {}
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "solar_radiation":
                 state = Mock()
-                state.state = "450.0"  # Moderate solar radiation for partly cloudy (adjusted for new zenith max)
+                state.state = "450.0"  # Moderate solar radiation for cloudy
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "solar_lux":
                 state = Mock()
-                state.state = "45000.0"  # Moderate lux for partly cloudy (adjusted proportionally)
+                state.state = "45000.0"  # Moderate lux for cloudy
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "uv_index":
                 state = Mock()
-                state.state = (
-                    "4.5"  # Moderate UV for partly cloudy (adjusted proportionally)
-                )
+                state.state = "4.5"  # Moderate UV for cloudy
                 mock_states[f"sensor.{sensor_key}"] = state
             else:
                 state = Mock()
@@ -452,7 +450,7 @@ class TestWeatherDetector:
         result = detector.get_weather_data()
         assert (
             result["condition"] == ATTR_CONDITION_SUNNY
-        )  # Should still detect clear conditions
+        )  # 900 W/m² with 1000 zenith max = sunny (clear sky)
 
         # Test with extreme cold
         mock_states_cold = {

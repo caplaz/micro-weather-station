@@ -268,11 +268,32 @@ class WeatherAnalysis:
                 solar_radiation, solar_lux, uv_index, solar_elevation, pressure_trends
             )
 
+            _LOGGER.debug(
+                "CLOUD COVER DEBUG: radiation=%.1f W/m² lux=%.0f uv=%.1f elevation=%.1f "
+                "→ cloud_cover=%.1f%%",
+                solar_radiation,
+                solar_lux,
+                uv_index,
+                solar_elevation,
+                cloud_cover,
+            )
+
             # Apply hysteresis to prevent rapid condition changes
             # Only change condition if cloud cover has changed significantly
             proposed_condition = self._map_cloud_cover_to_condition(cloud_cover)
+            _LOGGER.debug(
+                "PROPOSED CONDITION: %.1f%% cloud_cover → %s",
+                cloud_cover,
+                proposed_condition,
+            )
             final_condition = self._apply_condition_hysteresis(
                 proposed_condition, cloud_cover
+            )
+            _LOGGER.debug(
+                "FINAL CONDITION (after hysteresis): %s → %s (cloud_cover=%.1f%%)",
+                proposed_condition,
+                final_condition,
+                cloud_cover,
             )
 
             return final_condition
@@ -801,7 +822,28 @@ class WeatherAnalysis:
         )  # Exponential decay with air mass
 
         # Calculate cloud cover from each measurement using realistic maximums
+        # SAFETY CHECK: If measured radiation exceeds clear-sky max, it indicates
+        # either sensor miscalibration or an incorrect zenith_max_radiation setting
         radiation_ratio = avg_solar_radiation / max_solar_radiation
+
+        # If ratio > 1.0, the zenith_max_radiation is likely miscalibrated (too low)
+        # In this case, treat measured value as near-clear-sky and estimate cloud cover
+        # based on lux/UV measurements instead
+        if radiation_ratio > 1.05:  # Allow 5% overage for measurement noise
+            _LOGGER.warning(
+                "CLOUD COVER CALIBRATION WARNING: Solar radiation (%.1f W/m²) "
+                "exceeds calculated clear-sky maximum (%.1f W/m²). "
+                "This indicates zenith_max_radiation is set too low. "
+                "Current zenith_max: %.1f W/m². Consider increasing to 950-1000 W/m². "
+                "Home Assistant setting: Settings → Devices & Services → Micro Weather Station → Configure",
+                avg_solar_radiation,
+                max_solar_radiation,
+                self.zenith_max_radiation,
+            )
+            # Use conservative estimate: assume high radiation = some clouds
+            # Use lux and UV for better accuracy
+            radiation_ratio = 1.0  # Clamp to treat as nearly clear-sky
+
         cloud_cover_reduction = radiation_ratio * 100
         solar_cloud_cover = max(0, min(100, 100 - cloud_cover_reduction))
         lux_cloud_cover = max(0, min(100, 100 - (solar_lux / max_solar_lux * 100)))
@@ -850,8 +892,28 @@ class WeatherAnalysis:
                 # Very low measurements but some solar data - use solar radiation primarily
                 cloud_cover = solar_cloud_cover
         elif avg_solar_radiation == 0 and solar_lux == 0 and uv_index == 0:
-            # No solar input at all - assume complete overcast (night or very cloudy)
-            cloud_cover = 100
+            # No solar input at all - could be night, could be sensor issue
+            # Check if we have recent solar readings to distinguish between night and sensor glitch
+            solar_history = self._sensor_history.get("solar_radiation", [])
+            recent_solar_readings = [
+                entry["value"]
+                for entry in list(solar_history)[-10:]
+                if entry["value"] is not None and entry["value"] > 0
+            ]
+
+            if recent_solar_readings:
+                # We RECENTLY had solar readings but now they're all 0
+                # This is likely a sensor transition, not true night
+                recent_avg = sum(recent_solar_readings) / len(recent_solar_readings)
+                cloud_cover = 50.0  # Assume partly cloudy as safe default
+                _LOGGER.debug(
+                    "No solar data but recent history shows readings (avg: %.1f W/m²) - "
+                    "likely sensor transition, not assuming overcast",
+                    recent_avg,
+                )
+            else:
+                # No recent solar readings - truly night or always been cloudy
+                cloud_cover = 100
         else:
             cloud_cover = 50.0  # Unknown - assume partly cloudy
 
@@ -862,6 +924,37 @@ class WeatherAnalysis:
             pressure_trends
         )
         cloud_cover = max(0.0, min(100.0, cloud_cover + pressure_adjustment))
+
+        # Apply hysteresis to prevent extreme jumps in cloud cover
+        # Cloud cover should change gradually, not 0→100% in seconds
+        # Check if this is a drastic change from recent history
+        recent_readings = self._sensor_history.get("cloud_cover", [])
+        if len(recent_readings) > 0:
+            # Get the last non-None reading
+            last_reading = None
+            for entry in reversed(recent_readings[-10:]):  # Check last 10 readings
+                if entry["value"] is not None:
+                    last_reading = entry["value"]
+                    break
+
+            if last_reading is not None:
+                cover_change = abs(cloud_cover - last_reading)
+                # If change is > 40% in a single update, apply smoothing
+                if cover_change > 40:
+                    # Limit change to max 30% per update
+                    max_change = 30
+                    if cloud_cover > last_reading:
+                        cloud_cover = min(cloud_cover, last_reading + max_change)
+                    else:
+                        cloud_cover = max(cloud_cover, last_reading - max_change)
+
+                    _LOGGER.debug(
+                        "Cloud cover change limited: %.1f%% → %.1f%% (max change: %.1f%%, "
+                        "likely sensor glitch)",
+                        last_reading,
+                        cloud_cover,
+                        max_change,
+                    )
 
         _LOGGER.debug(
             "Final cloud cover: %.1f%% (solar-based: %.1f%%, pressure adjustment: %.1f%%)",
@@ -1181,7 +1274,7 @@ class WeatherAnalysis:
         )
 
         # Ensure reasonable bounds
-        calibrated_max_radiation = max(50.0, min(1200.0, calibrated_max_radiation))
+        calibrated_max_radiation = max(50.0, min(2000.0, calibrated_max_radiation))
 
         _LOGGER.debug(
             "Clear-sky max radiation: %.1f W/m² "
