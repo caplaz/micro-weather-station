@@ -1,5 +1,36 @@
 # Changelog
 
+## 3.0.0 (2025-10-22)
+
+### Major Features
+
+- **Dewpoint Sensor Support**: Added comprehensive dewpoint sensor integration with intelligent fallback calculation
+
+  - Direct dewpoint sensor support for maximum accuracy when available
+  - Automatic calculation from temperature and humidity using Magnus formula when direct sensor unavailable
+  - Enhanced fog detection using dewpoint analysis and conservative humidity thresholds (>98%)
+  - Seamless fallback mechanism between direct and calculated dewpoint measurements
+
+- **Enhanced Weather Forecast Algorithm**: Major overhaul of forecasting system with comprehensive meteorological analysis
+
+  - Improved forecast robustness with better sensor coverage and error handling
+  - Enhanced humidity sensor handling for more accurate weather predictions
+  - Fixed bidirectional day/night condition conversion in hourly forecasts
+  - Corrected hourly forecast condition progression with comprehensive test coverage
+  - Resolved inconsistent hourly data implementation issues (#16)
+
+### Bug Fixes
+
+- **Forecast Accuracy**: Fixed various forecast-related issues including condition progression and sensor handling
+- **Documentation**: Updated CI badge URLs for consistency and proper linking
+
+### Changes
+
+- Significant improvements to weather forecasting accuracy and reliability
+- Enhanced sensor support with dewpoint integration for better meteorological analysis
+- Improved code quality and testing infrastructure
+- Better user experience with updated CI status indicators
+
 ## 2.3.1 (2025-10-13)
 
 ### Major Features
