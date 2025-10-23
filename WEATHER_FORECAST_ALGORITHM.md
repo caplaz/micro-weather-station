@@ -223,6 +223,30 @@ stability_factor = atmospheric_stability
 micro_changes = calculate_micro_evolution_patterns(weather_system_type)
 ```
 
+**Pressure-Aware Evolution Frequency (Version 3.0.0 Enhancement):**
+
+```python
+def _calculate_pressure_aware_evolution_frequency(pressure_analysis, hour_idx):
+    """Calculate when conditions should evolve based on pressure trends."""
+    current_trend = pressure_analysis.get("current_trend", 0)
+    storm_probability = pressure_analysis.get("storm_probability", 0)
+
+    # Base evolution every 6 hours
+    base_evolution = (hour_idx % 6) == 0
+
+    # Pressure-driven evolution adjustments
+    if abs(current_trend) > 1.0:  # Significant pressure change
+        evolution_frequency = 3  # More frequent evolution
+    elif storm_probability > 30:  # Storm approaching
+        evolution_frequency = 4  # Moderately more frequent
+    else:
+        evolution_frequency = 6  # Standard frequency
+
+    return (hour_idx % evolution_frequency) == 0
+```
+
+This provides dynamic evolution timing based on meteorological conditions rather than fixed intervals.
+
 #### Hourly Temperature Forecasting
 
 **Algorithm**: `_forecast_hourly_temperature_comprehensive()`
@@ -253,10 +277,55 @@ forecast_condition = current_condition
 if not is_daytime:
     forecast_condition = convert_to_nighttime_condition(forecast_condition)
 
-# Micro-evolution condition changes
+# Diurnal condition variations (Version 3.0.0 Enhancement)
+forecast_condition = apply_diurnal_condition_variations(forecast_condition, astronomical_context)
+
+# Pressure-aware micro-evolution condition changes
 if should_apply_micro_change(hour_idx, change_probability):
     forecast_condition = apply_progressive_condition_change(forecast_condition)
 ```
+
+**Diurnal Condition Variations (Version 3.0.0):**
+
+The system now simulates realistic diurnal weather patterns throughout the 24-hour cycle:
+
+```python
+def apply_diurnal_condition_variations(condition, astronomical_context):
+    hour = astronomical_context["hour_of_day"]
+    is_daytime = astronomical_context["is_daytime"]
+
+    if is_daytime:
+        # Morning clearing trend (6-10 AM)
+        if 6 <= hour < 10 and condition == "cloudy":
+            return "partlycloudy"
+
+        # Afternoon stability with pressure influence (12-15 PM)
+        elif 12 <= hour < 15:
+            pressure_trend = get_pressure_trend()
+            if pressure_trend > 0.3 and condition == "cloudy":
+                return "partlycloudy"
+
+        # Late afternoon cloud increase (15-18 PM)
+        elif 15 <= hour < 18:
+            pressure_trend = get_pressure_trend()
+            if pressure_trend < -0.3 and condition == "sunny":
+                return "partlycloudy"
+
+        # Evening cloud increase (18-21 PM)
+        elif 18 <= hour < 21 and condition == "sunny":
+            return "partlycloudy"
+
+    else:  # Nighttime
+        # Late night clearing with rising pressure (22 PM - 3 AM)
+        if 22 <= hour or hour < 3:
+            pressure_trend = get_pressure_trend()
+            if pressure_trend > 0.5 and condition == "cloudy":
+                return "clear-night"
+
+    return condition
+```
+
+This ensures weather icons vary realistically throughout the day and night, even with stable meteorological conditions.
 
 #### Hourly Precipitation, Wind, and Humidity
 

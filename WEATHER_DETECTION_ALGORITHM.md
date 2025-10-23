@@ -127,6 +127,21 @@ ELSE:
 
 **Solar Elevation Enhancement:** When sun sensor is configured, cloud cover calculations are adjusted based on solar elevation angle, providing more accurate daytime weather detection throughout the day.
 
+**Sensor Validation and Safety Checks (Version 3.0.0):**
+
+The system now includes comprehensive sensor validation to ensure accurate cloud cover calculations:
+
+```
+ZENITH_MAX_RADIATION_BOUNDS = (800, 2000)  # W/m² expected range
+
+IF zenith_max_radiation < 800 OR zenith_max_radiation > 2000:
+    → Log warning: "Sensor miscalibration detected: zenith_max_radiation X W/m² outside expected range 800-2000 W/m²"
+    → Use fallback value of 1000 W/m²
+    → Continue with degraded but functional cloud cover analysis
+```
+
+This prevents false weather readings from miscalibrated solar sensors while maintaining system functionality.
+
 #### Priority 5: Twilight Conditions
 
 **Twilight Detection:** `(10 lx < solar_lux < 100 lx) OR (1 W/m² < solar_radiation < 50 W/m²)`
@@ -163,21 +178,24 @@ ELSE:
 
 ## Hysteresis and Condition Stability
 
-The weather detection system implements **hysteresis** to prevent rapid oscillation between weather conditions, ensuring a stable and reliable user experience. Weather conditions can fluctuate rapidly due to sensor noise, brief weather events, or transitional periods, but the hysteresis mechanism filters out these false changes.
+The weather detection system implements **enhanced hysteresis** to prevent rapid oscillation between weather conditions, ensuring a stable and reliable user experience. Weather conditions can fluctuate rapidly due to sensor noise, brief weather events, or transitional periods, but the hysteresis mechanism filters out these false changes while allowing responsive updates for significant weather changes.
 
 ### How Hysteresis Works
 
-**Condition Stability Check:**
+**Enhanced Condition Stability Check:**
 
 ```
 IF new_condition ≠ previous_condition:
-    → Check recent condition history (last 3 readings)
+    → Check recent condition history (last 3 readings within 1-hour window)
     → Count how many times new_condition appeared recently
 
     IF new_condition appeared ≥1 time recently:
         → Allow condition change (stable transition)
     ELIF condition pair is in major_changes list:
         → Allow immediate change (severe weather transition)
+    ELIF cloud_cover_change > 30% (extreme jump prevention):
+        → Keep previous_condition (prevent unrealistic jumps)
+        → Log: "Preventing extreme cloud cover jump: keeping X instead of Y"
     ELSE:
         → Keep previous_condition (prevent oscillation)
         → Log: "Preventing condition oscillation: keeping X instead of Y"
@@ -203,12 +221,29 @@ Severe weather conditions like thunderstorms, heavy rain, snow, lightning, and h
 
 Transitions between normal weather conditions (sunny ↔ partly_cloudy ↔ cloudy, etc.) require the new condition to be observed multiple times before changing, preventing flickering between states due to temporary sensor variations or brief weather fluctuations.
 
-### Benefits of Hysteresis
+### Extreme Jump Prevention
+
+**Cloud Cover Hysteresis (Version 3.0.0 Enhancement):**
+
+The system now implements **cloud cover change limiting** to prevent unrealistic condition jumps:
+
+```
+MAX_CLOUD_COVER_CHANGE = 30%  # Maximum allowed change per update
+
+IF |new_cloud_cover - previous_cloud_cover| > MAX_CLOUD_COVER_CHANGE:
+    → Keep previous_condition
+    → Log extreme jump prevention
+```
+
+This prevents scenarios where brief sensor noise or rapid cloud movement causes the weather to jump from "sunny" to "cloudy" in a single update, providing more stable and realistic weather reporting.
+
+### Benefits of Enhanced Hysteresis
 
 1. **Stable Display**: Weather cards don't flicker between conditions
-2. **Reliable Alerts**: Important weather changes still trigger immediately
-3. **Noise Reduction**: Filters out sensor noise and brief weather variations
-4. **User Experience**: Provides consistent, trustworthy weather information
+2. **Realistic Updates**: Prevents extreme jumps while allowing responsive changes
+3. **Reliable Alerts**: Important weather changes still trigger immediately
+4. **Noise Reduction**: Filters out sensor noise and brief weather variations
+5. **User Experience**: Provides consistent, trustworthy weather information
 
 ## Pressure Analysis System
 
@@ -537,7 +572,7 @@ calibrated_max_radiation = zenith_max_radiation × solar_constant_variation ×
                           astronomical_scaling
 ```
 
-Where `zenith_max_radiation` is user-configurable, and `astronomical_scaling` is based on solar elevation and atmospheric transmission.
+Where `zenith_max_radiation` is user-configurable (800-2000 W/m² range), and `astronomical_scaling` is based on solar elevation and atmospheric transmission.
 
 **Seasonal Radiation Variations:**
 

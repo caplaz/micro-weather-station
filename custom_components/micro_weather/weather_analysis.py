@@ -894,7 +894,9 @@ class WeatherAnalysis:
         elif avg_solar_radiation == 0 and solar_lux == 0 and uv_index == 0:
             # No solar input at all - could be night, could be sensor issue
             # Check if we have recent solar readings to distinguish between night and sensor glitch
-            solar_history = self._sensor_history.get("solar_radiation", [])
+            solar_history: deque[Dict[str, Any]] = self._sensor_history.get(
+                "solar_radiation", deque()
+            )
             recent_solar_readings = [
                 entry["value"]
                 for entry in list(solar_history)[-10:]
@@ -928,11 +930,15 @@ class WeatherAnalysis:
         # Apply hysteresis to prevent extreme jumps in cloud cover
         # Cloud cover should change gradually, not 0→100% in seconds
         # Check if this is a drastic change from recent history
-        recent_readings = self._sensor_history.get("cloud_cover", [])
+        recent_readings: deque[Dict[str, Any]] = self._sensor_history.get(
+            "cloud_cover", deque()
+        )
         if len(recent_readings) > 0:
             # Get the last non-None reading
             last_reading = None
-            for entry in reversed(recent_readings[-10:]):  # Check last 10 readings
+            for entry in reversed(
+                list(recent_readings)[-10:]
+            ):  # Check last 10 readings
                 if entry["value"] is not None:
                     last_reading = entry["value"]
                     break
