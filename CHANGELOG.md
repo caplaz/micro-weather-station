@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.0.1 (2025-10-24)
+
+### Bug Fixes
+
+- **Temperature Conversion Bug**: Fixed double temperature conversion in weather forecasts causing incorrect temperature display
+
+  - Removed unnecessary `convert_to_celsius()` calls in `generate_comprehensive_forecast` method
+  - Fixed issue where Fahrenheit temperatures were being converted twice, resulting in wrong forecast temperatures
+  - Removed unused import to maintain code quality standards
+
+- **Forecast Timing Issues**: Fixed forecast timing bugs where forecasts started from wrong time periods
+  - Daily forecast now correctly starts with the current day instead of tomorrow
+  - Hourly forecast now shows hourly intervals starting from the current hour instead of the next hour
+  - Fixed timing calculations in both comprehensive and fallback forecast methods
+  - Updated test assertions to reflect correct forecast timing behavior
+
+### Changes
+
+- Improved forecast temperature accuracy by eliminating double conversion errors
+- Enhanced forecast timing precision for better user experience
+- Enhanced code quality with proper import management
+
 ## 3.0.0 (2025-10-22)
 
 ### Major Features
