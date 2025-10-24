@@ -33,7 +33,7 @@ from .const import (
     KEY_WIND_SPEED,
 )
 from .weather_analysis import WeatherAnalysis
-from .weather_utils import convert_to_celsius, convert_to_kmh, is_forecast_hour_daytime
+from .weather_utils import convert_to_kmh, is_forecast_hour_daytime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -146,9 +146,9 @@ class AdvancedWeatherForecast:
             forecast.append(
                 {
                     "datetime": date.isoformat(),
-                    KEY_TEMPERATURE: round(convert_to_celsius(forecast_temp) or 20, 1),
+                    KEY_TEMPERATURE: round(forecast_temp or 20, 1),
                     "templow": round(
-                        (convert_to_celsius(forecast_temp) or 20)
+                        (forecast_temp or 20)
                         - self._calculate_temperature_range(
                             forecast_condition, meteorological_state
                         ),
