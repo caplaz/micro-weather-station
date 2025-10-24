@@ -3308,9 +3308,9 @@ class TestAdvancedWeatherForecast:
             conditions = [f[KEY_CONDITION] for f in result]
             is_nighttimes = [f.get("is_nighttime", False) for f in result]
 
-            # First 3 hours should be daytime (2 PM to 5 PM, before sunset at 6 PM)
-            # Hour 0 = 3 PM, Hour 1 = 4 PM, Hour 2 = 5 PM
-            for i in range(3):
+            # First 4 hours should be daytime (2 PM to 6 PM, before/after sunset at 6 PM)
+            # Hour 0 = 2 PM, Hour 1 = 3 PM, Hour 2 = 4 PM, Hour 3 = 5 PM
+            for i in range(4):
                 assert not is_nighttimes[i], f"Hour {i} should be daytime"
                 assert conditions[i] in [
                     ATTR_CONDITION_SUNNY,
@@ -3318,12 +3318,12 @@ class TestAdvancedWeatherForecast:
                     ATTR_CONDITION_CLOUDY,
                 ]
 
-            # At hour 3 (6 PM) should convert to nighttime
-            assert is_nighttimes[3], "Hour 3 (6 PM sunset) should be nighttime"
-            assert conditions[3] in [ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_CLOUDY]
+            # At hour 4 (6 PM) should convert to nighttime
+            assert is_nighttimes[4], "Hour 4 (6 PM sunset) should be nighttime"
+            assert conditions[4] in [ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_CLOUDY]
 
-            # After sunset (hours 4-11 = 7 PM to 2 AM) should be nighttime
-            for i in range(4, 12):
+            # After sunset (hours 5-12 = 7 PM to 2 AM) should be nighttime
+            for i in range(5, 13):
                 assert is_nighttimes[i], f"Hour {i} should be nighttime"
                 assert conditions[i] in [
                     ATTR_CONDITION_CLEAR_NIGHT,
@@ -3331,9 +3331,9 @@ class TestAdvancedWeatherForecast:
                 ]
 
             # After sunrise next day (using fallback 6-18) should be back to daytime
-            # Hours 12+ = 3 AM next day onwards
-            for i in range(12, 24):
-                forecast_hour = (14 + i + 1) % 24
+            # Hours 13+ = 3 AM next day onwards
+            for i in range(13, 24):
+                forecast_hour = (14 + i) % 24
                 # Using fallback 6-18, so 6 AM to 6 PM (before 18) = daytime
                 if 6 <= forecast_hour < 18:
                     assert not is_nighttimes[

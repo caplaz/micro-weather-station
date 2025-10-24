@@ -96,7 +96,7 @@ class AdvancedWeatherForecast:
         current_wind = sensor_data.get(KEY_WIND_SPEED, 5)
 
         for day_idx in range(5):
-            date = dt_util.now() + timedelta(days=day_idx + 1)
+            date = dt_util.now() + timedelta(days=day_idx)
 
             # Advanced temperature forecasting using multi-factor analysis
             forecast_temp = self._forecast_temperature_comprehensive(
@@ -207,7 +207,9 @@ class AdvancedWeatherForecast:
             micro_evolution = self._model_hourly_weather_evolution(meteorological_state)
 
             for hour_idx in range(24):
-                forecast_time = dt_util.now() + timedelta(hours=hour_idx + 1)
+                # Start from the current hour (rounded down) and add hourly intervals
+                current_hour = dt_util.now().replace(minute=0, second=0, microsecond=0)
+                forecast_time = current_hour + timedelta(hours=hour_idx)
 
                 # Determine astronomical context
                 astronomical_context = self._calculate_astronomical_context(
@@ -290,7 +292,9 @@ class AdvancedWeatherForecast:
                 else ATTR_CONDITION_CLOUDY
             )
             for hour_idx in range(24):
-                forecast_time = dt_util.now() + timedelta(hours=hour_idx + 1)
+                # Start from the current hour (rounded down) and add hourly intervals
+                current_hour = dt_util.now().replace(minute=0, second=0, microsecond=0)
+                forecast_time = current_hour + timedelta(hours=hour_idx)
 
                 # Use previous hour's condition as base for current hour (except first hour)
                 forecast_condition = base_condition
