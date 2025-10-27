@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.0.2 (2025-10-26)
+
+### Bug Fixes
+
+- **Daily Forecast Temperature Units**: Fixed issue where daily forecast temperatures displayed in Fahrenheit instead of Celsius (#17)
+
+  - Added temperature conversion in weather_detector.py for external forecast data before storage
+  - Improved external forecast handling in weather.py with proper unit conversion
+  - Added convert_to_fahrenheit utility function for forecast generation
+  - Added comprehensive test coverage with 19 new test methods covering temperature unit conversion, external vs comprehensive forecasts, condition progression, and error handling
+
+### Changes
+
+- Enhanced forecast accuracy with proper temperature unit handling
+- Improved test coverage for forecast functionality (78 total tests)
+- Better reliability for both external and comprehensive forecast data
+
 ## 3.0.1 (2025-10-24)
 
 ### Bug Fixes
