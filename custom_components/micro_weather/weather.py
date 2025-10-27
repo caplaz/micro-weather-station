@@ -375,7 +375,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             altitude = altitude_value
 
             forecast_data = self._forecast.generate_hourly_forecast_comprehensive(
-                current_temp=convert_to_fahrenheit(current_temp),
+                current_temp=float(convert_to_fahrenheit(current_temp) or 68.0),
                 current_condition=current_condition,
                 sensor_data=sensor_data,
                 sunrise_time=sunrise_time,
