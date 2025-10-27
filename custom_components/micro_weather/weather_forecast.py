@@ -1135,6 +1135,10 @@ class AdvancedWeatherForecast:
         system_evolution: Dict[str, Any],
     ) -> str:
         """Comprehensive condition forecasting using all meteorological factors."""
+        # For day 0, preserve the current condition - don't apply evolution changes
+        if day_idx == 0:
+            return current_condition
+
         # Start with current condition as base
         forecast_condition = current_condition
 

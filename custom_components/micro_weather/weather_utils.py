@@ -13,6 +13,13 @@ def convert_to_celsius(temp_f: Optional[float]) -> Optional[float]:
     return round((temp_f - 32) * 5 / 9, 1)
 
 
+def convert_to_fahrenheit(temp_c: Optional[float]) -> Optional[float]:
+    """Convert Celsius to Fahrenheit."""
+    if temp_c is None:
+        return None
+    return round((temp_c * 9 / 5) + 32, 1)
+
+
 def convert_to_hpa(pressure_inhg: Optional[float]) -> Optional[float]:
     """Convert inches of mercury to hPa."""
     if pressure_inhg is None:

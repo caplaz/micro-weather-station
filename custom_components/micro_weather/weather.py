@@ -38,7 +38,7 @@ from .const import (
 )
 from .version import __version__
 from .weather_forecast import AdvancedWeatherForecast
-from .weather_utils import get_sun_times
+from .weather_utils import convert_to_celsius, convert_to_fahrenheit, get_sun_times
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -196,13 +196,16 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             # Use the provided forecast data directly
             fallback_forecast = []
             for day_data in self.coordinator.data[KEY_FORECAST]:
+                # Handle None temperature values gracefully
+                temperature = day_data.get(KEY_TEMPERATURE)
+                if temperature is None:
+                    temperature = 20.0  # Default temperature when None
+
                 fallback_forecast.append(
                     Forecast(
                         datetime=day_data["datetime"],
-                        native_temperature=day_data[KEY_TEMPERATURE],
-                        native_templow=day_data.get(
-                            "templow", day_data[KEY_TEMPERATURE] - 3.0
-                        ),
+                        native_temperature=temperature,
+                        native_templow=day_data.get("templow", temperature - 3.0),
                         condition=day_data.get(KEY_CONDITION, ATTR_CONDITION_SUNNY),
                         native_precipitation=day_data.get(KEY_PRECIPITATION, 0),
                         native_wind_speed=day_data.get(KEY_WIND_SPEED, 0),
@@ -236,6 +239,12 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                     sensor_data[key] = None
                 else:
                     sensor_data[key] = value
+
+            # Convert temperature from Celsius to Fahrenheit for forecast generation
+            if sensor_data.get(KEY_TEMPERATURE) is not None:
+                sensor_data[KEY_TEMPERATURE] = convert_to_fahrenheit(
+                    sensor_data[KEY_TEMPERATURE]
+                )
 
             # Get current condition
             current_condition_value = self.coordinator.data.get(
@@ -275,8 +284,10 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 forecast_list.append(
                     Forecast(
                         datetime=day_data["datetime"],
-                        native_temperature=day_data[KEY_TEMPERATURE],
-                        native_templow=day_data["templow"],
+                        native_temperature=convert_to_celsius(
+                            day_data[KEY_TEMPERATURE]
+                        ),
+                        native_templow=convert_to_celsius(day_data["templow"]),
                         condition=day_data[KEY_CONDITION],
                         native_precipitation=day_data[KEY_PRECIPITATION],
                         native_wind_speed=day_data[KEY_WIND_SPEED],
@@ -334,6 +345,12 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 else:
                     sensor_data[key] = value
 
+            # Convert temperature from Celsius to Fahrenheit for forecast generation
+            if sensor_data.get(KEY_TEMPERATURE) is not None:
+                sensor_data[KEY_TEMPERATURE] = convert_to_fahrenheit(
+                    sensor_data[KEY_TEMPERATURE]
+                )
+
             # Get sunrise/sunset times for astronomical calculations
             sunrise_time, sunset_time = get_sun_times(self.coordinator.hass)
             # Handle MagicMock objects in test environment
@@ -358,7 +375,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             altitude = altitude_value
 
             forecast_data = self._forecast.generate_hourly_forecast_comprehensive(
-                current_temp=current_temp,
+                current_temp=convert_to_fahrenheit(current_temp),
                 current_condition=current_condition,
                 sensor_data=sensor_data,
                 sunrise_time=sunrise_time,
@@ -371,9 +388,12 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 forecast_list.append(
                     Forecast(
                         datetime=hour_data["datetime"],
-                        native_temperature=hour_data[KEY_TEMPERATURE],
-                        native_templow=hour_data[KEY_TEMPERATURE]
-                        - 3.0,  # Not used in hourly
+                        native_temperature=convert_to_celsius(
+                            hour_data[KEY_TEMPERATURE]
+                        ),
+                        native_templow=convert_to_celsius(
+                            hour_data[KEY_TEMPERATURE] - 3.0
+                        ),  # Not used in hourly
                         condition=hour_data[KEY_CONDITION],
                         native_precipitation=hour_data.get(KEY_PRECIPITATION, 0),
                         native_wind_speed=hour_data.get(KEY_WIND_SPEED, 0),

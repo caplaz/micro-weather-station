@@ -5,10 +5,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_FOG,
+    ATTR_CONDITION_HAIL,
     ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
+    ATTR_CONDITION_POURING,
     ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SNOWY,
     ATTR_CONDITION_SUNNY,
+    ATTR_CONDITION_WINDY,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -1892,6 +1897,543 @@ class TestMicroWeatherEntity:
         temperatures = [forecast["native_temperature"] for forecast in result]
         unique_temps = set(temperatures)
         assert len(unique_temps) >= 1  # Should have some temperature variation
+
+    async def test_forecast_temperature_unit_conversion(
+        self, weather_entity, coordinator
+    ):
+        """Test that forecast temperatures are properly converted to Celsius units.
+
+        This test verifies the fix for issue #17 where forecast temperatures
+        were displayed in Fahrenheit instead of Celsius when configured for Celsius.
+        """
+        from unittest.mock import patch
+
+        # Mock the forecast generation to return Fahrenheit temperatures
+        # This simulates the original bug where forecasts were in Fahrenheit
+        mock_fahrenheit_forecast = [
+            {
+                "datetime": "2024-01-01T00:00:00",
+                "temperature": 68.0,  # 20°C = 68°F
+                "templow": 59.0,  # 15°C = 59°F
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 5.0,
+                "humidity": 50,
+            },
+            {
+                "datetime": "2024-01-02T00:00:00",
+                "temperature": 77.0,  # 25°C = 77°F
+                "templow": 68.0,  # 20°C = 68°F
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 5.0,
+                "humidity": 50,
+            },
+        ]
+
+        with patch.object(
+            weather_entity._forecast,
+            "generate_comprehensive_forecast",
+            return_value=mock_fahrenheit_forecast,
+        ):
+            coordinator.data = {
+                "temperature": 20.0,  # Current temperature in Celsius
+                "condition": ATTR_CONDITION_SUNNY,
+                "humidity": 50,
+                "wind_speed": 5.0,
+                "precipitation": 0.0,
+                # No external forecast - will use comprehensive generation
+            }
+
+            result = await weather_entity.async_forecast_daily()
+
+            assert result is not None
+            assert len(result) == 2
+
+            # Verify temperatures are converted to Celsius
+            forecast1 = result[0]
+            forecast2 = result[1]
+
+            # 68°F should be converted to 20°C
+            assert abs(forecast1["native_temperature"] - 20.0) < 0.1
+            assert abs(forecast1["native_templow"] - 15.0) < 0.1
+
+            # 77°F should be converted to 25°C
+            assert abs(forecast2["native_temperature"] - 25.0) < 0.1
+            assert abs(forecast2["native_templow"] - 20.0) < 0.1
+
+    async def test_hourly_forecast_temperature_unit_conversion(
+        self, weather_entity, coordinator
+    ):
+        """Test that hourly forecast temperatures are properly converted to Celsius units."""
+        from unittest.mock import patch
+
+        # Mock the hourly forecast generation to return Fahrenheit temperatures
+        mock_fahrenheit_hourly = [
+            {
+                "datetime": "2024-01-01T00:00:00",
+                "temperature": 68.0,  # 20°C = 68°F
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 5.0,
+                "humidity": 50,
+                "is_nighttime": False,
+            },
+            {
+                "datetime": "2024-01-01T01:00:00",
+                "temperature": 64.4,  # 18°C = 64.4°F
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 5.0,
+                "humidity": 50,
+                "is_nighttime": False,
+            },
+        ]
+
+        with patch.object(
+            weather_entity._forecast,
+            "generate_hourly_forecast_comprehensive",
+            return_value=mock_fahrenheit_hourly,
+        ):
+            coordinator.data = {
+                "temperature": 20.0,  # Current temperature in Celsius
+                "condition": ATTR_CONDITION_SUNNY,
+                "humidity": 50,
+                "wind_speed": 5.0,
+                "precipitation": 0.0,
+            }
+
+            result = await weather_entity.async_forecast_hourly()
+
+            assert result is not None
+            assert len(result) == 2
+
+            # Verify temperatures are converted to Celsius
+            forecast1 = result[0]
+            forecast2 = result[1]
+
+            # 68°F should be converted to 20°C
+            assert abs(forecast1["native_temperature"] - 20.0) < 0.1
+
+            # 64.4°F should be converted to 18°C
+            assert abs(forecast2["native_temperature"] - 18.0) < 0.1
+
+    async def test_external_forecast_no_unit_conversion(
+        self, weather_entity, coordinator
+    ):
+        """Test that external forecast data is not unit-converted (assumed to be in Celsius)."""
+        # External forecast data should already be in Celsius
+        external_forecast = [
+            {
+                "datetime": "2024-01-01T00:00:00",
+                "temperature": 20.0,  # Already in Celsius
+                "templow": 15.0,  # Already in Celsius
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 5.0,
+                "humidity": 50,
+            },
+        ]
+
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_SUNNY,
+            "humidity": 50,
+            "wind_speed": 5.0,
+            "precipitation": 0.0,
+            "forecast": external_forecast,  # External forecast present
+        }
+
+        result = await weather_entity.async_forecast_daily()
+
+        assert result is not None
+        assert len(result) == 1
+
+        forecast = result[0]
+
+        # External temperatures should remain unchanged (no conversion)
+        assert forecast["native_temperature"] == 20.0
+        assert forecast["native_templow"] == 15.0
+
+    async def test_daily_forecast_external_with_missing_templow(
+        self, weather_entity, coordinator
+    ):
+        """Test external forecast handling when templow is missing."""
+        external_forecast = [
+            {
+                "datetime": "2024-01-01T00:00:00",
+                "temperature": 25.0,  # High temperature
+                # templow is missing - should default to temperature - 3.0
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 10.0,
+                "humidity": 45,
+            }
+        ]
+
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_CLOUDY,
+            "humidity": 60,
+            "wind_speed": 5.0,
+            "precipitation": 1.0,
+            "forecast": external_forecast,
+        }
+
+        result = await weather_entity.async_forecast_daily()
+
+        assert result is not None
+        assert len(result) == 1
+
+        forecast = result[0]
+        assert forecast["native_temperature"] == 25.0
+        assert forecast["native_templow"] == 22.0  # 25.0 - 3.0
+
+    async def test_daily_forecast_external_with_invalid_temperatures(
+        self, weather_entity, coordinator
+    ):
+        """Test external forecast handling with None/invalid temperature values."""
+        external_forecast = [
+            {
+                "datetime": "2024-01-01T00:00:00",
+                "temperature": None,  # Invalid temperature
+                "templow": 15.0,
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 10.0,
+                "humidity": 45,
+            }
+        ]
+
+        coordinator.data = {
+            "temperature": 20.0,
+            "condition": ATTR_CONDITION_CLOUDY,
+            "humidity": 60,
+            "wind_speed": 5.0,
+            "precipitation": 1.0,
+            "forecast": external_forecast,
+        }
+
+        result = await weather_entity.async_forecast_daily()
+
+        assert result is not None
+        assert len(result) == 1
+
+        forecast = result[0]
+        assert forecast["native_temperature"] == 20.0  # Default value when None
+        assert forecast["native_templow"] == 15.0
+
+    async def test_daily_forecast_comprehensive_extreme_temperatures(
+        self, weather_entity, coordinator
+    ):
+        """Test comprehensive forecast with extreme temperature values."""
+        from unittest.mock import patch
+
+        # Mock extreme temperature forecast
+        mock_extreme_forecast = [
+            {
+                "datetime": "2024-01-01T00:00:00",
+                "temperature": 212.0,  # 100°C = 212°F (boiling point)
+                "templow": -40.0,  # -40°C = -40°F
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 5.0,
+                "humidity": 50,
+            },
+        ]
+
+        with patch.object(
+            weather_entity._forecast,
+            "generate_comprehensive_forecast",
+            return_value=mock_extreme_forecast,
+        ):
+            coordinator.data = {
+                "temperature": 100.0,  # Extreme current temperature
+                "condition": ATTR_CONDITION_SUNNY,
+                "humidity": 10,  # Low humidity for extreme temps
+                "wind_speed": 5.0,
+                "precipitation": 0.0,
+            }
+
+            result = await weather_entity.async_forecast_daily()
+
+            assert result is not None
+            assert len(result) == 1
+
+            forecast = result[0]
+            # Should convert extreme temperatures accurately
+            assert abs(forecast["native_temperature"] - 100.0) < 0.1  # 212°F -> 100°C
+            assert abs(forecast["native_templow"] - (-40.0)) < 0.1  # -40°F -> -40°C
+
+    async def test_daily_forecast_comprehensive_with_various_conditions(
+        self, weather_entity, coordinator
+    ):
+        """Test comprehensive forecast with different starting weather conditions."""
+        test_conditions = [
+            ATTR_CONDITION_SUNNY,
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_RAINY,
+            ATTR_CONDITION_SNOWY,
+            ATTR_CONDITION_LIGHTNING_RAINY,
+        ]
+
+        for condition in test_conditions:
+            coordinator.data = {
+                "temperature": 20.0,
+                "condition": condition,
+                "humidity": 50,
+                "wind_speed": 5.0,
+                "precipitation": 0.0,
+            }
+
+            result = await weather_entity.async_forecast_daily()
+
+            assert result is not None
+            assert len(result) == 5
+
+            # First forecast should start with the given condition
+            first_forecast = result[0]
+            assert first_forecast["condition"] == condition
+
+            # All forecasts should have valid data
+            for forecast in result:
+                assert isinstance(forecast["native_temperature"], float)
+                assert isinstance(forecast["native_templow"], float)
+                assert forecast["condition"] in [
+                    ATTR_CONDITION_SUNNY,
+                    ATTR_CONDITION_PARTLYCLOUDY,
+                    ATTR_CONDITION_CLOUDY,
+                    ATTR_CONDITION_RAINY,
+                    ATTR_CONDITION_SNOWY,
+                    ATTR_CONDITION_LIGHTNING_RAINY,
+                    ATTR_CONDITION_POURING,
+                    ATTR_CONDITION_HAIL,
+                    ATTR_CONDITION_WINDY,
+                    ATTR_CONDITION_FOG,
+                    ATTR_CONDITION_CLEAR_NIGHT,
+                ]
+                assert isinstance(forecast["native_precipitation"], float)
+                assert isinstance(forecast["native_wind_speed"], float)
+                assert isinstance(forecast["humidity"], int)
+
+    async def test_daily_forecast_comprehensive_pressure_scenarios(
+        self, weather_entity, coordinator
+    ):
+        """Test comprehensive forecast with different pressure system scenarios."""
+        from unittest.mock import MagicMock, patch
+
+        # Test high pressure system
+        mock_high_pressure = MagicMock()
+        mock_high_pressure.analyze_pressure_trends.return_value = {
+            "pressure_system": "high_pressure",
+            "current_trend": 2.0,
+            "long_term_trend": 1.5,
+            "storm_probability": 5,
+        }
+
+        with patch.object(weather_entity._forecast, "analysis", mock_high_pressure):
+            coordinator.data = {
+                "temperature": 25.0,  # Warm temperature
+                "condition": ATTR_CONDITION_SUNNY,
+                "humidity": 40,
+                "wind_speed": 3.0,
+                "precipitation": 0.0,
+            }
+
+            result = await weather_entity.async_forecast_daily()
+
+            assert result is not None
+            assert len(result) == 5
+
+            # High pressure should generally favor clearer conditions
+            sunny_count = sum(
+                1 for f in result if f["condition"] == ATTR_CONDITION_SUNNY
+            )
+            assert sunny_count >= 2  # At least some sunny days
+
+        # Test low pressure system
+        mock_low_pressure = MagicMock()
+        mock_low_pressure.analyze_pressure_trends.return_value = {
+            "pressure_system": "low_pressure",
+            "current_trend": -1.5,
+            "long_term_trend": -1.0,
+            "storm_probability": 60,
+        }
+
+        with patch.object(weather_entity._forecast, "analysis", mock_low_pressure):
+            coordinator.data = {
+                "temperature": 15.0,  # Cooler temperature
+                "condition": ATTR_CONDITION_CLOUDY,
+                "humidity": 70,
+                "wind_speed": 8.0,
+                "precipitation": 2.0,
+            }
+
+            result = await weather_entity.async_forecast_daily()
+
+            assert result is not None
+            assert len(result) == 5
+
+            # Low pressure should favor precipitation
+            rainy_count = sum(
+                1
+                for f in result
+                if f["condition"]
+                in [
+                    ATTR_CONDITION_RAINY,
+                    ATTR_CONDITION_LIGHTNING_RAINY,
+                    ATTR_CONDITION_POURING,
+                ]
+            )
+            assert rainy_count >= 1  # At least some rainy days
+
+    async def test_daily_forecast_comprehensive_altitude_effects(
+        self, weather_entity, coordinator
+    ):
+        """Test how altitude affects daily forecast generation."""
+        # Test with different altitude settings
+        test_altitudes = [0, 500, 1000, 2000]  # meters
+
+        for altitude in test_altitudes:
+            # Mock the coordinator entry to return different altitudes
+            mock_entry = MagicMock()
+            mock_entry.options = {"altitude": altitude}
+            coordinator.entry = mock_entry
+
+            coordinator.data = {
+                "temperature": 20.0,
+                "condition": ATTR_CONDITION_SUNNY,
+                "humidity": 50,
+                "wind_speed": 5.0,
+                "precipitation": 0.0,
+            }
+
+            result = await weather_entity.async_forecast_daily()
+
+            assert result is not None
+            assert len(result) == 5
+
+            # All forecasts should be valid regardless of altitude
+            for forecast in result:
+                assert isinstance(forecast["native_temperature"], float)
+                assert isinstance(forecast["native_templow"], float)
+                assert forecast["condition"] is not None
+                assert isinstance(forecast["native_precipitation"], float)
+
+    async def test_daily_forecast_external_vs_comprehensive_priority(
+        self, weather_entity, coordinator
+    ):
+        """Test that external forecast takes absolute priority over comprehensive generation."""
+        from unittest.mock import patch
+
+        external_forecast = [
+            {
+                "datetime": "2024-01-01T00:00:00",
+                "temperature": 30.0,  # Very different from sensor data
+                "templow": 25.0,
+                "condition": ATTR_CONDITION_SNOWY,  # Very different condition
+                "precipitation": 10.0,  # Heavy precipitation
+                "wind_speed": 20.0,  # Strong wind
+                "humidity": 90,  # High humidity
+            }
+        ]
+
+        # Mock comprehensive forecast to return completely different data
+        mock_comprehensive = [
+            {
+                "datetime": "2024-01-01T00:00:00",
+                "temperature": 15.0,  # Different temperature
+                "templow": 10.0,
+                "condition": ATTR_CONDITION_SUNNY,
+                "precipitation": 0.0,
+                "wind_speed": 5.0,
+                "humidity": 40,
+            }
+        ]
+
+        with patch.object(
+            weather_entity._forecast,
+            "generate_comprehensive_forecast",
+            return_value=mock_comprehensive,
+        ):
+            coordinator.data = {
+                "temperature": 20.0,
+                "condition": ATTR_CONDITION_CLOUDY,
+                "humidity": 50,
+                "wind_speed": 5.0,
+                "precipitation": 0.0,
+                "forecast": external_forecast,  # External takes priority
+            }
+
+            result = await weather_entity.async_forecast_daily()
+
+            assert result is not None
+            assert len(result) == 1
+
+            # Should use external forecast data exclusively
+            forecast = result[0]
+            assert forecast["native_temperature"] == 30.0  # External temperature
+            assert forecast["native_templow"] == 25.0  # External templow
+            assert forecast["condition"] == ATTR_CONDITION_SNOWY  # External condition
+            assert forecast["native_precipitation"] == 10.0  # External precipitation
+            assert forecast["native_wind_speed"] == 20.0  # External wind
+            assert forecast["humidity"] == 90  # External humidity
+
+    async def test_daily_forecast_temperature_unit_conversion_precision(
+        self, weather_entity, coordinator
+    ):
+        """Test precision of temperature unit conversions in daily forecast."""
+        from unittest.mock import patch
+
+        # Test various Fahrenheit temperatures and their Celsius equivalents
+        test_cases = [
+            (32.0, 0.0),  # Freezing point
+            (68.0, 20.0),  # Room temperature
+            (77.0, 25.0),  # Warm
+            (86.0, 30.0),  # Hot
+            (104.0, 40.0),  # Very hot
+            (-4.0, -20.0),  # Cold
+            (212.0, 100.0),  # Boiling point
+        ]
+
+        for fahrenheit, expected_celsius in test_cases:
+            mock_forecast = [
+                {
+                    "datetime": "2024-01-01T00:00:00",
+                    "temperature": fahrenheit,
+                    "templow": fahrenheit - 5.0,  # 5°F lower
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "precipitation": 0.0,
+                    "wind_speed": 5.0,
+                    "humidity": 50,
+                }
+            ]
+
+            with patch.object(
+                weather_entity._forecast,
+                "generate_comprehensive_forecast",
+                return_value=mock_forecast,
+            ):
+                coordinator.data = {
+                    "temperature": expected_celsius,
+                    "condition": ATTR_CONDITION_SUNNY,
+                    "humidity": 50,
+                    "wind_speed": 5.0,
+                    "precipitation": 0.0,
+                }
+
+                result = await weather_entity.async_forecast_daily()
+
+                assert result is not None
+                assert len(result) == 1
+
+                forecast = result[0]
+                # Check conversion precision (within 0.1°C)
+                assert abs(forecast["native_temperature"] - expected_celsius) < 0.1
+                assert (
+                    abs(forecast["native_templow"] - (expected_celsius - 5.0 * 5 / 9))
+                    < 0.1
+                )
 
 
 class TestAsyncSetupEntry:

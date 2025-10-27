@@ -6,6 +6,7 @@ from custom_components.micro_weather.weather_utils import (
     convert_altitude_to_meters,
     convert_precipitation_rate,
     convert_to_celsius,
+    convert_to_fahrenheit,
     convert_to_hpa,
     convert_to_kmh,
     is_forecast_hour_daytime,
@@ -28,6 +29,24 @@ class TestWeatherUtils:
         # Test edge cases
         assert convert_to_celsius(0.0) == -17.8  # Very cold
         assert convert_to_celsius(100.0) == 37.8  # Hot
+
+    def test_convert_to_fahrenheit(self):
+        """Test Celsius to Fahrenheit conversion."""
+        # Test normal temperature
+        assert convert_to_fahrenheit(0.0) == 32.0  # Freezing point
+        assert convert_to_fahrenheit(100.0) == 212.0  # Boiling point
+        assert convert_to_fahrenheit(22.2) == 72.0  # Room temperature
+
+        # Test None input
+        assert convert_to_fahrenheit(None) is None
+
+        # Test edge cases
+        assert convert_to_fahrenheit(-17.8) == 0.0  # Very cold
+        assert convert_to_fahrenheit(37.8) == 100.0  # Hot
+
+        # Test decimal precision
+        assert convert_to_fahrenheit(20.0) == 68.0  # 20°C = 68°F
+        assert convert_to_fahrenheit(25.0) == 77.0  # 25°C = 77°F
 
     def test_convert_to_hpa(self):
         """Test pressure conversion from inHg to hPa."""
@@ -71,6 +90,13 @@ class TestWeatherUtils:
         # Convert back to verify round-trip
         temp_f_back = temp_c * 9 / 5 + 32
         assert abs(temp_f - temp_f_back) < 0.1  # Should be very close
+
+        # Test Fahrenheit conversion precision
+        temp_c = 22.5
+        temp_f = convert_to_fahrenheit(temp_c)
+        # Convert back to verify round-trip
+        temp_c_back = (temp_f - 32) * 5 / 9
+        assert abs(temp_c - temp_c_back) < 0.1  # Should be very close
 
     def test_pressure_conversion_precision(self):
         """Test pressure conversion precision."""

@@ -217,6 +217,16 @@ class WeatherDetector:
             forecast_data = self.forecast.generate_enhanced_forecast(
                 condition, self._prepare_forecast_sensor_data(sensor_data), altitude
             )
+            # Convert forecast temperatures from Fahrenheit to Celsius for HA compatibility
+            for day_forecast in forecast_data:
+                if KEY_TEMPERATURE in day_forecast:
+                    day_forecast[KEY_TEMPERATURE] = convert_to_celsius(
+                        day_forecast[KEY_TEMPERATURE]
+                    )
+                if "templow" in day_forecast:
+                    day_forecast["templow"] = convert_to_celsius(
+                        day_forecast["templow"]
+                    )
         except Exception as e:
             _LOGGER.error("Forecast generation failed: %s", e)
             forecast_data = []
