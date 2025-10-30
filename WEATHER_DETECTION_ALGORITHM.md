@@ -429,6 +429,81 @@ ELIF solar_radiation < 200 W/m² AND solar_lux < 20000 lx AND uv_index < 1:
     → 40% cloud cover (partly cloudy fallback when data is inconclusive)
 ```
 
+### Luminance Multiplier Enhancement (Version 3.1.0)
+
+The luminance multiplier provides intelligent adjustment of solar luminance readings based on solar elevation angle, compensating for natural light reduction during early morning and late afternoon periods when the sun is low on the horizon.
+
+**Why Luminance Adjustment Matters:**
+
+During low solar elevation periods (early morning, late afternoon), natural solar radiation is significantly reduced due to the longer atmospheric path the sunlight must travel. This creates a challenge for weather detection algorithms that rely on solar sensors, as the same cloud conditions will produce much lower readings when the sun is low compared to midday.
+
+**Solar Elevation Impact on Natural Light:**
+
+- **Solar Elevation 0° (sunrise/sunset)**: Atmospheric path is ~35x longer than overhead sun
+- **Solar Elevation 15°**: Atmospheric path is ~4x longer than overhead sun
+- **Solar Elevation 30°**: Atmospheric path is ~2x longer than overhead sun
+- **Solar Elevation 45°+**: Minimal atmospheric attenuation
+
+**Luminance Multiplier Algorithm:**
+
+```
+# Calculate elevation factor (0.0 = sunrise/sunset, 1.0 = overhead sun)
+elevation_factor = max(0.0, 1.0 - (solar_elevation / 90.0))
+
+# Apply user-configurable multiplier (0.1x to 5.0x, default 1.0x)
+effective_multiplier = 1.0 + (luminance_multiplier - 1.0) * elevation_factor
+
+# Adjust solar_lux reading before cloud cover calculations
+adjusted_solar_lux = solar_lux * effective_multiplier
+```
+
+**How It Works:**
+
+1. **Elevation Factor Calculation**: Determines how much adjustment is needed based on sun position
+
+   - At solar elevation 90° (overhead): factor = 0.0 (no adjustment)
+   - At solar elevation 0° (horizon): factor = 1.0 (full adjustment)
+
+2. **Multiplier Application**: Applies the user-configured multiplier proportionally
+
+   - **Multiplier = 1.0x**: No adjustment (original behavior)
+   - **Multiplier = 2.0x**: Doubles low-sun readings for better sensitivity
+   - **Multiplier = 0.5x**: Reduces low-sun readings for less sensitivity
+
+3. **Seamless Integration**: Adjusted readings flow into existing cloud cover calculations without changing the core algorithm
+
+**Configuration Options:**
+
+- **Range**: 0.1x to 5.0x (10% to 500% adjustment)
+- **Default**: 1.0x (no adjustment - maintains backward compatibility)
+- **Step Size**: 0.1x increments for fine-tuning
+- **Real-time**: Adjustments update continuously as sun position changes
+
+**Benefits:**
+
+- **Improved Low-Sun Accuracy**: Better cloud detection during dawn/dusk periods
+- **User Control**: Configurable sensitivity based on local conditions and sensor characteristics
+- **Backward Compatible**: Default 1.0x maintains existing behavior for current users
+- **Scientific Foundation**: Based on atmospheric physics and solar geometry
+- **No False Positives**: Only adjusts readings, doesn't change detection logic
+
+**Real-World Impact:**
+
+**Before Enhancement:**
+
+- Early morning cloud detection often inaccurate due to naturally low solar readings
+- Weather conditions might show "cloudy" even on clear mornings
+- Inconsistent sensitivity throughout the day
+
+**After Enhancement:**
+
+- Consistent cloud detection accuracy from dawn to dusk
+- More reliable weather reporting during transitional lighting
+- User can fine-tune sensitivity for their specific location and sensors
+- Professional-grade accuracy using astronomical principles
+
+This enhancement represents a significant improvement in solar-based weather detection, providing more accurate and consistent results throughout the entire day while maintaining full user control over sensitivity adjustments.
+
 ### Historical Weather Bias Correction
 
 **Revolutionary Sunrise/Sunset Accuracy Enhancement:**

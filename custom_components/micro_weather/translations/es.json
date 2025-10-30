@@ -91,14 +91,16 @@
           "solar_lux_sensor": "Sensor Solar Lux",
           "uv_index_sensor": "Sensor de Índice UV",
           "sun_sensor": "Sensor Solar",
-          "zenith_max_radiation": "Radiación Máxima en el Cenit"
+          "zenith_max_radiation": "Radiación Máxima en el Cenit",
+          "luminance_multiplier": "Multiplicador de Luminancia"
         },
         "data_description": {
           "solar_radiation_sensor": "Sensor opcional para mediciones de radiación solar.",
           "solar_lux_sensor": "Sensor opcional para mediciones de luz.",
           "uv_index_sensor": "Sensor opcional para mediciones de índice UV.",
           "sun_sensor": "Sensor opcional para datos de elevación solar.",
-          "zenith_max_radiation": "Radiación solar máxima en el cenit (sol directamente overhead). Se utiliza para normalizar las lecturas de radiación solar para cálculos precisos de cobertura de nubes. Valores típicos: 400-1200 W/m² dependiendo de la ubicación y condiciones atmosféricas."
+          "zenith_max_radiation": "Radiación solar máxima en el cenit (sol directamente overhead). Se utiliza para normalizar las lecturas de radiación solar para cálculos precisos de cobertura de nubes. Valores típicos: 400-1200 W/m² dependiendo de la ubicación y condiciones atmosféricas.",
+          "luminance_multiplier": "Multiplicador aplicado a las lecturas de luminancia cuando el sol está bajo (temprano en la mañana/tarde). Valores más altos (>1.0) aumentan las lecturas en ángulos solares bajos para compensar la reducción natural de luz. Valores <1.0 disminuyen las lecturas. Predeterminado: 1.0 (sin ajuste)."
         }
       },
       "final": {
@@ -211,14 +213,16 @@
           "solar_lux_sensor": "Sensor Solar Lux",
           "uv_index_sensor": "Sensor de Índice UV",
           "sun_sensor": "Sensor Solar",
-          "zenith_max_radiation": "Radiación Máxima en el Cenit"
+          "zenith_max_radiation": "Radiación Máxima en el Cenit",
+          "luminance_multiplier": "Multiplicador de Luminancia"
         },
         "data_description": {
           "solar_radiation_sensor": "Sensor opcional para detección primaria de cobertura de nubes (>400 W/m² = soleado, <100 = nublado). Utilizado en detección de niebla y sobrescribe otras condiciones para detección de cielo despejado.",
           "solar_lux_sensor": "Sensor opcional para detección día/noche basada en luz. Detección de cobertura de nubes de respaldo y cálculos de visibilidad cuando sensor de radiación solar no disponible.",
           "uv_index_sensor": "Sensor opcional para confirmación de cielo despejado (UV alto = definitivamente soleado). Proporciona medición de intensidad solar para recomendaciones de seguridad y precisión mejorada de detección de meteorología soleada.",
           "sun_sensor": "Sensor opcional que proporciona datos de elevación solar para cálculos precisos de cobertura de nubes. Mejora precisión de detección meteorológica considerando posición del sol (elevación mayor = más radiación solar esperada). Se repliega a 45° elevación si no configurado.",
-          "zenith_max_radiation": "Radiación solar máxima en el cenit (sol directamente overhead). Se utiliza para normalizar las lecturas de radiación solar para cálculos precisos de cobertura de nubes. Valores típicos: 400-1200 W/m² dependiendo de la ubicación y condiciones atmosféricas."
+          "zenith_max_radiation": "Radiación solar máxima en el cenit (sol directamente overhead). Se utiliza para normalizar las lecturas de radiación solar para cálculos precisos de cobertura de nubes. Valores típicos: 400-1200 W/m² dependiendo de la ubicación y condiciones atmosféricas.",
+          "luminance_multiplier": "Multiplicador aplicado a las lecturas de luminancia cuando el sol está bajo (temprano en la mañana/tarde). Valores más altos (>1.0) aumentan las lecturas en ángulos solares bajos para compensar la reducción natural de luz. Valores <1.0 disminuyen las lecturas. Predeterminado: 1.0 (sin ajuste)."
         }
       },
       "device_config": {

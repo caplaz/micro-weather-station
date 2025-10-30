@@ -91,14 +91,16 @@
           "solar_lux_sensor": "Solar Lux-Sensor",
           "uv_index_sensor": "UV-Index-Sensor",
           "sun_sensor": "Sonnen-Sensor",
-          "zenith_max_radiation": "Zenit-Max-Strahlung"
+          "zenith_max_radiation": "Zenit-Max-Strahlung",
+          "luminance_multiplier": "Helligkeits-Multiplikator"
         },
         "data_description": {
           "solar_radiation_sensor": "Optionaler Sensor für Sonnenstrahlungsmessungen.",
           "solar_lux_sensor": "Optionaler Sensor für Lichtmessungen.",
           "uv_index_sensor": "Optionaler Sensor für UV-Index-Messungen.",
           "sun_sensor": "Optionaler Sensor für Sonnenhöhendaten.",
-          "zenith_max_radiation": "Maximale Sonnenstrahlung im Zenit (direkt über der Sonne). Wird verwendet, um Sonnenstrahlungsmessungen für genaue Wolkenbedeckungsberechnungen zu normalisieren. Typische Werte: 400-1200 W/m² abhängig von Standort und atmosphärischen Bedingungen."
+          "zenith_max_radiation": "Maximale Sonnenstrahlung im Zenit (direkt über der Sonne). Wird verwendet, um Sonnenstrahlungsmessungen für genaue Wolkenbedeckungsberechnungen zu normalisieren. Typische Werte: 400-1200 W/m² abhängig von Standort und atmosphärischen Bedingungen.",
+          "luminance_multiplier": "Multiplikator, der auf Helligkeitsmessungen angewendet wird, wenn die Sonne tief steht (früher Morgen/später Nachmittag). Höhere Werte (>1.0) erhöhen die Messungen bei niedrigen Sonnenwinkeln, um die natürliche Lichtreduzierung auszugleichen. Werte <1.0 verringern die Messungen. Standard: 1.0 (keine Anpassung)."
         }
       },
       "final": {
@@ -211,14 +213,16 @@
           "solar_lux_sensor": "Solar Lux-Sensor",
           "uv_index_sensor": "UV-Index-Sensor",
           "sun_sensor": "Sonnen-Sensor",
-          "zenith_max_radiation": "Zenit-Max-Strahlung"
+          "zenith_max_radiation": "Zenit-Max-Strahlung",
+          "luminance_multiplier": "Helligkeits-Multiplikator"
         },
         "data_description": {
           "solar_radiation_sensor": "Optionaler Sensor für primäre Wolkenbedeckungs-Erkennung (>400 W/m² = sonnig, <100 = bewölkt). Wird in Nebel-Erkennung verwendet und überschreibt andere Bedingungen für klaren Himmel-Erkennung.",
           "solar_lux_sensor": "Optionaler Sensor für lichtbasierte Tag/Nacht-Erkennung. Backup-Wolkenbedeckungs-Erkennung und Sichtbarkeits-Berechnungen, wenn Solarstrahlungs-Sensor nicht verfügbar.",
           "uv_index_sensor": "Optionaler Sensor für klare Himmel-Bestätigung (hoher UV = definitiv sonnig). Bietet Sonnenintensitäts-Messung für Sicherheitsempfehlungen und verbesserte sonnige Wetter-Erkennungs-Genauigkeit.",
           "sun_sensor": "Optionaler Sensor, der Sonnenhöhen-Daten für genaue Wolkenbedeckungs-Berechnungen bereitstellt. Verbessert die Wettererkennungs-Genauigkeit unter Berücksichtigung der Sonnenposition (höhere Erhebung = mehr erwartete Sonnenstrahlung). Fällt zurück auf 45° Erhebung, falls nicht konfiguriert.",
-          "zenith_max_radiation": "Maximale Sonnenstrahlung im Zenit (direkt über der Sonne). Wird verwendet, um Sonnenstrahlungsmessungen für genaue Wolkenbedeckungsberechnungen zu normalisieren. Typische Werte: 400-1200 W/m² abhängig von Standort und atmosphärischen Bedingungen."
+          "zenith_max_radiation": "Maximale Sonnenstrahlung im Zenit (direkt über der Sonne). Wird verwendet, um Sonnenstrahlungsmessungen für genaue Wolkenbedeckungsberechnungen zu normalisieren. Typische Werte: 400-1200 W/m² abhängig von Standort und atmosphärischen Bedingungen.",
+          "luminance_multiplier": "Multiplikator, der auf Helligkeitsmessungen angewendet wird, wenn die Sonne tief steht (früher Morgen/später Nachmittag). Höhere Werte (>1.0) erhöhen die Messungen bei niedrigen Sonnenwinkeln, um die natürliche Lichtreduzierung auszugleichen. Werte <1.0 verringern die Messungen. Standard: 1.0 (keine Anpassung)."
         }
       },
       "device_config": {
