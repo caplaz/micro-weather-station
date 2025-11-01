@@ -91,14 +91,16 @@
           "solar_lux_sensor": "Solar Lux Sensor",
           "uv_index_sensor": "UV Index Sensor",
           "sun_sensor": "Sun Sensor",
-          "zenith_max_radiation": "Zenith Max Radiation"
+          "zenith_max_radiation": "Zenith Max Radiation",
+          "luminance_multiplier": "Luminance Multiplier"
         },
         "data_description": {
           "solar_radiation_sensor": "Optional sensor for primary cloud cover detection (>400 W/m² = sunny, <100 = cloudy). Used in fog detection and overrides other conditions for clear sky detection.",
           "solar_lux_sensor": "Optional sensor for light-based day/night detection. Backup cloud cover detection and visibility calculations when solar radiation sensor unavailable.",
           "uv_index_sensor": "Optional sensor for clear sky confirmation (high UV = definitely sunny). Provides sun intensity measurement for safety recommendations and enhanced sunny weather detection.",
           "sun_sensor": "Optional sensor providing solar elevation data for accurate cloud cover calculations. Improves weather detection accuracy by accounting for sun position (higher elevation = more expected solar radiation). Falls back to 45° elevation if not configured.",
-          "zenith_max_radiation": "Maximum solar radiation at zenith (directly overhead sun). Used to normalize solar radiation readings for accurate cloud cover calculations. Typical values: 400-1200 W/m² depending on location and atmospheric conditions."
+          "zenith_max_radiation": "Maximum solar radiation at zenith (directly overhead sun). Used to normalize solar radiation readings for accurate cloud cover calculations. Typical values: 400-1200 W/m² depending on location and atmospheric conditions.",
+          "luminance_multiplier": "Multiplier applied to solar radiation and lux readings when the sun is low (early morning/late afternoon). Higher values (>1.0) boost readings during low sun angles to compensate for natural light reduction through thicker atmosphere. Values <1.0 reduce readings. Default: 1.0 (no adjustment)."
         }
       },
       "final": {
@@ -211,14 +213,16 @@
           "solar_lux_sensor": "Solar Lux Sensor",
           "uv_index_sensor": "UV Index Sensor",
           "sun_sensor": "Sun Sensor",
-          "zenith_max_radiation": "Zenith Max Radiation"
+          "zenith_max_radiation": "Zenith Max Radiation",
+          "luminance_multiplier": "Luminance Multiplier"
         },
         "data_description": {
           "solar_radiation_sensor": "Optional sensor for primary cloud cover detection (>400 W/m² = sunny, <100 = cloudy). Used in fog detection and overrides other conditions for clear sky detection.",
           "solar_lux_sensor": "Optional sensor for light-based day/night detection. Backup cloud cover detection and visibility calculations when solar radiation sensor unavailable.",
           "uv_index_sensor": "Optional sensor for clear sky confirmation (high UV = definitely sunny). Provides sun intensity measurement for safety recommendations and enhanced sunny weather detection.",
           "sun_sensor": "Optional sensor providing solar elevation data for accurate cloud cover calculations. Improves weather detection accuracy by accounting for sun position (higher elevation = more expected solar radiation). Falls back to 45° elevation if not configured.",
-          "zenith_max_radiation": "Maximum solar radiation at zenith (directly overhead sun). Used to normalize solar radiation readings for accurate cloud cover calculations. Typical values: 400-1200 W/m² depending on location and atmospheric conditions."
+          "zenith_max_radiation": "Maximum solar radiation at zenith (directly overhead sun). Used to normalize solar radiation readings for accurate cloud cover calculations. Typical values: 400-1200 W/m² depending on location and atmospheric conditions.",
+          "luminance_multiplier": "Multiplier applied to solar radiation and lux readings when the sun is low (early morning/late afternoon). Higher values (>1.0) boost readings during low sun angles to compensate for natural light reduction through thicker atmosphere. Values <1.0 reduce readings. Default: 1.0 (no adjustment)."
         }
       },
       "device_config": {
