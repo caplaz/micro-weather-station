@@ -429,9 +429,9 @@ ELIF solar_radiation < 200 W/m² AND solar_lux < 20000 lx AND uv_index < 1:
     → 40% cloud cover (partly cloudy fallback when data is inconclusive)
 ```
 
-### Luminance Multiplier Enhancement (Version 3.1.0)
+### Luminance Multiplier Enhancement
 
-The luminance multiplier provides intelligent adjustment of solar luminance readings based on solar elevation angle, compensating for natural light reduction during early morning and late afternoon periods when the sun is low on the horizon.
+The luminance multiplier provides intelligent adjustment of solar radiation and lux readings based on solar elevation angle, compensating for natural light reduction during early morning and late afternoon periods when the sun is low on the horizon.
 
 **Why Luminance Adjustment Matters:**
 
@@ -453,7 +453,8 @@ elevation_factor = max(0.0, 1.0 - (solar_elevation / 90.0))
 # Apply user-configurable multiplier (0.1x to 5.0x, default 1.0x)
 effective_multiplier = 1.0 + (luminance_multiplier - 1.0) * elevation_factor
 
-# Adjust solar_lux reading before cloud cover calculations
+# Adjust solar radiation and lux readings before cloud cover calculations
+adjusted_solar_radiation = solar_radiation * effective_multiplier
 adjusted_solar_lux = solar_lux * effective_multiplier
 ```
 
@@ -470,7 +471,7 @@ adjusted_solar_lux = solar_lux * effective_multiplier
    - **Multiplier = 2.0x**: Doubles low-sun readings for better sensitivity
    - **Multiplier = 0.5x**: Reduces low-sun readings for less sensitivity
 
-3. **Seamless Integration**: Adjusted readings flow into existing cloud cover calculations without changing the core algorithm
+3. **Seamless Integration**: Adjusted readings flow into existing cloud cover calculations without changing the core algorithm (solar radiation has 85% weight, lux has 15% weight in cloud cover determination)
 
 **Configuration Options:**
 
@@ -481,7 +482,7 @@ adjusted_solar_lux = solar_lux * effective_multiplier
 
 **Benefits:**
 
-- **Improved Low-Sun Accuracy**: Better cloud detection during dawn/dusk periods
+- **Improved Low-Sun Accuracy**: Better cloud detection during dawn/dusk periods by compensating both solar radiation (primary sensor) and lux readings
 - **User Control**: Configurable sensitivity based on local conditions and sensor characteristics
 - **Backward Compatible**: Default 1.0x maintains existing behavior for current users
 - **Scientific Foundation**: Based on atmospheric physics and solar geometry
@@ -497,12 +498,12 @@ adjusted_solar_lux = solar_lux * effective_multiplier
 
 **After Enhancement:**
 
-- Consistent cloud detection accuracy from dawn to dusk
-- More reliable weather reporting during transitional lighting
+- Consistent cloud detection accuracy from dawn to dusk by compensating both solar radiation and lux readings
+- More reliable weather reporting during transitional lighting, especially targeting the primary cloud cover sensor
 - User can fine-tune sensitivity for their specific location and sensors
 - Professional-grade accuracy using astronomical principles
 
-This enhancement represents a significant improvement in solar-based weather detection, providing more accurate and consistent results throughout the entire day while maintaining full user control over sensitivity adjustments.
+This enhancement represents a significant improvement in solar-based weather detection, providing more accurate and consistent results throughout the entire day while maintaining full user control over sensitivity adjustments. By compensating both solar radiation and lux readings, the system achieves comprehensive atmospheric correction for superior cloud cover detection accuracy.
 
 ### Historical Weather Bias Correction
 
