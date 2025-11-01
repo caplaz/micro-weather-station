@@ -140,29 +140,10 @@ class WeatherAnalysis:
         is_severe_turbulence = (gust_factor > 3.0 and wind_gust > 20) or wind_gust > 40
 
         # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
-        # First check if we have clear precipitation indicators
+        # Rain/snow takes precedence over all other conditions
         significant_rain = rain_rate > 0.01
 
-        # If rain_state is "wet" but no significant rain_rate, check if
-        # it might be fog first
-        if rain_state == "wet" and not significant_rain:
-            # Check for fog conditions before assuming precipitation
-            fog_conditions = self.analyze_fog_conditions(
-                outdoor_temp,
-                humidity,
-                dewpoint,
-                temp_dewpoint_spread,
-                wind_speed,
-                solar_radiation,
-                is_daytime,
-            )
-            if fog_conditions is not None:
-                # PRIORITY 1A: FOG CONDITIONS (when moisture sensor shows
-                # wet but it's fog)
-                return fog_conditions
-
-        # Now check for precipitation (either significant rain_rate OR wet
-        # sensor without fog conditions)
+        # Check for precipitation (either significant rain_rate OR wet sensor)
         if significant_rain or rain_state == "wet":
             precipitation_intensity = self.classify_precipitation_intensity(rain_rate)
 
@@ -195,7 +176,21 @@ class WeatherAnalysis:
             else:
                 return ATTR_CONDITION_RAINY  # Light rain/drizzle
 
-        # PRIORITY 2: SEVERE WEATHER CONDITIONS
+        # PRIORITY 2: FOG CONDITIONS
+        # Fog takes precedence after precipitation
+        fog_conditions = self.analyze_fog_conditions(
+            outdoor_temp,
+            humidity,
+            dewpoint,
+            temp_dewpoint_spread,
+            wind_speed,
+            solar_radiation,
+            is_daytime,
+        )
+        if fog_conditions is not None:
+            return fog_conditions
+
+        # PRIORITY 3: SEVERE WEATHER CONDITIONS
         # (No precipitation but extreme conditions suggesting thunderstorm activity)
         # More conservative: require very low pressure AND strong winds, OR severe turbulence
         if (
@@ -206,28 +201,7 @@ class WeatherAnalysis:
         if wind_gale:  # Gale force winds
             return ATTR_CONDITION_WINDY  # Windstorm
 
-        # PRIORITY 2.5: WINDY CONDITIONS
-        # (Gusty or strong winds without precipitation)
-        # Require either sustained winds >= 15 mph OR very gusty conditions with minimum sustained wind
-        if wind_strong or (is_very_gusty and wind_speed >= 8):
-            return ATTR_CONDITION_WINDY  # Windy conditions
-
-        # PRIORITY 3: FOG CONDITIONS (Critical for safety)
-        # Check for fog in dry conditions (wet conditions already checked above)
-        if rain_state != "wet":
-            fog_conditions = self.analyze_fog_conditions(
-                outdoor_temp,
-                humidity,
-                dewpoint,
-                temp_dewpoint_spread,
-                wind_speed,
-                solar_radiation,
-                is_daytime,
-            )
-            if fog_conditions is not None:
-                return fog_conditions
-
-        # PRIORITY 4: DAYTIME CONDITIONS (Solar radiation analysis)
+        # PRIORITY 4: DAYTIME/NIGHTTIME CONDITIONS (Cloud cover analysis)
         if is_daytime:
             # Get solar elevation from sensor data for accurate cloud cover calculation
             # If solar_elevation is missing, check if we have solar sensor data
@@ -296,16 +270,29 @@ class WeatherAnalysis:
                 cloud_cover,
             )
 
+            # PRIORITY 5: WINDY CONDITIONS (only on sunny days)
+            # Windy condition only applies if it's sunny/clear with strong winds
+            # If it's cloudy, return cloudy (not windy)
+            if final_condition == ATTR_CONDITION_SUNNY:
+                # Only override sunny with windy if winds are strong
+                if wind_strong or (is_very_gusty and wind_speed >= 8):
+                    _LOGGER.debug(
+                        "Overriding sunny with windy (wind_speed=%.1f mph, gusty=%s)",
+                        wind_speed,
+                        is_very_gusty,
+                    )
+                    return ATTR_CONDITION_WINDY
+
             return final_condition
 
-        # PRIORITY 5: TWILIGHT CONDITIONS
+        # PRIORITY 7: TWILIGHT CONDITIONS
         elif is_twilight:
             if solar_lux > 50 and pressure_normal:
                 return ATTR_CONDITION_PARTLYCLOUDY
             else:
                 return ATTR_CONDITION_CLOUDY
 
-        # PRIORITY 6: NIGHTTIME CONDITIONS
+        # PRIORITY 8: NIGHTTIME CONDITIONS
         else:
             # Night analysis based on atmospheric conditions
             # Prioritize clear conditions when pressure is favorable, even with moderate humidity
@@ -510,20 +497,20 @@ class WeatherAnalysis:
         """Advanced fog analysis using meteorological principles.
 
         Analyzes atmospheric conditions to determine fog likelihood using
-        scientific criteria for fog formation. The algorithm considers:
+        scientific criteria for fog formation. The algorithm uses a unified
+        scoring system that considers:
 
         - Humidity levels (fog requires near-saturation)
         - Temperature-dewpoint spread (closer = higher fog probability)
-        - Wind speed (light winds favor fog formation)
-        - Solar radiation (low radiation indicates existing fog)
+        - Wind speed (light winds favor fog formation, strong winds disperse fog)
+        - Solar radiation (fog reduces radiation, but can exist with sun penetration)
         - Time of day (radiation fog typically forms at night/early morning)
-        - Dawn/twilight conditions (prevent false fog detection during sunrise/sunset)
 
-        Fog Types Detected:
-        - Dense fog: Extremely high humidity (99%+) with minimal spread AND very low solar radiation
-        - Radiation fog: High humidity (98%+) with light winds at night AND no solar radiation
-        - Advection fog: Moist air moving over cooler surface
-        - Evaporation fog: After rain with warm ground
+        Fog Types Considered:
+        - Dense/Radiation fog: Very high humidity, minimal spread, calm winds
+        - Advection fog: High humidity, moderate winds moving moist air
+        - Evaporation fog: High humidity after rain with warmer conditions
+        - Daytime fog: Sun shining through fog layer (high humidity + tight spread)
 
         Args:
             temp: Current temperature in Fahrenheit
@@ -535,95 +522,108 @@ class WeatherAnalysis:
             is_daytime: Boolean indicating if it's currently daytime
 
         Returns:
-            str: "foggy" if fog conditions are met, "clear" otherwise
+            str: ATTR_CONDITION_FOG if fog conditions are met, None otherwise
 
         Note:
-            Uses conservative thresholds to reduce false positives. Special handling
-            for dawn/twilight conditions when solar radiation is present but low,
-            which indicates sunrise/sunset rather than fog.
+            Uses a scoring system to avoid overlapping conditions and provide
+            smoother fog detection across varying atmospheric conditions.
         """
 
-        # Detect dawn/twilight conditions (solar radiation present but sun is low)
-        # During dawn/twilight: 5-100 W/m² with increasing light = not fog
-        is_twilight = 5 < solar_rad < 100
+        # Calculate fog probability score (0-100)
+        fog_score = 0
 
-        # If we're in twilight with any meaningful solar radiation,
-        # require much stricter conditions for fog detection
-        if is_twilight:
-            _LOGGER.debug(
-                "Twilight conditions detected (solar_rad: %.1f W/m²) - "
-                "humidity: %.1f%%, spread: %.1f°F, wind: %.1f mph",
-                solar_rad,
-                humidity,
-                spread,
-                wind_speed,
-            )
-            # During twilight, only detect fog if conditions are extreme
-            # AND solar radiation is very suppressed (indicating actual fog blocking light)
-            if humidity >= 99.8 and spread <= 0.5 and solar_rad < 15:
-                # Dense fog blocking twilight sun
-                _LOGGER.debug("Extreme fog conditions during twilight - reporting fog")
-                return ATTR_CONDITION_FOG
-            # Otherwise, it's just high humidity during dawn/dusk - not fog
-            _LOGGER.debug(
-                "Twilight with high humidity but not fog - skipping fog detection"
-            )
-            return None
-
-        # Adjust thresholds based on time of day
-        if not is_daytime:
-            # True nighttime (no solar radiation): More restrictive thresholds
-            dense_humidity_threshold = 99.5
-            radiation_humidity_threshold = 99.5  # Increased from 99
-            radiation_spread_threshold = (
-                0.5  # Decreased from 1.0 - require very tight spread
-            )
-            advection_humidity_threshold = 98
+        # 1. HUMIDITY FACTOR (0-40 points) - Most important for fog
+        if humidity >= 98:
+            fog_score += 40  # Extremely high - dense fog likely
+        elif humidity >= 95:
+            fog_score += 30  # Very high - fog probable
+        elif humidity >= 92:
+            fog_score += 20  # High - fog possible
+        elif humidity >= 88:
+            fog_score += 10  # Moderately high - marginal fog conditions
         else:
-            # Daytime: Original thresholds
-            dense_humidity_threshold = 99
-            radiation_humidity_threshold = 98
-            radiation_spread_threshold = 2
-            advection_humidity_threshold = 95
+            fog_score += 0  # Too low for fog
 
-        # Dense fog conditions (extremely restrictive, requires
-        # virtually no solar radiation at night)
-        if (
-            humidity >= dense_humidity_threshold
-            and spread <= 0.5  # Very tight spread
-            and wind_speed <= 2
-            and solar_rad <= 2  # Essentially no solar radiation
-        ):
+        # 2. TEMPERATURE-DEWPOINT SPREAD FACTOR (0-30 points)
+        if spread <= 0.5:
+            fog_score += 30  # Nearly saturated - fog very likely
+        elif spread <= 1.0:
+            fog_score += 25  # Very close - fog likely
+        elif spread <= 2.0:
+            fog_score += 15  # Close - fog possible
+        elif spread <= 3.0:
+            fog_score += 5  # Marginal - light fog/mist possible
+        else:
+            fog_score += 0  # Too large for fog
+
+        # 3. WIND FACTOR (0-15 points)
+        # Light winds allow fog to form and persist
+        # Strong winds disperse fog
+        if wind_speed <= 2:
+            fog_score += 15  # Calm - ideal for dense fog
+        elif wind_speed <= 5:
+            fog_score += 10  # Light - fog can persist
+        elif wind_speed <= 8:
+            fog_score += 5  # Moderate - fog may form but lighter
+        else:
+            fog_score -= 10  # Strong winds disperse fog
+
+        # 4. SOLAR RADIATION FACTOR (0-15 points)
+        # Fog reduces solar radiation, but some can penetrate thin fog
+        if is_daytime:
+            # During daytime, solar radiation helps distinguish fog from haze
+            if solar_rad < 50:
+                fog_score += 15  # Very low - dense fog blocking sun
+            elif solar_rad < 150:
+                fog_score += 10  # Low - moderate fog or heavy overcast
+            elif solar_rad < 300:
+                fog_score += 5  # Reduced - light fog or overcast
+            else:
+                fog_score += 0  # Normal radiation - no fog indicated
+        else:
+            # At night, solar radiation should be negligible
+            if solar_rad <= 2:
+                fog_score += 10  # No radiation - consistent with night fog
+            elif solar_rad <= 10:
+                fog_score += 5  # Minimal - twilight or light pollution
+            else:
+                fog_score -= 5  # Unexpected daytime radiation at night
+
+        # 5. TEMPERATURE FACTOR (bonus points for evaporation fog)
+        # Warmer temperatures after cooling can indicate evaporation fog
+        if temp > 40 and humidity >= 95 and spread <= 2:
+            fog_score += 5  # Bonus for evaporation fog conditions
+
+        # Apply fog detection threshold with logging
+        _LOGGER.debug(
+            "Fog score calculation: %.1f points (humidity=%.1f%%, spread=%.2f°F, "
+            "wind=%.1f mph, solar=%.1f W/m², temp=%.1f°F, daytime=%s)",
+            fog_score,
+            humidity,
+            spread,
+            wind_speed,
+            solar_rad,
+            temp,
+            is_daytime,
+        )
+
+        # Fog detection thresholds based on score
+        if fog_score >= 70:
+            _LOGGER.debug("Dense fog detected (score: %.1f >= 70)", fog_score)
             return ATTR_CONDITION_FOG
-
-        # Radiation fog (only in true darkness - no solar radiation at all)
-        if (
-            humidity >= radiation_humidity_threshold
-            and spread <= radiation_spread_threshold
-            and wind_speed <= 3
-            and solar_rad <= 2
-        ):
+        elif fog_score >= 55:
+            _LOGGER.debug("Moderate fog detected (score: %.1f >= 55)", fog_score)
             return ATTR_CONDITION_FOG
+        elif fog_score >= 45:
+            # Marginal fog - only if humidity is very high
+            if humidity >= 95:
+                _LOGGER.debug(
+                    "Light fog detected (score: %.1f >= 45, humidity >= 95%%)",
+                    fog_score,
+                )
+                return ATTR_CONDITION_FOG
 
-        # Advection fog (moist air over cooler surface) - also requires low solar radiation
-        if (
-            humidity >= advection_humidity_threshold
-            and spread <= 3
-            and 3 <= wind_speed <= 12
-            and solar_rad < 10  # Added solar radiation check
-        ):
-            return ATTR_CONDITION_FOG
-
-        # Evaporation fog (after rain, warm ground) - requires low solar radiation
-        if (
-            humidity >= advection_humidity_threshold
-            and spread <= 3
-            and wind_speed <= 6
-            and temp > 40
-            and solar_rad < 10  # Added solar radiation check
-        ):
-            return ATTR_CONDITION_FOG
-
+        _LOGGER.debug("No fog detected (score: %.1f < threshold)", fog_score)
         return None
 
     def _calculate_pressure_trend_cloud_adjustment(
@@ -1361,15 +1361,28 @@ class WeatherAnalysis:
         is_daytime = solar_radiation > 5 or solar_lux > 50
 
         if condition == ATTR_CONDITION_FOG:
-            # Fog visibility based on density (dewpoint spread)
-            if temp_dewpoint_spread <= 1:
-                return 0.3  # Dense fog: <0.5 km
-            elif temp_dewpoint_spread <= 2:
-                return 0.8  # Thick fog: <1 km
-            elif temp_dewpoint_spread <= 3:
-                return 1.5  # Moderate fog: 1-2 km
+            # Fog visibility based on multiple factors for better accuracy
+            # Use humidity and dewpoint spread for density assessment
+
+            # Dense fog: extremely high humidity + very tight spread
+            if humidity >= 98 and temp_dewpoint_spread <= 0.5:
+                return 0.2  # Dense fog: <0.3 km (very poor visibility)
+
+            # Thick fog: very high humidity + tight spread
+            elif humidity >= 95 and temp_dewpoint_spread <= 1.0:
+                return 0.5  # Thick fog: <0.5 km (poor visibility)
+
+            # Moderate fog: high humidity + moderate spread
+            elif humidity >= 92 and temp_dewpoint_spread <= 2.0:
+                return 1.0  # Moderate fog: ~1 km
+
+            # Light fog/mist: moderate humidity or wider spread
+            elif temp_dewpoint_spread <= 3.0:
+                return 2.0  # Light fog/mist: ~2 km
+
+            # Very light fog conditions (shouldn't normally happen)
             else:
-                return 2.5  # Light fog/mist: 2-3 km
+                return 3.0  # Very light fog: ~3 km
 
         elif condition in [ATTR_CONDITION_RAINY, ATTR_CONDITION_SNOWY]:
             # Precipitation visibility reduction

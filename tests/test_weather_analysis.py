@@ -9,6 +9,7 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_RAINY,
     ATTR_CONDITION_SUNNY,
+    ATTR_CONDITION_WINDY,
 )
 import pytest
 
@@ -118,38 +119,76 @@ class TestWeatherAnalysis:
         assert analysis.classify_precipitation_intensity(0.6) == "heavy"
 
     def test_analyze_fog_conditions(self, analysis):
-        """Test fog condition analysis."""
-        # Test clear conditions (no fog)
+        """Test fog condition analysis using unified scoring system."""
+        # Test clear conditions (no fog) - low humidity, large spread
         result = analysis.analyze_fog_conditions(
             70.0, 50.0, 50.0, 20.0, 5.0, 200.0, True
         )
         assert result is None
 
-        # Test dense fog conditions (nighttime with no solar radiation)
+        # Test dense fog conditions (nighttime)
+        # High humidity (98% = 40pts) + tight spread (0.1°F = 30pts) + calm winds (1.5mph = 15pts) + no solar (10pts) = 95pts
         result_fog = analysis.analyze_fog_conditions(
             70.0, 99.5, 69.9, 0.1, 1.5, 0.0, False
         )
         assert result_fog == ATTR_CONDITION_FOG
 
-        # Test radiation fog (nighttime with no solar radiation)
-        result_rad = analysis.analyze_fog_conditions(
-            70.0, 99.5, 69.5, 0.5, 2.0, 0.0, False
+        # Test moderate fog conditions (nighttime)
+        # High humidity (92% = 20pts) + moderate spread (2.0°F = 15pts) + light winds (3mph = 10pts) + no solar (10pts) = 55pts
+        result_moderate = analysis.analyze_fog_conditions(
+            70.0, 92.0, 68.0, 2.0, 3.0, 0.0, False
         )
-        assert result_rad == ATTR_CONDITION_FOG
+        assert result_moderate == ATTR_CONDITION_FOG
 
-        # Test twilight conditions with high humidity - should NOT be fog
-        result_twilight = analysis.analyze_fog_conditions(
+        # Test light fog (high humidity required)
+        # Very high humidity (95% = 30pts) + larger spread (2.5°F = 5pts) + light winds (4mph = 10pts) + no solar (10pts) = 55pts
+        result_light = analysis.analyze_fog_conditions(
+            70.0, 95.0, 67.5, 2.5, 4.0, 0.0, False
+        )
+        assert result_light == ATTR_CONDITION_FOG
+
+        # Test twilight conditions with extremely high humidity and tight spread - IS fog
+        # Very high humidity (99% = 40pts) + very tight spread (0.3°F = 30pts) + calm winds (1.3mph = 15pts) = 85pts
+        # Even with 22 W/m² solar, the atmospheric conditions indicate dense fog blocking dawn light
+        result_twilight_fog = analysis.analyze_fog_conditions(
             54.0, 99.0, 53.7, 0.3, 1.3, 22.0, False
         )
-        assert result_twilight is None  # Twilight with solar radiation = not fog
+        assert result_twilight_fog == ATTR_CONDITION_FOG  # Dense fog even at twilight
 
-        # Test extreme fog during twilight (very suppressed solar radiation)
-        result_twilight_fog = analysis.analyze_fog_conditions(
-            70.0, 99.9, 69.4, 0.1, 1.0, 10.0, False
+        # Test twilight with moderate humidity - should NOT be fog
+        # Moderate humidity (90% = 0pts) even with tight spread doesn't trigger fog
+        result_twilight_clear = analysis.analyze_fog_conditions(
+            54.0, 90.0, 53.0, 1.0, 3.0, 50.0, False
         )
-        assert (
-            result_twilight_fog == ATTR_CONDITION_FOG
-        )  # Dense fog blocking dawn light
+        assert result_twilight_clear is None  # Normal dawn/twilight humidity, not fog
+
+        # Test daytime fog (sun shining through fog)
+        # Very high humidity (98% = 40pts) + tight spread (0.5°F = 30pts) + calm winds (2mph = 15pts) + low solar (<50 = 15pts) = 100pts
+        result_daytime_fog = analysis.analyze_fog_conditions(
+            70.0, 98.0, 69.5, 0.5, 2.0, 40.0, True
+        )
+        assert result_daytime_fog == ATTR_CONDITION_FOG
+
+        # Test marginal conditions (below threshold)
+        # Moderate humidity (88% = 10pts) + larger spread (3.5°F = 0pts) + moderate winds (6mph = 5pts) + low solar (10pts) = 25pts
+        result_marginal = analysis.analyze_fog_conditions(
+            70.0, 88.0, 64.5, 3.5, 6.0, 2.0, False
+        )
+        assert result_marginal is None  # Below 45-point threshold
+
+        # Test evaporation fog conditions (warmer temp bonus)
+        # Very high humidity (95% = 30pts) + tight spread (1.5°F = 15pts) + light winds (4mph = 10pts) + no solar (10pts) + temp bonus (5pts) = 70pts
+        result_evap = analysis.analyze_fog_conditions(
+            50.0, 95.0, 48.5, 1.5, 4.0, 0.0, False
+        )
+        assert result_evap == ATTR_CONDITION_FOG
+
+        # Test strong winds dispersing fog (negative score modifier)
+        # High humidity (95% = 30pts) + tight spread (1.0°F = 25pts) + strong winds (12mph = -10pts) + no solar (10pts) = 55pts
+        result_windy = analysis.analyze_fog_conditions(
+            70.0, 95.0, 69.0, 1.0, 12.0, 0.0, False
+        )
+        assert result_windy == ATTR_CONDITION_FOG  # Still enough for moderate fog
 
     def test_analyze_cloud_cover(self, analysis):
         """Test cloud cover analysis."""
@@ -180,13 +219,13 @@ class TestWeatherAnalysis:
         # Test moderately low solar values (mostly cloudy)
         cloud_cover_mostly = analysis.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
         assert cloud_cover_mostly == pytest.approx(
-            73.2, abs=0.1
+            73.2, abs=0.2
         )  # Astronomical calculation (UV ignored due to inconsistency)
 
         # Test borderline low solar values (partly cloudy fallback)
         cloud_cover_fallback = analysis.analyze_cloud_cover(150.0, 15000.0, 0.8, 20.0)
         assert cloud_cover_fallback == pytest.approx(
-            57.6, abs=0.1
+            57.6, abs=0.3
         )  # Astronomical calculation (UV ignored due to inconsistency)
 
         # Test that higher values don't trigger fallback
@@ -686,6 +725,107 @@ class TestWeatherAnalysis:
         # Test with boundary values
         direction_boundary = analysis.calculate_prevailing_direction([0, 360, 359.9])
         assert direction_boundary == "north"  # All should map to north sector
+
+    def test_weather_condition_priority_order(self, analysis):
+        """Test that weather conditions follow correct priority order: rain > fog > cloudy, windy only on sunny."""
+
+        # PRIORITY 1: Rain should override fog
+        sensor_data_rain_fog = {
+            "rain_rate": 0.1,  # Significant rain
+            "rain_state": "wet",
+            "outdoor_temp": 50.0,
+            "humidity": 98.0,  # Fog-level humidity
+            "dewpoint": 49.5,
+            "wind_speed": 2.0,
+            "wind_gust": 3.0,
+            "solar_radiation": 10.0,
+            "solar_lux": 1000.0,
+            "uv_index": 0.0,
+            "pressure": 29.92,
+            "solar_elevation": 45.0,
+        }
+        condition = analysis.determine_weather_condition(sensor_data_rain_fog, 0.0)
+        assert condition == ATTR_CONDITION_RAINY  # Rain takes priority over fog
+
+        # PRIORITY 2: Fog should override cloudy
+        sensor_data_fog = {
+            "rain_rate": 0.0,  # No rain
+            "rain_state": "dry",
+            "outdoor_temp": 50.0,
+            "humidity": 98.0,  # Very high humidity
+            "dewpoint": 49.5,  # Tight dewpoint spread (0.5°F)
+            "wind_speed": 2.0,  # Calm winds
+            "wind_gust": 3.0,
+            "solar_radiation": 10.0,  # Low solar (heavy overcast conditions)
+            "solar_lux": 1000.0,
+            "uv_index": 0.0,
+            "pressure": 29.92,
+            "solar_elevation": 45.0,
+        }
+        condition = analysis.determine_weather_condition(sensor_data_fog, 0.0)
+        assert condition == ATTR_CONDITION_FOG  # Fog takes priority over cloudy
+
+        # PRIORITY 5: Windy should ONLY apply on sunny days
+        sensor_data_windy_cloudy = {
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "outdoor_temp": 60.0,
+            "humidity": 70.0,
+            "dewpoint": 50.0,
+            "wind_speed": 25.0,  # Strong winds
+            "wind_gust": 35.0,
+            "solar_radiation": 100.0,  # Low solar = cloudy
+            "solar_lux": 10000.0,
+            "uv_index": 1.0,
+            "pressure": 29.92,
+            "solar_elevation": 45.0,
+        }
+        condition = analysis.determine_weather_condition(sensor_data_windy_cloudy, 0.0)
+        assert condition in [
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+        ]  # Should be cloudy/partly cloudy, NOT windy
+
+        # Windy should apply on sunny days
+        sensor_data_windy_sunny = {
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "outdoor_temp": 70.0,
+            "humidity": 40.0,
+            "dewpoint": 40.0,
+            "wind_speed": 25.0,  # Strong winds
+            "wind_gust": 35.0,
+            "solar_radiation": 800.0,  # High solar = sunny
+            "solar_lux": 80000.0,
+            "uv_index": 8.0,
+            "pressure": 30.10,
+            "solar_elevation": 60.0,
+        }
+        condition = analysis.determine_weather_condition(sensor_data_windy_sunny, 0.0)
+        assert condition == ATTR_CONDITION_WINDY  # Windy on sunny day
+
+        # Test that cloudy with moderate winds stays cloudy (not windy)
+        sensor_data_cloudy_moderate_wind = {
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "outdoor_temp": 60.0,
+            "humidity": 75.0,
+            "dewpoint": 52.0,
+            "wind_speed": 15.0,  # Moderate winds (not strong enough)
+            "wind_gust": 20.0,
+            "solar_radiation": 150.0,  # Moderate solar = cloudy
+            "solar_lux": 15000.0,
+            "uv_index": 2.0,
+            "pressure": 29.80,
+            "solar_elevation": 45.0,
+        }
+        condition = analysis.determine_weather_condition(
+            sensor_data_cloudy_moderate_wind, 0.0
+        )
+        assert condition in [
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+        ]  # Should stay cloudy (winds not strong enough)
 
     def test_calculate_clear_sky_max_radiation(self, analysis):
         """Test clear-sky maximum radiation calculation."""

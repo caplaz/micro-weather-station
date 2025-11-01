@@ -14,6 +14,18 @@ _For version-specific improvements and changes, see the [CHANGELOG](CHANGELOG.md
 
 The algorithm uses a comprehensive 7-priority system with meteorological principles to analyze sensor data and determine accurate weather conditions. Each priority level has specific scientific criteria and thresholds to ensure accurate weather detection.
 
+**Priority Order (Highest to Lowest):**
+
+1. **Active Precipitation** - Rain/snow takes precedence over all conditions
+2. **Fog Conditions** - Critical for safety, uses unified scoring system (0-100 points)
+3. **Severe Weather** - Thunderstorms, lightning, gale-force winds without precipitation
+4. **Daytime Cloud Cover** - Sunny, partly cloudy, or cloudy based on solar radiation analysis
+5. **Windy Conditions** - **Only applies on sunny days** (cloudy + wind = cloudy, not windy)
+6. **Twilight Conditions** - Dawn/dusk transitional periods
+7. **Nighttime Conditions** - Clear night, partly cloudy night, or cloudy night based on atmospheric analysis
+
+**Key Principle:** Higher priority conditions override lower priority conditions. For example, rain overrides fog, fog overrides cloudy, and windy only applies when skies are clear (not when cloudy).
+
 #### Priority 1: Active Precipitation (Highest Priority)
 
 **Smart Moisture Analysis:**
@@ -55,67 +67,101 @@ ELSE:
     → "rainy" (light rain/drizzle)
 ```
 
-#### Priority 2: Severe Weather Conditions (No Precipitation)
+#### Priority 3: Severe Weather Conditions (No Precipitation)
 
 ```
 IF pressure < 29.50 inHg AND wind_speed ≥19mph AND gust_factor >2.0 AND wind_gust >15mph:
     → "lightning" (severe weather system approaching)
 ELIF gust_factor >3.0 AND wind_gust >20mph OR wind_gust >40mph:
     → "lightning" (severe turbulence indicating thunderstorm activity)
-IF wind_speed ≥ 32mph:
+ELIF wind_speed ≥ 32mph:
     → "windy" (gale force winds)
 ```
 
-#### Priority 2.5: Windy Conditions (Gusty/Strong Winds Without Precipitation)
+#### Priority 2: Fog Conditions (Critical for Safety)
+
+**Unified Fog Scoring System (0-100 Points):**
+
+The system uses a sophisticated scoring algorithm to detect fog conditions, replacing the previous overlapping detection methods with a unified approach that considers multiple meteorological factors:
+
+**Scoring Breakdown:**
+
+1. **Humidity Factor (0-40 points)** - Most important for fog formation
+
+   - ≥98%: 40 points (extremely high - dense fog likely)
+   - ≥95%: 30 points (very high - fog probable)
+   - ≥92%: 20 points (high - fog possible)
+   - ≥88%: 10 points (moderately high - marginal fog conditions)
+   - <88%: 0 points (too low for fog)
+
+2. **Temperature-Dewpoint Spread Factor (0-30 points)** - Saturation indicator
+
+   - ≤0.5°F: 30 points (nearly saturated - fog very likely)
+   - ≤1.0°F: 25 points (very close - fog likely)
+   - ≤2.0°F: 15 points (close - fog possible)
+   - ≤3.0°F: 5 points (marginal - light fog/mist possible)
+   - > 3.0°F: 0 points (too large for fog)
+
+3. **Wind Factor (0-15 points)** - Formation vs. dispersal
+
+   - ≤2 mph: 15 points (calm - ideal for dense fog)
+   - ≤5 mph: 10 points (light - fog can persist)
+   - ≤8 mph: 5 points (moderate - fog may form but lighter)
+   - > 8 mph: -10 points (strong winds disperse fog)
+
+4. **Solar Radiation Factor (0-15 points)** - Time of day and fog density
+
+   - **Daytime (is_daytime=True):**
+     - <50 W/m²: 15 points (very low - dense fog blocking sun)
+     - <150 W/m²: 10 points (low - moderate fog or heavy overcast)
+     - <300 W/m²: 5 points (reduced - light fog or overcast)
+     - ≥300 W/m²: 0 points (normal radiation - no fog indicated)
+   - **Nighttime (is_daytime=False):**
+     - ≤2 W/m²: 10 points (no radiation - consistent with night fog)
+     - ≤10 W/m²: 5 points (minimal - twilight or light pollution)
+     - > 10 W/m²: -5 points (unexpected daytime radiation at night)
+
+5. **Temperature Bonus (0-5 points)** - Evaporation fog indicator
+   - Temp >40°F AND humidity ≥95% AND spread ≤2°F: +5 points
+
+**Fog Detection Thresholds:**
 
 ```
-IF wind_gust ≥ 30 AND gust_factor > 2.0 AND rain_rate ≤ 0.02:
-    → "windy" (very gusty winds with minimal precipitation)
-ELIF wind_speed ≥ 19mph AND wind_speed < 32mph:
-    → "windy" (strong winds without precipitation)
+IF fog_score ≥70:
+    → Dense fog (very high confidence)
+ELIF fog_score ≥55:
+    → Moderate fog (high confidence)
+ELIF fog_score ≥45 AND humidity ≥95%:
+    → Light fog/mist (marginal conditions with very high humidity required)
+ELSE:
+    → No fog
 ```
 
-#### Priority 3: Fog Conditions (Critical for Safety)
+**Fog Types Detected:**
 
-**Advanced Fog Analysis (when rain_state ≠ "wet"):**
+This unified scoring system naturally handles all fog types without separate overlapping conditions:
 
-The system uses sophisticated meteorological principles to detect different types of fog based on atmospheric conditions, with special handling for dawn/twilight periods to prevent false detections.
+- **Dense/Radiation Fog**: Very high humidity + minimal spread + calm winds + low/no solar radiation (score: 70-100)
+- **Advection Fog**: High humidity + moderate spread + light-to-moderate winds (score: 55-70)
+- **Evaporation Fog**: High humidity + temperature bonus after rain (score: 55-75)
+- **Daytime Fog**: Sun shining through fog layer - high humidity + tight spread + suppressed solar radiation (score: 60-90)
 
-**Twilight Detection (prevents false fog detection during dawn/dusk):**
+**Benefits of Unified Scoring:**
 
-```
-IF 5 W/m² < solar_radiation < 100 W/m²:  # Dawn/twilight conditions
-    IF humidity ≥99.8% AND dewpoint_spread ≤0.5°F AND solar_radiation <15 W/m²:
-        → "fog" (extreme fog blocking twilight sun)
-    ELSE:
-        → NOT fog (high humidity during dawn/dusk is normal)
-```
+- **Eliminates Overlapping Conditions**: No conflicts between fog types
+- **Smoother Transitions**: Gradual fog detection as conditions evolve
+- **Better Edge Case Handling**: Properly weights all factors simultaneously
+- **Enhanced Accuracy**: More nuanced fog detection across varying conditions
+- **Consistent Thresholds**: Single scoring system for all fog scenarios
 
-**Nighttime Fog Detection (solar_radiation ≤2 W/m²):**
-
-```
-Dense Fog: humidity ≥99.5% AND dewpoint_spread ≤0.5°F AND wind ≤2mph
-Radiation Fog: humidity ≥99.5% AND dewpoint_spread ≤0.5°F AND wind ≤3mph
-Advection Fog: humidity ≥98% AND dewpoint_spread ≤3°F AND 3mph ≤ wind ≤12mph AND solar <10 W/m²
-Evaporation Fog: humidity ≥98% AND dewpoint_spread ≤3°F AND wind ≤6mph AND temp >40°F AND solar <10 W/m²
-```
-
-**Daytime Fog Detection:**
-
-```
-Dense Fog: humidity ≥99% AND dewpoint_spread ≤0.5°F AND wind ≤2mph AND solar ≤2 W/m²
-Radiation Fog: humidity ≥98% AND dewpoint_spread ≤2°F AND wind ≤3mph AND solar ≤2 W/m²
-Advection Fog: humidity ≥95% AND dewpoint_spread ≤3°F AND 3mph ≤ wind ≤12mph AND solar <10 W/m²
-```
-
-#### Priority 4: Daytime Conditions
+#### Priority 4: Daytime Conditions (Cloud Cover Analysis)
 
 **Daytime Detection:** `solar_radiation > 5 W/m² OR solar_lux > 50 lx OR uv_index > 0.1`
 
 **Cloud Cover Analysis:**
 
 ```
-IF cloud_cover ≤40%:
+IF cloud_cover ≤20%:
     → "sunny"
 ELIF cloud_cover ≤60%:
     → "partly_cloudy"
@@ -124,6 +170,25 @@ ELIF cloud_cover ≤85%:
 ELSE:
     → "cloudy" (overcast)
 ```
+
+**Important Note:** Cloud cover thresholds were adjusted from 25% to 20% for sunny conditions to better reflect actual weather conditions (version 3.0.0 improvement).
+
+#### Priority 5: Windy Conditions (Only on Sunny Days)
+
+**Critical Behavior:** Windy condition **only applies when skies are clear/sunny** with strong winds. If it's cloudy or partly cloudy, the system reports the cloud condition (not windy), even with strong winds. This ensures accurate weather representation - cloudy with wind is still "cloudy", not "windy".
+
+```
+IF final_daytime_condition == "sunny" AND (wind_speed ≥19mph OR (very_gusty AND wind_speed ≥8mph)):
+    → "windy" (override sunny with windy only when clear skies + strong winds)
+ELSE:
+    → Return cloud condition (cloudy/partly_cloudy) - DO NOT override with windy
+```
+
+**Why This Matters:**
+
+- **Cloudy + Wind = Cloudy** (not windy) - Users need to know about cloud cover
+- **Sunny + Wind = Windy** - Clear skies make wind the dominant weather feature
+- **Prevents Confusion**: Avoids scenarios like "windy" when it's actually overcast and stormy
 
 **Solar Elevation Enhancement:** When sun sensor is configured, cloud cover calculations are adjusted based on solar elevation angle, providing more accurate daytime weather detection throughout the day.
 
@@ -142,7 +207,7 @@ IF zenith_max_radiation < 800 OR zenith_max_radiation > 2000:
 
 This prevents false weather readings from miscalibrated solar sensors while maintaining system functionality.
 
-#### Priority 5: Twilight Conditions
+#### Priority 6: Twilight Conditions
 
 **Twilight Detection:** `(10 lx < solar_lux < 100 lx) OR (1 W/m² < solar_radiation < 50 W/m²)`
 
@@ -153,7 +218,7 @@ ELSE:
     → "cloudy"
 ```
 
-#### Priority 6: Nighttime Conditions
+#### Priority 7: Nighttime Conditions
 
 **Nighttime Detection:** All solar sensors ≤ threshold values
 
