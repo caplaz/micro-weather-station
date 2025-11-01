@@ -969,6 +969,13 @@ class WeatherAnalysis:
             pressure_adjustment,
         )
 
+        # Store cloud cover for hysteresis and trend analysis
+        if "cloud_cover" not in self._sensor_history:
+            self._sensor_history["cloud_cover"] = deque(maxlen=50)
+        self._sensor_history["cloud_cover"].append(
+            {"timestamp": datetime.now(), "value": cloud_cover}
+        )
+
         return cloud_cover
 
     def _map_cloud_cover_to_condition(self, cloud_cover: float) -> str:
