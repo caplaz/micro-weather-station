@@ -309,7 +309,9 @@ class AdvancedWeatherForecast:
                     if forecast_condition == ATTR_CONDITION_SUNNY:
                         forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
                     elif forecast_condition == ATTR_CONDITION_PARTLYCLOUDY:
-                        forecast_condition = ATTR_CONDITION_CLOUDY
+                        # CRITICAL FIX: Preserve clear-night for partly cloudy conditions at night
+                        # (matching main forecast logic fix)
+                        forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
                 else:
                     if forecast_condition == ATTR_CONDITION_CLEAR_NIGHT:
                         forecast_condition = ATTR_CONDITION_SUNNY
@@ -681,8 +683,8 @@ class AdvancedWeatherForecast:
             cloud_cover = min(95.0, cloud_cover + 60.0)  # Stronger influence
         elif pressure_trend < 0:  # Slightly falling pressure
             cloud_cover = min(95.0, cloud_cover + 40.0)  # Stronger influence
-        elif pressure_trend > 0.5:  # Rising pressure = decreasing clouds
-            cloud_cover = max(5.0, cloud_cover - 20.0)
+        elif pressure_trend > 0.2:  # Rising pressure = decreasing clouds
+            cloud_cover = max(5.0, cloud_cover - 40.0)  # Stronger influence
 
         # Add cloud type classification
         if cloud_cover < 25:
@@ -1135,38 +1137,35 @@ class AdvancedWeatherForecast:
         system_evolution: Dict[str, Any],
     ) -> str:
         """Comprehensive condition forecasting using all meteorological factors."""
-        # For day 0, preserve the current condition - don't apply evolution changes
-        if day_idx == 0:
-            return current_condition
-
         # Start with current condition as base
         forecast_condition = current_condition
 
-        # Get evolution stage for this day
-        evolution_path = system_evolution.get("evolution_path", [])
-        if day_idx < len(evolution_path):
-            evolution_stage = evolution_path[day_idx]
+        # Get evolution stage for this day (skip for day 0)
+        if day_idx > 0:
+            evolution_path = system_evolution.get("evolution_path", [])
+            if day_idx < len(evolution_path):
+                evolution_stage = evolution_path[day_idx]
 
-            # Map evolution stages to conditions
-            evolution_condition_map = {
-                "stable_high": ATTR_CONDITION_SUNNY,
-                "weakening_high": ATTR_CONDITION_PARTLYCLOUDY,
-                "active_low": ATTR_CONDITION_CLOUDY,
-                "frontal_passage": ATTR_CONDITION_RAINY,
-                "frontal_approach": ATTR_CONDITION_CLOUDY,
-                "post_frontal": ATTR_CONDITION_PARTLYCLOUDY,
-                "clearing": ATTR_CONDITION_SUNNY,
-                "transitional": ATTR_CONDITION_PARTLYCLOUDY,
-                "new_system": ATTR_CONDITION_CLOUDY,
-                "current": current_condition,
-                "transitioning": ATTR_CONDITION_PARTLYCLOUDY,
-                "new_pattern": ATTR_CONDITION_CLOUDY,
-                "stabilizing": ATTR_CONDITION_SUNNY,
-            }
+                # Map evolution stages to conditions
+                evolution_condition_map = {
+                    "stable_high": ATTR_CONDITION_SUNNY,
+                    "weakening_high": ATTR_CONDITION_PARTLYCLOUDY,
+                    "active_low": ATTR_CONDITION_CLOUDY,
+                    "frontal_passage": ATTR_CONDITION_RAINY,
+                    "frontal_approach": ATTR_CONDITION_CLOUDY,
+                    "post_frontal": ATTR_CONDITION_PARTLYCLOUDY,
+                    "clearing": ATTR_CONDITION_SUNNY,
+                    "transitional": ATTR_CONDITION_PARTLYCLOUDY,
+                    "new_system": ATTR_CONDITION_CLOUDY,
+                    "current": current_condition,
+                    "transitioning": ATTR_CONDITION_PARTLYCLOUDY,
+                    "new_pattern": ATTR_CONDITION_CLOUDY,
+                    "stabilizing": ATTR_CONDITION_SUNNY,
+                }
 
-            forecast_condition = evolution_condition_map.get(
-                evolution_stage, current_condition
-            )
+                forecast_condition = evolution_condition_map.get(
+                    evolution_stage, current_condition
+                )
 
         # Apply pressure system influence
         pressure_system = meteorological_state["pressure_analysis"].get(
@@ -1897,11 +1896,26 @@ class AdvancedWeatherForecast:
             if forecast_condition == ATTR_CONDITION_SUNNY:
                 forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
             elif forecast_condition == ATTR_CONDITION_PARTLYCLOUDY:
-                # Convert to clear_night or cloudy based on cloud cover
-                if cloud_cover < 50:
-                    forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
-                else:
+                # CRITICAL FIX: Don't use cloud_cover at night since solar radiation is 0 and cloud_cover defaults to ~50%
+                # Instead, preserve clear-night conditions unless there's strong meteorological evidence for clouds
+                pressure_analysis = meteorological_state.get("pressure_analysis", {})
+                pressure_trend = pressure_analysis.get("current_trend", 0)
+                storm_prob = pressure_analysis.get("storm_probability", 0)
+
+                if not isinstance(pressure_trend, (int, float)):
+                    pressure_trend = 0.0
+                if not isinstance(storm_prob, (int, float)):
+                    storm_prob = 0.0
+
+                # Only convert to cloudy if there's strong evidence:
+                # - Falling pressure (weather deteriorating) OR
+                # - High storm probability OR
+                # - Very high cloud cover from last daytime reading (>70%)
+                if pressure_trend < -0.5 or storm_prob > 40 or cloud_cover > 70:
                     forecast_condition = ATTR_CONDITION_CLOUDY
+                else:
+                    # Default to clear-night for partly cloudy at night (preserves clear conditions)
+                    forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
             # Preserve other conditions as-is (rain, snow, storms, fog)
 
         # Simulate realistic diurnal condition variations

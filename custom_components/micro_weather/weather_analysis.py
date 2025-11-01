@@ -586,8 +586,14 @@ class WeatherAnalysis:
                 fog_score += 10  # No radiation - consistent with night fog
             elif solar_rad <= 10:
                 fog_score += 5  # Minimal - twilight or light pollution
+            elif solar_rad <= 50:
+                fog_score += (
+                    0  # Moderate twilight radiation - fog possible but less likely
+                )
             else:
-                fog_score -= 5  # Unexpected daytime radiation at night
+                fog_score -= (
+                    15  # Significant radiation during night - fog very unlikely
+                )
 
         # 5. TEMPERATURE FACTOR (bonus points for evaporation fog)
         # Warmer temperatures after cooling can indicate evaporation fog
@@ -656,39 +662,51 @@ class WeatherAnalysis:
         # Base adjustment from short-term trend (3-hour change)
         # Falling pressure = more clouds, rising pressure = fewer clouds
         short_term_adjustment = 0.0
-        if current_trend < -1.0:  # Falling >1 hPa in 3 hours
+        if current_trend < -0.5:  # Falling >0.5 hPa in 3 hours (more sensitive)
             # Scale adjustment based on magnitude (capped at -20% for very rapid drops)
-            short_term_adjustment = max(-20.0, current_trend * 5.0)
-        elif current_trend > 1.0:  # Rising >1 hPa in 3 hours
-            # Scale adjustment based on magnitude (capped at +15% for rapid rises)
-            short_term_adjustment = min(15.0, current_trend * 3.0)
+            short_term_adjustment = max(
+                -20.0, current_trend * 8.0
+            )  # Increased sensitivity
+        elif current_trend > 0.2:  # Rising >0.2 hPa in 3 hours (more sensitive)
+            # Scale adjustment based on magnitude (capped at +20% for rapid rises)
+            short_term_adjustment = min(
+                20.0, current_trend * 15.0
+            )  # Increased sensitivity
 
         # Long-term trend adjustment (24-hour change)
         long_term_adjustment = 0.0
-        if long_term_trend < -3.0:  # Falling >3 hPa in 24 hours
+        if long_term_trend < -1.0:  # Falling >1 hPa in 24 hours (more sensitive)
             # Sustained pressure drop indicates approaching weather system
-            long_term_adjustment = max(-25.0, long_term_trend * 4.0)
-        elif long_term_trend > 3.0:  # Rising >3 hPa in 24 hours
+            long_term_adjustment = max(
+                -25.0, long_term_trend * 6.0
+            )  # Increased sensitivity
+        elif long_term_trend > 0.1:  # Rising >0.1 hPa in 24 hours (more sensitive)
             # Sustained pressure rise indicates clearing
-            long_term_adjustment = min(20.0, long_term_trend * 3.0)
+            long_term_adjustment = min(
+                25.0, long_term_trend * 12.0
+            )  # Increased sensitivity
 
         # Pressure system adjustment
         system_adjustment = 0.0
         if pressure_system == "low_pressure":
-            system_adjustment = 10.0  # Low pressure systems tend to be cloudier
+            system_adjustment = (
+                15.0  # Low pressure systems tend to be cloudier (stronger)
+            )
         elif pressure_system == "high_pressure":
-            system_adjustment = -5.0  # High pressure systems tend to be clearer
+            system_adjustment = (
+                -50.0
+            )  # High pressure systems tend to be clearer (stronger)
 
         # Combine adjustments with weighting
         # Short-term trends are more immediate but long-term trends are more reliable
         total_adjustment = (
-            short_term_adjustment * 0.4  # 40% weight to recent changes
-            + long_term_adjustment * 0.5  # 50% weight to sustained trends
-            + system_adjustment * 0.1  # 10% weight to pressure system
+            short_term_adjustment * 0.3  # 30% weight to recent changes
+            + long_term_adjustment * 0.4  # 40% weight to sustained trends
+            + system_adjustment * 0.3  # 30% weight to pressure system
         )
 
         # Ensure reasonable bounds
-        total_adjustment = max(-40.0, min(30.0, total_adjustment))
+        total_adjustment = max(-40.0, min(35.0, total_adjustment))
 
         _LOGGER.debug(
             "Pressure trend cloud adjustment: %.1f%% "

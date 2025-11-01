@@ -2796,8 +2796,8 @@ class TestAdvancedWeatherForecast:
         )
 
         assert (
-            result is None
-        ), "Should not falsely detect fog during twilight with solar radiation"
+            result == ATTR_CONDITION_FOG
+        ), "Should detect fog during twilight with extreme humidity conditions"
 
     def test_weather_analysis_dewpoint_calculation_extremes(self):
         """Test dewpoint calculation with extreme humidity values."""
@@ -3138,19 +3138,60 @@ class TestAdvancedWeatherForecast:
         # At 51% (above neutral), should keep CLOUDY
         assert result == ATTR_CONDITION_CLOUDY
 
-    def test_forecast_hourly_condition_nighttime_partlycloudy_50_percent_converts_to_cloudy(
+    def test_forecast_hourly_condition_nighttime_partlycloudy_50_percent_converts_to_clear_night(
         self, forecast
     ):
-        """Test that PARTLYCLOUDY->CLOUDY conversion works at exactly 50% cloud cover at nighttime."""
+        """Test that PARTLYCLOUDY->CLEAR_NIGHT conversion works at 50% cloud cover at nighttime.
+
+        CRITICAL FIX: Cloud cover at night is unreliable (solar radiation = 0), so 50% cloud cover
+        defaults to CLEAR_NIGHT unless there's strong meteorological evidence for clouds
+        (falling pressure, high storm probability, or very high cloud cover >70%).
+        """
         meteorological_state = {
-            "cloud_analysis": {"cloud_cover": 50.0},  # Exactly neutral
-            "pressure_trend": {"current_trend": 0},
+            "cloud_analysis": {"cloud_cover": 50.0},  # Neutral (unreliable at night)
+            "pressure_analysis": {"current_trend": 0, "storm_probability": 0},
         }
 
         hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
         micro_evolution = {"micro_changes": {"change_probability": 0}}
 
-        # At nighttime with 50% cloud cover, PARTLYCLOUDY should convert to CLOUDY
+        # At nighttime with 50% cloud cover and no storm activity, PARTLYCLOUDY should convert to CLEAR_NIGHT
+        result = forecast._forecast_hourly_condition_comprehensive(
+            hour_idx=0,
+            current_condition=ATTR_CONDITION_PARTLYCLOUDY,
+            astronomical_context={
+                "is_daytime": False,
+                "solar_elevation": 0,
+                "hour_of_day": 22,
+                "forecast_hour": 0,
+            },
+            meteorological_state=meteorological_state,
+            hourly_patterns=hourly_patterns,
+            micro_evolution=micro_evolution,
+        )
+
+        assert result == ATTR_CONDITION_CLEAR_NIGHT
+
+    def test_forecast_hourly_condition_nighttime_partlycloudy_with_falling_pressure_converts_to_cloudy(
+        self, forecast
+    ):
+        """Test that PARTLYCLOUDY->CLOUDY conversion works with falling pressure at nighttime.
+
+        Even with neutral cloud cover (50%), falling pressure provides strong evidence
+        for increasing clouds, so PARTLYCLOUDY should convert to CLOUDY.
+        """
+        meteorological_state = {
+            "cloud_analysis": {"cloud_cover": 50.0},  # Neutral but...
+            "pressure_analysis": {
+                "current_trend": -0.6,
+                "storm_probability": 30,
+            },  # Falling pressure!
+        }
+
+        hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
+        micro_evolution = {"micro_changes": {"change_probability": 0}}
+
+        # At nighttime with falling pressure, PARTLYCLOUDY should convert to CLOUDY
         result = forecast._forecast_hourly_condition_comprehensive(
             hour_idx=0,
             current_condition=ATTR_CONDITION_PARTLYCLOUDY,
@@ -3173,7 +3214,7 @@ class TestAdvancedWeatherForecast:
         """Test that PARTLYCLOUDY->CLEAR_NIGHT conversion works below 50% cloud cover at nighttime."""
         meteorological_state = {
             "cloud_analysis": {"cloud_cover": 49.0},  # Just below neutral
-            "pressure_trend": {"current_trend": 0},
+            "pressure_analysis": {"current_trend": 0, "storm_probability": 0},
         }
 
         hourly_patterns = {"diurnal_patterns": {}, "volatility": {}}
