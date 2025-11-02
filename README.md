@@ -106,6 +106,21 @@ For advanced users or custom setups.
    ├── weather_detector.py
    ├── weather_forecast.py
    ├── weather_utils.py
+   ├── meteorological_constants.py
+   ├── analysis/
+   │   ├── __init__.py
+   │   ├── core.py
+   │   ├── atmospheric.py
+   │   ├── solar.py
+   │   └── trends.py
+   ├── forecast/
+   │   ├── __init__.py
+   │   ├── meteorological.py
+   │   ├── patterns.py
+   │   ├── evolution.py
+   │   ├── astronomical.py
+   │   ├── daily.py
+   │   └── hourly.py
    └── translations/
        ├── de.json
        ├── en.json
@@ -360,22 +375,37 @@ The integration now supports direct dewpoint sensors for improved accuracy:
 
 ## Weather Detection Logic
 
+The integration uses a modular architecture with specialized analyzers to process your sensor data:
+
+- **Core Analyzer**: Priority-based weather condition determination with 7 detection levels
+- **Atmospheric Analyzer**: Pressure systems, fog detection scoring (0-100 points), and storm probability
+- **Solar Analyzer**: Cloud cover estimation using solar radiation and clear-sky models
+- **Trends Analyzer**: Historical data analysis and pattern recognition
+
 For detailed information about the sophisticated meteorological algorithms used for weather condition detection, see [WEATHER_DETECTION_ALGORITHM](WEATHER_DETECTION_ALGORITHM.md).
 
 ## Intelligent Forecasting
 
-The integration provides sophisticated 5-day daily and 24-hour hourly forecasts using meteorological principles and your actual sensor data.
+The integration provides sophisticated 5-day daily and 24-hour hourly forecasts using a modular forecasting system:
+
+- **Meteorological Analyzer**: Comprehensive atmospheric state analysis and stability assessment
+- **Pattern Recognizer**: Historical weather pattern analysis and seasonal factor calculation
+- **Evolution Modeler**: Weather system transition prediction with confidence levels
+- **Astronomical Calculator**: Solar position and diurnal temperature cycle modeling
+- **Daily Generator**: 5-day forecast with temperature, conditions, precipitation, wind, and humidity
+- **Hourly Generator**: 24-hour detailed predictions with micro-evolution modeling
 
 For comprehensive information about the advanced forecasting algorithms, meteorological principles, and technical implementation details, see [WEATHER_FORECAST_ALGORITHM](WEATHER_FORECAST_ALGORITHM.md).
 
-### Key Features
+### Key Forecasting Features
 
 - **Pressure-based Prediction**: Uses barometric pressure trends as primary forecast driver
-- **Temperature Forecasting**: Pressure patterns combined with seasonal variations
-- **Condition Prediction**: Sophisticated priority system analyzing multiple weather factors
-- **Precipitation Analysis**: Multi-factor probability calculation using humidity and pressure
-- **Wind Forecasting**: Considers current conditions and atmospheric pressure changes
-- **Local Calibration**: Adapts to your specific microclimate patterns over time
+- **Multi-factor Temperature Forecasting**: Combines pressure patterns, seasonal variations, and system evolution
+- **Sophisticated Condition Prediction**: Priority system analyzing clouds, pressure, humidity, and wind
+- **Precipitation Probability**: Multi-factor calculation using humidity, dewpoint spread, and pressure trends
+- **Wind Forecasting**: Pressure gradient analysis with atmospheric stability considerations
+- **Confidence Dampening**: Accuracy estimates that decrease with forecast distance
+- **Local Pattern Learning**: Adapts to your specific microclimate patterns over time
 
 ## Automation Examples
 

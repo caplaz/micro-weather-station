@@ -1,5 +1,52 @@
 # Changelog
 
+## 3.1.0 (2025-11-02)
+
+### Architecture Improvements
+
+- **Modular Architecture**: Reorganized codebase into specialized modules for improved maintainability and extensibility
+
+  - **Analysis Modules**: Split weather analysis into dedicated modules
+
+    - `analysis/core.py`: Priority-based weather condition determination
+    - `analysis/atmospheric.py`: Pressure systems, fog detection, and storm probability
+    - `analysis/solar.py`: Cloud cover analysis using solar radiation
+    - `analysis/trends.py`: Historical data analysis and pattern recognition
+
+  - **Forecast Modules**: Organized forecasting into specialized components
+    - `forecast/meteorological.py`: Meteorological state analysis and atmospheric stability
+    - `forecast/patterns.py`: Historical pattern recognition and seasonal factors
+    - `forecast/evolution.py`: Weather system transition prediction
+    - `forecast/astronomical.py`: Solar position and diurnal cycle calculations
+    - `forecast/daily.py`: 5-day forecast generation
+    - `forecast/hourly.py`: 24-hour detailed predictions
+
+- **Facade Pattern**: Implemented clean coordination layers
+
+  - `weather_analysis.py`: Coordinates analysis modules
+  - `weather_forecast.py`: Orchestrates forecast generators
+  - Maintains 100% backward compatibility with existing code
+
+- **Documentation Updates**: Comprehensive documentation describing the modular architecture
+  - Updated `DEVELOPMENT.md` with detailed module descriptions
+  - Enhanced `WEATHER_DETECTION_ALGORITHM.md` with module responsibilities
+  - Improved `WEATHER_FORECAST_ALGORITHM.md` with architectural overview
+  - Updated `README.md` with modular system description
+
+### Benefits
+
+- **Maintainability**: Each module has a single, well-defined responsibility
+- **Testability**: Individual modules can be tested in isolation
+- **Extensibility**: New features can be added to specific modules without affecting others
+- **Code Quality**: Improved organization and separation of concerns
+- **Developer Experience**: Easier to find and modify specific functionality
+
+### Testing
+
+- All 246 functional tests continue to pass
+- Zero breaking changes for end users
+- Full backward compatibility maintained
+
 ## 3.0.2 (2025-10-26)
 
 ### Bug Fixes

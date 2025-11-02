@@ -6,7 +6,20 @@ This document provides a comprehensive overview of the advanced intelligent fore
 
 The forecast system employs advanced meteorological modeling techniques, integrating multiple data sources and analytical methods to provide highly accurate weather predictions. The system uses a combination of traditional meteorological principles, atmospheric physics, and data-driven pattern recognition to forecast future weather states.
 
-### Core Components
+### Forecast System Architecture
+
+The forecasting subsystem is organized into specialized modules, each handling a specific aspect of weather prediction:
+
+1. **Meteorological Analysis** (`forecast/meteorological.py`): Comprehensive state analysis and atmospheric stability
+2. **Pattern Recognition** (`forecast/patterns.py`): Historical pattern analysis and seasonal factors
+3. **Evolution Modeling** (`forecast/evolution.py`): Weather system transition prediction
+4. **Astronomical Calculations** (`forecast/astronomical.py`): Solar position and diurnal cycles
+5. **Daily Forecast Generator** (`forecast/daily.py`): 5-day prediction generation
+6. **Hourly Forecast Generator** (`forecast/hourly.py`): 24-hour detailed predictions
+
+The main coordination is handled by `weather_forecast.py`, which integrates these specialized components to generate comprehensive forecasts.
+
+### Core Capabilities
 
 1. **Comprehensive Daily Forecast**: 5-day predictions using multi-factor meteorological analysis
 2. **Advanced Hourly Forecast**: 24-hour detailed predictions with astronomical and micro-evolution modeling
@@ -15,17 +28,15 @@ The forecast system employs advanced meteorological modeling techniques, integra
 5. **Historical Pattern Recognition**: Machine learning-like analysis of weather correlations and trends
 6. **Moisture Transport Modeling**: Advanced analysis of humidity dynamics and precipitation potential
 
-## Algorithm Architecture
+## Meteorological Analysis Module
 
-### 1. Comprehensive Daily Forecast Generation
+### Comprehensive Meteorological State Analysis
 
-The daily forecast system (`generate_comprehensive_forecast`) creates 5-day predictions using an integrated meteorological analysis framework:
+The `MeteorologicalAnalyzer` module performs comprehensive analysis of all available meteorological factors to establish the current atmospheric state. This forms the foundation for all forecast predictions.
 
-#### Multi-Factor Meteorological State Analysis
+#### State Analysis Process
 
-**Algorithm**: `_analyze_comprehensive_meteorological_state()`
-
-The system performs comprehensive analysis of all available meteorological factors:
+The analyzer integrates multiple data sources:
 
 ```python
 meteorological_state = {

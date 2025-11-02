@@ -4,15 +4,76 @@ This document explains how the Micro Weather Station determines weather conditio
 
 ## Algorithm Overview
 
-The weather detection system uses a sophisticated priority-based algorithm with meteorological principles to analyze sensor data and determine accurate weather conditions.
+The weather detection system uses a sophisticated modular architecture with specialized analyzers to process sensor data and determine accurate weather conditions. The system combines meteorological principles, atmospheric physics, and machine learning-like pattern recognition.
+
+### Detection System Architecture
+
+The detection subsystem is organized into specialized modules:
+
+1. **Core Condition Analyzer** (`analysis/core.py`): Priority-based weather condition determination
+2. **Atmospheric Analyzer** (`analysis/atmospheric.py`): Pressure systems, fog detection, and storm probability
+3. **Solar Analyzer** (`analysis/solar.py`): Cloud cover analysis using solar radiation
+4. **Trends Analyzer** (`analysis/trends.py`): Historical data analysis and pattern recognition
+
+The main coordination is handled by `weather_analysis.py`, which orchestrates these specialized analyzers, and `weather_detector.py`, which combines analysis with forecasting to provide complete weather information.
 
 _For version-specific improvements and changes, see the [CHANGELOG](CHANGELOG.md)._
+
+## Module Responsibilities
+
+### Core Condition Analyzer (`analysis/core.py`)
+
+The core analyzer implements the priority-based weather condition detection system. It processes inputs from other analyzers and determines the final weather condition using a sophisticated decision tree.
+
+**Key Functions:**
+
+- Determines weather condition priority order
+- Processes precipitation data (rain rate, moisture sensors)
+- Evaluates fog scores from atmospheric analyzer
+- Integrates cloud cover data from solar analyzer
+- Applies meteorological rules for condition classification
+
+### Atmospheric Analyzer (`analysis/atmospheric.py`)
+
+Handles all atmospheric pressure and fog-related analysis.
+
+**Key Functions:**
+
+- Calculates sea-level pressure with altitude corrections
+- Detects fog conditions using unified scoring system (0-100 points)
+- Analyzes pressure trends (3-hour and long-term)
+- Calculates storm probability based on pressure patterns
+- Processes wind data for direction trends and stability
+
+### Solar Analyzer (`analysis/solar.py`)
+
+Processes solar radiation data to determine cloud cover and sky conditions.
+
+**Key Functions:**
+
+- Estimates cloud cover percentage using solar radiation
+- Calculates clear-sky theoretical radiation models
+- Computes solar elevation and air mass
+- Applies historical weather bias for improved accuracy
+- Handles low-elevation edge cases (sunrise/sunset)
+
+### Trends Analyzer (`analysis/trends.py`)
+
+Manages historical weather data and identifies patterns.
+
+**Key Functions:**
+
+- Stores circular buffer of sensor readings
+- Calculates linear regression trends
+- Computes statistical volatility
+- Handles circular statistics for wind direction
+- Detects recurring patterns and anomalies
 
 ## Weather Condition Detection Logic
 
 ### Priority-Based Detection System
 
-The algorithm uses a comprehensive 7-priority system with meteorological principles to analyze sensor data and determine accurate weather conditions. Each priority level has specific scientific criteria and thresholds to ensure accurate weather detection.
+The core analyzer implements a comprehensive 7-priority system with meteorological principles to analyze sensor data and determine accurate weather conditions. Each priority level has specific scientific criteria and thresholds to ensure accurate weather detection.
 
 **Priority Order (Highest to Lowest):**
 

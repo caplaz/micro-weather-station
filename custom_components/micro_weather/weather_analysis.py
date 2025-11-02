@@ -1,53 +1,33 @@
-"""Weather analysis and trend calculation functions."""
+"""Weather analysis and trend calculation functions.
+
+BACKWARD COMPATIBILITY MODULE - This module now serves as a proxy to the refactored
+analysis modules. All functionality has been reorganized into specialized modules:
+- analysis.core: Core weather condition determination
+- analysis.atmospheric: Pressure and fog analysis
+- analysis.solar: Solar radiation and cloud cover
+- analysis.trends: Historical data trends
+
+This module maintains the original WeatherAnalysis class interface for
+backward compatibility with existing code.
+"""
 
 from collections import deque
-from datetime import datetime, timedelta
-import logging
-import math
-import statistics
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from homeassistant.components.weather import (
-    ATTR_CONDITION_CLEAR_NIGHT,
-    ATTR_CONDITION_CLOUDY,
-    ATTR_CONDITION_FOG,
-    ATTR_CONDITION_LIGHTNING,
-    ATTR_CONDITION_LIGHTNING_RAINY,
-    ATTR_CONDITION_PARTLYCLOUDY,
-    ATTR_CONDITION_POURING,
-    ATTR_CONDITION_RAINY,
-    ATTR_CONDITION_SNOWY,
-    ATTR_CONDITION_SUNNY,
-    ATTR_CONDITION_WINDY,
-)
-
-from .const import (
-    DEFAULT_ZENITH_MAX_RADIATION,
-    KEY_DEWPOINT,
-    KEY_HUMIDITY,
-    KEY_OUTDOOR_TEMP,
-    KEY_PRESSURE,
-    KEY_RAIN_RATE,
-    KEY_SOLAR_LUX_INTERNAL,
-    KEY_SOLAR_RADIATION,
-    KEY_UV_INDEX,
-    KEY_WIND_GUST,
-    KEY_WIND_SPEED,
-)
-from .meteorological_constants import (
-    CloudCoverThresholds,
-    FogThresholds,
-    PrecipitationThresholds,
-    PressureThresholds,
-    TemperatureThresholds,
-    WindThresholds,
-)
-
-_LOGGER = logging.getLogger(__name__)
+from .analysis.atmospheric import AtmosphericAnalyzer
+from .analysis.core import WeatherConditionAnalyzer
+from .analysis.solar import SolarAnalyzer
+from .analysis.trends import TrendsAnalyzer
+from .const import DEFAULT_ZENITH_MAX_RADIATION
 
 
 class WeatherAnalysis:
-    """Handles weather condition analysis and historical trend calculations."""
+    """Handles weather condition analysis and historical trend calculations.
+
+    This class now serves as a facade/proxy to the refactored analyzer modules,
+    maintaining the original API for backward compatibility while delegating
+    to specialized components.
+    """
 
     def __init__(
         self,
@@ -58,478 +38,97 @@ class WeatherAnalysis:
 
         Args:
             sensor_history: Dictionary of sensor historical data deques
-            zenith_max_radiation: Maximum solar radiation at zenith (W/m²) for calibration
+            zenith_max_radiation: Maximum solar radiation at zenith (W/m2) for calibration
         """
         self._sensor_history = sensor_history or {}
-        # Track recent weather conditions for hysteresis (time-based, not count-based)
-        self._condition_history: deque[Dict[str, Any]] = (
-            deque()
-        )  # No maxlen - we'll manage by time
         self.zenith_max_radiation = zenith_max_radiation
 
+        # Initialize specialized analyzers
+        self.atmospheric = AtmosphericAnalyzer(self._sensor_history)
+        self.solar = SolarAnalyzer(self._sensor_history, zenith_max_radiation)
+        self.trends = TrendsAnalyzer(self._sensor_history)
+        self.core = WeatherConditionAnalyzer(self.atmospheric, self.solar)
+
+    # Core weather condition methods - delegate to core analyzer
     def determine_weather_condition(
-        self, sensor_data: Dict[str, Any], altitude: float | None = 0.0
+        self, sensor_data: Dict[str, Any], altitude: Optional[float] = 0.0
     ) -> str:
+        """Determine weather condition from sensor data.
+
+        Args:
+            sensor_data: Dictionary of current sensor readings
+            altitude: Altitude in meters for pressure correction
+
+        Returns:
+            Weather condition string
         """
-        Advanced meteorological weather condition detection.
+        return self.core.determine_condition(sensor_data, altitude)
 
-        Uses scientific weather analysis principles:
-        - Precipitation analysis (intensity, type, persistence)
-        - Atmospheric pressure systems
-        - Solar radiation for cloud cover assessment
-        - Wind patterns for storm identification
-        - Temperature/humidity for fog and frost conditions
-        - Dewpoint analysis for precipitation potential
+    def calculate_dewpoint(self, temp_f: float, humidity: Optional[float]) -> float:
+        """Calculate dewpoint using Magnus formula.
+
+        Args:
+            temp_f: Temperature in Fahrenheit
+            humidity: Relative humidity as percentage
+
+        Returns:
+            Dewpoint temperature in Fahrenheit
         """
+        return self.core.calculate_dewpoint(temp_f, humidity)
 
-        # Extract sensor values with better defaults
-        rain_rate = sensor_data.get(KEY_RAIN_RATE, 0.0)
-        rain_state = sensor_data.get("rain_state", "dry").lower()
-        wind_speed = sensor_data.get(KEY_WIND_SPEED, 0.0)
-        wind_gust = sensor_data.get(KEY_WIND_GUST, 0.0)
-        solar_radiation = sensor_data.get(KEY_SOLAR_RADIATION, 0.0)
-        solar_lux = sensor_data.get(KEY_SOLAR_LUX_INTERNAL, 0.0)
-        uv_index = sensor_data.get(KEY_UV_INDEX, 0.0)
-        outdoor_temp = sensor_data.get(KEY_OUTDOOR_TEMP, 70.0)
-        humidity = sensor_data.get(KEY_HUMIDITY, 50.0)
-        pressure = sensor_data.get(KEY_PRESSURE, 29.92)
+    def classify_precipitation_intensity(self, rain_rate: float) -> str:
+        """Classify precipitation intensity.
 
-        # Default altitude to 0.0 if None
-        altitude = altitude or 0.0
+        Args:
+            rain_rate: Rain rate in inches/hour or mm/hour
 
-        # Calculate derived meteorological parameters
-        # Use dewpoint sensor if available, otherwise calculate from temp/humidity
-        dewpoint_raw = sensor_data.get(KEY_DEWPOINT)
-        if dewpoint_raw is not None:
-            dewpoint = float(dewpoint_raw)
-        else:
-            dewpoint = self.calculate_dewpoint(outdoor_temp, humidity)
-        temp_dewpoint_spread = outdoor_temp - dewpoint
-        is_freezing = outdoor_temp <= TemperatureThresholds.FREEZING
+        Returns:
+            Intensity classification
+        """
+        return self.core.classify_precipitation_intensity(rain_rate)
 
-        # Advanced daytime detection (solar elevation proxy)
-        is_daytime = solar_radiation > 5 or solar_lux > 50 or uv_index > 0.1
-        is_twilight = (solar_lux > 10 and solar_lux < 100) or (
-            solar_radiation > 1 and solar_radiation < 50
-        )
+    def estimate_visibility(self, condition: str, sensor_data: Dict[str, Any]) -> float:
+        """Estimate visibility based on weather condition.
 
-        # Pressure analysis (meteorologically accurate thresholds)
-        # Adjust pressure for altitude and pressure type
-        adjusted_pressure = self.adjust_pressure_for_altitude(
-            pressure, altitude, "relative"
-        )
-        pressure_thresholds = self.get_altitude_adjusted_pressure_thresholds(altitude)
+        Args:
+            condition: Current weather condition
+            sensor_data: Current sensor readings
 
-        pressure_very_high = adjusted_pressure > pressure_thresholds["very_high"]
-        pressure_high = adjusted_pressure > pressure_thresholds["high"]
-        pressure_normal = (
-            pressure_thresholds["normal_low"]
-            <= adjusted_pressure
-            <= pressure_thresholds["normal_high"]
-        )
-        pressure_low = adjusted_pressure < pressure_thresholds["low"]
-        pressure_very_low = adjusted_pressure < pressure_thresholds["very_low"]
-        pressure_extremely_low = (
-            adjusted_pressure < pressure_thresholds["extremely_low"]
-        )
+        Returns:
+            Estimated visibility in kilometers
+        """
+        return self.core.estimate_visibility(condition, sensor_data)
 
-        # Enhanced wind analysis (Beaufort scale adapted with turbulence detection)
-        wind_calm = wind_speed < WindThresholds.CALM
-        wind_light = WindThresholds.CALM <= wind_speed < WindThresholds.LIGHT_BREEZE
-        wind_strong = (
-            WindThresholds.FRESH_BREEZE <= wind_speed < WindThresholds.NEAR_GALE
-        )
-        wind_gale = wind_speed >= WindThresholds.NEAR_GALE
-
-        # Enhanced gust analysis for better storm detection
-        gust_factor = wind_gust / max(wind_speed, 1)  # Gust ratio for turbulence
-        is_gusty = (
-            gust_factor > WindThresholds.GUST_FACTOR_MODERATE
-            and wind_gust > WindThresholds.GUST_MODERATE
-        )
-        is_very_gusty = (
-            gust_factor > WindThresholds.GUST_FACTOR_STRONG
-            and wind_gust > WindThresholds.GUST_STRONG
-        )
-
-        # Severe turbulence indicator (suggests thunderstorm activity)
-        is_severe_turbulence = (
-            gust_factor > WindThresholds.GUST_FACTOR_SEVERE
-            and wind_gust > WindThresholds.GUST_SEVERE
-        ) or wind_gust > WindThresholds.GUST_EXTREME
-
-        # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
-        # Rain/snow takes precedence over all other conditions
-        significant_rain = rain_rate > PrecipitationThresholds.SIGNIFICANT
-
-        # Check for precipitation (either significant rain_rate OR wet sensor)
-        if significant_rain or rain_state == "wet":
-            precipitation_intensity = self.classify_precipitation_intensity(rain_rate)
-
-            # Determine precipitation type based on temperature
-            if is_freezing:
-                # Snow conditions (temperature at or below freezing)
-                return ATTR_CONDITION_SNOWY
-
-            # Enhanced storm detection with turbulence analysis
-            # Only trigger for significant storm conditions with meaningful precipitation
-            if (
-                pressure_extremely_low  # Severe storm pressure (< 29.20 inHg)
-                or (
-                    pressure_very_low
-                    and wind_strong
-                    and rain_rate > PrecipitationThresholds.LIGHT
-                )  # Storm pressure + strong winds + moderate+ rain
-                or (
-                    pressure_very_low
-                    and is_very_gusty
-                    and rain_rate > PrecipitationThresholds.MODERATE
-                )  # Storm pressure + very gusty + heavy rain
-                or (
-                    is_severe_turbulence
-                    and rain_rate > PrecipitationThresholds.STORM_MIN_RATE
-                )  # Severe wind turbulence + any precipitation (thunderstorm indicator)
-            ):
-                return ATTR_CONDITION_LIGHTNING_RAINY  # Thunderstorm/severe weather
-
-            # Regular rain classification
-            if (
-                precipitation_intensity == "heavy"
-                or rain_rate > PrecipitationThresholds.MODERATE
-            ):
-                return ATTR_CONDITION_POURING  # Heavy rain
-            elif (
-                precipitation_intensity == "moderate"
-                or rain_rate > PrecipitationThresholds.LIGHT
-            ):
-                return ATTR_CONDITION_RAINY  # Moderate rain
-            else:
-                return ATTR_CONDITION_RAINY  # Light rain/drizzle
-
-        # PRIORITY 2: FOG CONDITIONS
-        # Fog takes precedence after precipitation
-        fog_conditions = self.analyze_fog_conditions(
-            outdoor_temp,
-            humidity,
-            dewpoint,
-            temp_dewpoint_spread,
-            wind_speed,
-            solar_radiation,
-            is_daytime,
-        )
-        if fog_conditions is not None:
-            return fog_conditions
-
-        # PRIORITY 3: SEVERE WEATHER CONDITIONS
-        # (No precipitation but extreme conditions suggesting thunderstorm activity)
-        # More conservative: require very low pressure AND strong winds, OR severe turbulence
-        if (
-            pressure_very_low and wind_strong and is_very_gusty
-        ) or is_severe_turbulence:  # Enhanced: severe turbulence indicates thunderstorm
-            return ATTR_CONDITION_LIGHTNING  # Dry thunderstorm or severe weather system
-
-        if wind_gale:  # Gale force winds
-            return ATTR_CONDITION_WINDY  # Windstorm
-
-        # PRIORITY 4: DAYTIME/NIGHTTIME CONDITIONS (Cloud cover analysis)
-        if is_daytime:
-            # Get solar elevation from sensor data for accurate cloud cover calculation
-            # If solar_elevation is missing, check if we have solar sensor data
-            solar_elevation = sensor_data.get("solar_elevation")
-            has_solar_data = solar_radiation > 0 or solar_lux > 0 or uv_index > 0
-
-            # If we have solar data but no elevation, use a reasonable default
-            # If we have neither, fall back to atmospheric analysis
-            if solar_elevation is None:
-                if has_solar_data:
-                    solar_elevation = (
-                        45.0  # Default when we have solar data but no elevation
-                    )
-                else:
-                    # No solar data and no elevation - use atmospheric fallback
-                    _LOGGER.debug(
-                        "Solar sensors and elevation unavailable during daytime - "
-                        "using atmospheric fallback analysis"
-                    )
-                    # Use atmospheric conditions for weather determination
-                    if (
-                        humidity < TemperatureThresholds.HUMIDITY_MODERATE
-                        and temp_dewpoint_spread > TemperatureThresholds.SPREAD_MODERATE
-                    ):
-                        return ATTR_CONDITION_SUNNY
-                    elif (
-                        humidity < TemperatureThresholds.HUMIDITY_MODERATE_HIGH
-                        and temp_dewpoint_spread > TemperatureThresholds.SPREAD_HUMID
-                        and pressure_normal
-                    ):
-                        return ATTR_CONDITION_SUNNY
-                    elif pressure_high and humidity < 75:
-                        return ATTR_CONDITION_SUNNY
-                    elif pressure_low and humidity < 80:
-                        return ATTR_CONDITION_PARTLYCLOUDY
-                    elif humidity >= 85:
-                        return ATTR_CONDITION_CLOUDY
-                    else:
-                        return ATTR_CONDITION_PARTLYCLOUDY
-
-            # Analyze pressure trends for meteorological accuracy
-            pressure_trends = self.analyze_pressure_trends(altitude)
-
-            cloud_cover = self.analyze_cloud_cover(
-                solar_radiation, solar_lux, uv_index, solar_elevation, pressure_trends
-            )
-
-            _LOGGER.debug(
-                "CLOUD COVER DEBUG: radiation=%.1f W/m² lux=%.0f uv=%.1f elevation=%.1f "
-                "→ cloud_cover=%.1f%%",
-                solar_radiation,
-                solar_lux,
-                uv_index,
-                solar_elevation,
-                cloud_cover,
-            )
-
-            # Apply hysteresis to prevent rapid condition changes
-            # Only change condition if cloud cover has changed significantly
-            proposed_condition = self._map_cloud_cover_to_condition(cloud_cover)
-            _LOGGER.debug(
-                "PROPOSED CONDITION: %.1f%% cloud_cover → %s",
-                cloud_cover,
-                proposed_condition,
-            )
-            final_condition = self._apply_condition_hysteresis(
-                proposed_condition, cloud_cover
-            )
-            _LOGGER.debug(
-                "FINAL CONDITION (after hysteresis): %s → %s (cloud_cover=%.1f%%)",
-                proposed_condition,
-                final_condition,
-                cloud_cover,
-            )
-
-            # PRIORITY 5: WINDY CONDITIONS (only on sunny days)
-            # Windy condition only applies if it's sunny/clear with strong winds
-            # If it's cloudy, return cloudy (not windy)
-            if final_condition == ATTR_CONDITION_SUNNY:
-                # Only override sunny with windy if winds are strong
-                if wind_strong or (
-                    is_very_gusty and wind_speed >= WindThresholds.LIGHT_BREEZE
-                ):
-                    _LOGGER.debug(
-                        "Overriding sunny with windy (wind_speed=%.1f mph, gusty=%s)",
-                        wind_speed,
-                        is_very_gusty,
-                    )
-                    return ATTR_CONDITION_WINDY
-
-            return final_condition
-
-        # PRIORITY 7: TWILIGHT CONDITIONS
-        elif is_twilight:
-            if solar_lux > 50 and pressure_normal:
-                return ATTR_CONDITION_PARTLYCLOUDY
-            else:
-                return ATTR_CONDITION_CLOUDY
-
-        # PRIORITY 8: NIGHTTIME CONDITIONS
-        else:
-            # Night analysis based on atmospheric conditions
-            # Prioritize clear conditions when pressure is favorable, even with moderate humidity
-            # Order conditions from most specific to least specific
-
-            # Most specific: Combined conditions
-            if (
-                pressure_low
-                and humidity > TemperatureThresholds.HUMIDITY_HIGH
-                and wind_speed < 3
-            ):
-                return ATTR_CONDITION_CLOUDY  # Low pressure + very high humidity + calm = cloudy
-
-            # Clear night conditions (favorable pressure/humidity combinations)
-            elif (
-                pressure_very_high
-                and wind_calm
-                and humidity < TemperatureThresholds.HUMIDITY_MODERATE_HIGH
-            ):
-                return ATTR_CONDITION_CLEAR_NIGHT  # Perfect clear night
-            elif pressure_high and not is_gusty and humidity < 80:
-                return ATTR_CONDITION_CLEAR_NIGHT  # Clear night
-            elif pressure_low and humidity < 65:
-                return ATTR_CONDITION_CLEAR_NIGHT  # Low pressure, low humidity = clear
-
-            # Partly cloudy night (moderate conditions)
-            elif pressure_normal and wind_light and humidity < 85:
-                return ATTR_CONDITION_PARTLYCLOUDY  # Partly cloudy night (moderate humidity OK)
-            elif pressure_low and humidity < 90:
-                return (
-                    ATTR_CONDITION_PARTLYCLOUDY  # Low pressure with moderate humidity
-                )
-
-            # Cloudy night (high humidity)
-            elif humidity > 90:
-                return ATTR_CONDITION_CLOUDY  # Very high humidity = likely cloudy/overcast night
-
-            # Default night condition
-            else:
-                return ATTR_CONDITION_PARTLYCLOUDY  # Default night condition
-
-        # FALLBACK: Should rarely be reached
-        return ATTR_CONDITION_PARTLYCLOUDY
-
+    # Atmospheric methods - delegate to atmospheric analyzer
     def adjust_pressure_for_altitude(
-        self, pressure_inhg: float, altitude_m: float | None, pressure_type: str
+        self, pressure_inhg: float, altitude_m: Optional[float], pressure_type: str
     ) -> float:
-        """Adjust pressure thresholds based on altitude and pressure type.
-
-        This method corrects pressure readings for altitude effects:
-        - If pressure_type is "atmospheric", assumes the sensor already
-          provides sea-level pressure
-        - If pressure_type is "relative", converts station pressure to sea-level equivalent
-
-        Uses the barometric formula for accurate altitude correction.
+        """Adjust pressure for altitude using barometric formula.
 
         Args:
             pressure_inhg: Pressure reading in inches of mercury
             altitude_m: Altitude in meters above sea level
-            pressure_type: "relative" (station pressure) or
-            "atmospheric" (sea-level pressure)
+            pressure_type: "relative" (station) or "atmospheric" (sea-level)
 
         Returns:
-            float: Pressure adjusted to sea-level equivalent in inches
-            of mercury
+            Pressure adjusted to sea-level equivalent
         """
-        altitude_m = altitude_m or 0.0  # Default to 0.0 if None
-
-        if pressure_type == "atmospheric" or altitude_m == 0:
-            # Already sea-level pressure or at sea level
-            return pressure_inhg
-
-        # Convert station pressure to sea-level pressure using barometric formula
-        # P0 = P * (1 - (L * h) / T0)^(g * M / (R * L))
-        # Where:
-        # P0 = sea level pressure
-        # P = station pressure
-        # h = altitude in meters
-        # L = temperature lapse rate (0.0065 K/m)
-        # T0 = standard temperature at sea level (288.15 K)
-        # g = gravitational acceleration (9.80665 m/s²)
-        # M = molar mass of air (0.0289644 kg/mol)
-        # R = universal gas constant (8.31432 J/(mol·K))
-
-        # Convert pressure from inHg to hPa for calculation
-        pressure_hpa = pressure_inhg * 33.8639
-
-        # Standard atmospheric constants
-        L = 0.0065  # Temperature lapse rate (K/m)
-        T0 = 288.15  # Standard temperature at sea level (K)
-        g = 9.80665  # Gravitational acceleration (m/s²)
-        M = 0.0289644  # Molar mass of air (kg/mol)
-        R = 8.31432  # Universal gas constant (J/(mol·K))
-
-        # Calculate exponent
-        exponent = (g * M) / (R * L)
-
-        # Calculate sea-level pressure
-        if altitude_m > 0:
-            sea_level_pressure_hpa = (
-                pressure_hpa * (1 - (L * altitude_m) / T0) ** exponent
-            )
-        else:
-            sea_level_pressure_hpa = pressure_hpa
-
-        # Convert back to inHg
-        sea_level_pressure_inhg = sea_level_pressure_hpa / 33.8639
-
-        return sea_level_pressure_inhg
+        return self.atmospheric.adjust_pressure_for_altitude(
+            pressure_inhg, altitude_m, pressure_type
+        )
 
     def get_altitude_adjusted_pressure_thresholds(
-        self, altitude_m: float | None
+        self, altitude_m: Optional[float]
     ) -> Dict[str, float]:
         """Get pressure thresholds adjusted for altitude.
-
-        Pressure systems behave differently at various altitudes. This method
-        adjusts the standard sea-level pressure thresholds to account for
-        the thinner atmosphere at higher elevations.
 
         Args:
             altitude_m: Altitude in meters above sea level
 
         Returns:
-            dict: Altitude-adjusted pressure thresholds in inches of mercury
+            Dictionary of pressure thresholds in inHg
         """
-        altitude_m = altitude_m or 0.0  # Default to 0.0 if None
-
-        # Base thresholds at sea level (inHg)
-        base_thresholds = {
-            "very_high": 30.20,  # High pressure system
-            "high": 30.00,  # Above normal
-            "normal_high": 30.20,  # Upper normal range
-            "normal_low": 29.80,  # Lower normal range
-            "low": 29.80,  # Low pressure system
-            "very_low": 29.50,  # Storm system
-            "extremely_low": 29.20,  # Severe storm
-        }
-
-        if altitude_m == 0:
-            return base_thresholds
-
-        # Adjust thresholds based on altitude
-        # At higher altitudes, pressure is naturally lower, so thresholds need adjustment
-        # Using approximate barometric formula: pressure decreases by ~1 hPa per 8 meters
-        altitude_adjustment_hpa = altitude_m / 8.0  # Approximate hPa reduction
-        altitude_adjustment_inhg = altitude_adjustment_hpa / 33.8639  # Convert to inHg
-
-        # Apply altitude adjustment (reduce thresholds at higher altitudes)
-        adjusted_thresholds = {}
-        for key, threshold_inhg in base_thresholds.items():
-            adjusted_thresholds[key] = threshold_inhg - altitude_adjustment_inhg
-
-        return adjusted_thresholds
-
-    def calculate_dewpoint(self, temp_f: float, humidity: float | None) -> float:
-        """Calculate dewpoint using Magnus formula (meteorologically accurate).
-
-        The dewpoint is the temperature at which air becomes saturated with
-        water vapor. This implementation uses the Magnus-Tetens formula,
-        which is accurate for typical atmospheric conditions.
-
-        Args:
-            temp_f: Temperature in Fahrenheit
-            humidity: Relative humidity as percentage (0-100), or None
-
-        Returns:
-            float: Dewpoint temperature in Fahrenheit
-
-        Note:
-            Falls back to approximation for very dry conditions (humidity <= 0) or None
-        """
-        if humidity is None or humidity <= 0:
-            return temp_f - 50  # Approximate for very dry conditions
-
-        # Convert to Celsius for calculation
-        temp_c = (temp_f - 32) * 5 / 9
-
-        # Magnus formula constants (Tetens 1930, Murray 1967)
-        a = 17.27
-        b = 237.7
-
-        # Calculate dewpoint in Celsius using Magnus-Tetens approximation
-        gamma = (a * temp_c) / (b + temp_c) + math.log(humidity / 100.0)
-        dewpoint_c = (b * gamma) / (a - gamma)
-
-        # Convert back to Fahrenheit
-        return dewpoint_c * 9 / 5 + 32
-
-    def classify_precipitation_intensity(self, rain_rate: float) -> str:
-        """Classify precipitation intensity (meteorological standards)."""
-        if rain_rate >= PrecipitationThresholds.HEAVY:
-            return "heavy"  # Heavy rain
-        elif rain_rate >= PrecipitationThresholds.LIGHT:
-            return "moderate"  # Moderate rain
-        elif rain_rate >= PrecipitationThresholds.SIGNIFICANT:
-            return "light"  # Light rain/drizzle
-        else:
-            return "trace"  # Trace amounts
+        return self.atmospheric.get_altitude_adjusted_pressure_thresholds(altitude_m)
 
     def analyze_fog_conditions(
         self,
@@ -541,1005 +140,73 @@ class WeatherAnalysis:
         solar_rad: float,
         is_daytime: bool,
     ) -> Optional[str]:
-        """Advanced fog analysis using meteorological principles.
-
-        Analyzes atmospheric conditions to determine fog likelihood using
-        scientific criteria for fog formation. The algorithm uses a unified
-        scoring system that considers:
-
-        - Humidity levels (fog requires near-saturation)
-        - Temperature-dewpoint spread (closer = higher fog probability)
-        - Wind speed (light winds favor fog formation, strong winds disperse fog)
-        - Solar radiation (fog reduces radiation, but can exist with sun penetration)
-        - Time of day (radiation fog typically forms at night/early morning)
-
-        Fog Types Considered:
-        - Dense/Radiation fog: Very high humidity, minimal spread, calm winds
-        - Advection fog: High humidity, moderate winds moving moist air
-        - Evaporation fog: High humidity after rain with warmer conditions
-        - Daytime fog: Sun shining through fog layer (high humidity + tight spread)
+        """Analyze atmospheric conditions for fog.
 
         Args:
-            temp: Current temperature in Fahrenheit
+            temp: Temperature in Fahrenheit
             humidity: Relative humidity percentage
             dewpoint: Dewpoint temperature in Fahrenheit
             spread: Temperature minus dewpoint in Fahrenheit
             wind_speed: Wind speed in mph
-            solar_rad: Solar radiation in W/m²
-            is_daytime: Boolean indicating if it's currently daytime
+            solar_rad: Solar radiation in W/m2
+            is_daytime: Boolean indicating daytime
 
         Returns:
-            str: ATTR_CONDITION_FOG if fog conditions are met, None otherwise
-
-        Note:
-            Uses a scoring system to avoid overlapping conditions and provide
-            smoother fog detection across varying atmospheric conditions.
+            ATTR_CONDITION_FOG if fog detected, None otherwise
         """
-
-        # Calculate fog probability score (0-100)
-        fog_score = 0
-
-        # 1. HUMIDITY FACTOR (0-40 points) - Most important for fog
-        if humidity >= FogThresholds.HUMIDITY_DENSE_FOG:
-            fog_score += FogThresholds.SCORE_DENSE
-        elif humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG:
-            fog_score += FogThresholds.SCORE_PROBABLE
-        elif humidity >= FogThresholds.HUMIDITY_POSSIBLE_FOG:
-            fog_score += FogThresholds.SCORE_POSSIBLE
-        elif humidity >= FogThresholds.HUMIDITY_MARGINAL_FOG:
-            fog_score += FogThresholds.SCORE_MARGINAL
-        else:
-            fog_score += 0  # Too low for fog
-
-        # 2. TEMPERATURE-DEWPOINT SPREAD FACTOR (0-30 points)
-        if spread <= FogThresholds.SPREAD_SATURATED:
-            fog_score += FogThresholds.SCORE_SPREAD_SATURATED
-        elif spread <= FogThresholds.SPREAD_VERY_CLOSE:
-            fog_score += FogThresholds.SCORE_SPREAD_VERY_CLOSE
-        elif spread <= FogThresholds.SPREAD_CLOSE:
-            fog_score += FogThresholds.SCORE_SPREAD_CLOSE
-        elif spread <= FogThresholds.SPREAD_MARGINAL:
-            fog_score += FogThresholds.SCORE_SPREAD_MARGINAL
-        else:
-            fog_score += 0  # Too large for fog
-
-        # 3. WIND FACTOR (0-15 points)
-        # Light winds allow fog to form and persist
-        # Strong winds disperse fog
-        if wind_speed <= FogThresholds.WIND_CALM:
-            fog_score += FogThresholds.SCORE_WIND_CALM
-        elif wind_speed <= FogThresholds.WIND_LIGHT:
-            fog_score += FogThresholds.SCORE_WIND_LIGHT
-        elif wind_speed <= FogThresholds.WIND_MODERATE:
-            fog_score += FogThresholds.SCORE_WIND_MODERATE
-        else:
-            fog_score += FogThresholds.PENALTY_WIND_STRONG
-
-        # 4. SOLAR RADIATION FACTOR (0-15 points)
-        # Fog reduces solar radiation, but some can penetrate thin fog
-        if is_daytime:
-            # During daytime, solar radiation helps distinguish fog from haze
-            if solar_rad < FogThresholds.SOLAR_VERY_LOW:
-                fog_score += FogThresholds.SCORE_SOLAR_DENSE
-            elif solar_rad < FogThresholds.SOLAR_LOW:
-                fog_score += FogThresholds.SCORE_SOLAR_MODERATE
-            elif solar_rad < FogThresholds.SOLAR_REDUCED:
-                fog_score += FogThresholds.SCORE_SOLAR_LIGHT
-            else:
-                fog_score += 0  # Normal radiation - no fog indicated
-        else:
-            # At night, solar radiation should be negligible
-            if solar_rad <= FogThresholds.SOLAR_MINIMAL_NIGHT:
-                fog_score += FogThresholds.SCORE_SOLAR_NIGHT
-            elif solar_rad <= FogThresholds.SOLAR_TWILIGHT:
-                fog_score += FogThresholds.SCORE_SOLAR_TWILIGHT
-            elif solar_rad <= FogThresholds.SOLAR_MODERATE_TWILIGHT:
-                fog_score += (
-                    0  # Moderate twilight radiation - fog possible but less likely
-                )
-            else:
-                fog_score += FogThresholds.PENALTY_SOLAR_STRONG
-
-        # 5. TEMPERATURE FACTOR (bonus points for evaporation fog)
-        # Warmer temperatures after cooling can indicate evaporation fog
-        if (
-            temp > FogThresholds.TEMP_WARM_THRESHOLD
-            and humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG
-            and spread <= FogThresholds.SPREAD_CLOSE
-        ):
-            fog_score += 5  # Bonus for evaporation fog conditions
-
-        # Apply fog detection threshold with logging
-        _LOGGER.debug(
-            "Fog score calculation: %.1f points (humidity=%.1f%%, spread=%.2f°F, "
-            "wind=%.1f mph, solar=%.1f W/m², temp=%.1f°F, daytime=%s)",
-            fog_score,
-            humidity,
-            spread,
-            wind_speed,
-            solar_rad,
-            temp,
-            is_daytime,
+        return self.atmospheric.analyze_fog_conditions(
+            temp, humidity, dewpoint, spread, wind_speed, solar_rad, is_daytime
         )
 
-        # Fog detection thresholds based on score
-        if fog_score >= FogThresholds.THRESHOLD_DENSE_FOG:
-            _LOGGER.debug(
-                "Dense fog detected (score: %.1f >= %d)",
-                fog_score,
-                FogThresholds.THRESHOLD_DENSE_FOG,
-            )
-            return ATTR_CONDITION_FOG
-        elif fog_score >= FogThresholds.THRESHOLD_MODERATE_FOG:
-            _LOGGER.debug(
-                "Moderate fog detected (score: %.1f >= %d)",
-                fog_score,
-                FogThresholds.THRESHOLD_MODERATE_FOG,
-            )
-            return ATTR_CONDITION_FOG
-        elif fog_score >= FogThresholds.THRESHOLD_LIGHT_FOG:
-            # Marginal fog - only if humidity is very high
-            if humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG:
-                _LOGGER.debug(
-                    "Light fog detected (score: %.1f >= %d, humidity >= %d%%)",
-                    fog_score,
-                    FogThresholds.THRESHOLD_LIGHT_FOG,
-                    FogThresholds.HUMIDITY_PROBABLE_FOG,
-                )
-                return ATTR_CONDITION_FOG
-
-        _LOGGER.debug("No fog detected (score: %.1f < threshold)", fog_score)
-        return None
-
-    def _calculate_pressure_trend_cloud_adjustment(
-        self, pressure_trends: Dict[str, Any] | None
-    ) -> float:
-        """
-        Calculate cloud cover adjustment based on pressure trends.
-
-        Falling pressure indicates approaching weather systems and increased cloud cover.
-        Rising pressure indicates clearing conditions and decreased cloud cover.
+    def analyze_pressure_trends(
+        self, altitude: Optional[float] = 0.0
+    ) -> Dict[str, Any]:
+        """Analyze pressure trends for weather prediction.
 
         Args:
-            pressure_trends: Pressure trend analysis from analyze_pressure_trends()
+            altitude: Altitude in meters for pressure thresholds
 
         Returns:
-            float: Cloud cover adjustment percentage (-50 to +50)
+            Dictionary with pressure analysis
         """
-        if not pressure_trends:
-            return 0.0
+        return self.atmospheric.analyze_pressure_trends(altitude)
 
-        # Extract trend data
-        current_trend = pressure_trends.get(
-            "current_trend", 0.0
-        )  # 3-hour change in hPa
-        long_term_trend = pressure_trends.get(
-            "long_term_trend", 0.0
-        )  # 24-hour change in hPa
-        pressure_system = pressure_trends.get("pressure_system", "normal")
+    def analyze_wind_direction_trends(self) -> Dict[str, Any]:
+        """Analyze wind direction trends for weather prediction.
 
-        # Base adjustment from short-term trend (3-hour change)
-        # Falling pressure = more clouds, rising pressure = fewer clouds
-        short_term_adjustment = 0.0
-        if current_trend < PressureThresholds.TREND_3H_RAPID_FALL:
-            # Scale adjustment based on magnitude (capped at -20% for very rapid drops)
-            short_term_adjustment = max(
-                -20.0, current_trend * PressureThresholds.SHORT_TERM_MULTIPLIER_FALL
-            )
-        elif current_trend > PressureThresholds.TREND_3H_MODERATE_RISE:
-            # Scale adjustment based on magnitude (capped at +20% for rapid rises)
-            short_term_adjustment = min(
-                20.0, current_trend * PressureThresholds.SHORT_TERM_MULTIPLIER_RISE
-            )
+        Returns:
+            Dictionary with wind direction analysis
+        """
+        return self.atmospheric._analyze_wind_direction()
 
-        # Long-term trend adjustment (24-hour change)
-        long_term_adjustment = 0.0
-        if long_term_trend < PressureThresholds.TREND_24H_RAPID_FALL:
-            # Sustained pressure drop indicates approaching weather system
-            long_term_adjustment = max(
-                -25.0, long_term_trend * PressureThresholds.LONG_TERM_MULTIPLIER_FALL
-            )
-        elif long_term_trend > PressureThresholds.TREND_24H_MODERATE_RISE:
-            # Sustained pressure rise indicates clearing
-            long_term_adjustment = min(
-                25.0, long_term_trend * PressureThresholds.LONG_TERM_MULTIPLIER_RISE
-            )
-
-        # Pressure system adjustment
-        system_adjustment = 0.0
-        if pressure_system == "low_pressure":
-            system_adjustment = PressureThresholds.LOW_PRESSURE_CLOUD_INCREASE
-        elif pressure_system == "high_pressure":
-            system_adjustment = PressureThresholds.HIGH_PRESSURE_CLOUD_REDUCTION
-        elif pressure_system == "storm":
-            system_adjustment = PressureThresholds.STORM_CLOUD_INCREASE
-
-        # Combine adjustments with weighting
-        # Short-term trends are more immediate but long-term trends are more reliable
-        total_adjustment = (
-            short_term_adjustment * 0.3  # 30% weight to recent changes
-            + long_term_adjustment * 0.4  # 40% weight to sustained trends
-            + system_adjustment * PressureThresholds.SYSTEM_WEIGHT
-        )
-
-        # Ensure reasonable bounds
-        total_adjustment = max(-40.0, min(35.0, total_adjustment))
-
-        _LOGGER.debug(
-            "Pressure trend cloud adjustment: %.1f%% "
-            "(short: %.1f%%, long: %.1f%%, system: %.1f%%, "
-            "current_trend: %.2f hPa/3h, long_trend: %.2f hPa/24h)",
-            total_adjustment,
-            short_term_adjustment,
-            long_term_adjustment,
-            system_adjustment,
-            current_trend,
-            long_term_trend,
-        )
-
-        return total_adjustment
-
+    # Solar methods - delegate to solar analyzer
     def analyze_cloud_cover(
         self,
         solar_radiation: float,
         solar_lux: float,
         uv_index: float,
         solar_elevation: float = 45.0,
-        pressure_trends: Dict[str, Any] | None = None,
+        pressure_trends: Optional[Dict[str, Any]] = None,
     ) -> float:
-        """
-        Estimate cloud cover percentage using solar radiation analysis.
-
-        Uses advanced astronomical calculations for accurate clear-sky maximums:
-        - Solar constant variation throughout the year
-        - Air mass correction for atmospheric path length
-        - Atmospheric extinction (Rayleigh scattering, ozone absorption)
-        - Elevation-based scaling with scientific accuracy
-        - Pressure trend integration for meteorological accuracy
+        """Estimate cloud cover percentage using solar radiation.
 
         Args:
-            solar_radiation: Current solar radiation in W/m²
+            solar_radiation: Current solar radiation in W/m2
             solar_lux: Current solar illuminance in lux
             uv_index: Current UV index value
-            solar_elevation: Solar elevation angle in degrees from sun.sun sensor
-                           (defaults to 45° if not configured)
-            pressure_trends: Optional pressure trend analysis from analyze_pressure_trends()
-
-        Returns:
-            float: Estimated cloud cover percentage (0-100)
-        """
-
-        # Handle None values by defaulting to 0.0
-        if solar_radiation is None:
-            solar_radiation = 0.0
-        if solar_lux is None:
-            solar_lux = 0.0
-        if uv_index is None:
-            uv_index = 0.0
-
-        # Use moving average of solar radiation to filter temporary fluctuations
-        # like passing clouds, while still responding to genuine weather changes
-        avg_solar_radiation = self._get_solar_radiation_average(solar_radiation)
-
-        # Calculate theoretical clear-sky maximum using astronomical principles
-        max_solar_radiation = self._calculate_clear_sky_max_radiation(solar_elevation)
-
-        # Handle very low solar radiation cases more intelligently
-        # Very low values during daytime indicate heavy overcast conditions
-        # Use relative thresholds based on expected clear-sky radiation, but only when astronomical calculations are unreliable
-        relative_radiation_threshold = max_solar_radiation * 0.3  # 30% of expected max
-        if (
-            avg_solar_radiation < relative_radiation_threshold
-            and solar_lux < 20000
-            and uv_index < 1
-            and solar_elevation < 15  # Only apply fallback when sun is very low
-        ):  # Only apply fallback when astronomical calculations are less reliable
-            # Get historical weather bias to avoid false cloudy readings at sunrise/sunset
-            historical_bias = self.get_historical_weather_bias(hours=6)
-
-            # If skies have been predominantly clear and pressure supports clear conditions,
-            # significantly reduce the cloud cover estimate
-            bias_adjustment = 0.0
-            if historical_bias["bias_strength"] > 0.7:  # Strong clear bias
-                # Reduce cloud cover by up to 50% based on bias strength
-                bias_adjustment = -50.0 * historical_bias["bias_strength"]
-                _LOGGER.debug(
-                    "Applying strong clear bias at sunrise/sunset: %.1f%% reduction "
-                    "(clear history: %.1f%%, bias: %.2f, morning: %s)",
-                    bias_adjustment,
-                    historical_bias["clear_percentage"],
-                    historical_bias["bias_strength"],
-                    historical_bias["is_morning"],
-                )
-            elif historical_bias["bias_strength"] > 0.5:  # Moderate clear bias
-                # Reduce cloud cover by up to 30%
-                bias_adjustment = -30.0 * historical_bias["bias_strength"]
-                _LOGGER.debug(
-                    "Applying moderate clear bias at sunrise/sunset: %.1f%% reduction "
-                    "(clear history: %.1f%%, bias: %.2f, morning: %s)",
-                    bias_adjustment,
-                    historical_bias["clear_percentage"],
-                    historical_bias["bias_strength"],
-                    historical_bias["is_morning"],
-                )
-
-            # If all solar measurements are extremely low relative to expectations,
-            # it indicates heavy clouds
-            if (
-                (
-                    avg_solar_radiation < max_solar_radiation * 0.1
-                    or avg_solar_radiation < 50
-                )
-                and (solar_lux < 5000 or solar_lux < max_solar_radiation * 6)
-                and uv_index == 0
-            ):
-                cloud_cover = 85.0  # Heavy overcast conditions
-            elif (
-                avg_solar_radiation < max_solar_radiation * 0.2
-                or avg_solar_radiation < 100
-            ) and solar_lux < 10000:
-                cloud_cover = 70.0  # Mostly cloudy conditions
-            else:
-                cloud_cover = 40.0  # Partly cloudy when data is inconclusive
-
-            # Apply historical bias adjustment
-            cloud_cover = max(0.0, cloud_cover + bias_adjustment)
-
-        # Calculate lux maximum (roughly 100-150 lux per W/m² depending on spectrum)
-        # Use 120 lx/W/m² as a reasonable average
-        max_solar_lux = max_solar_radiation * 120
-
-        # UV index maximum scales with solar elevation and air mass
-        # UV is more sensitive to elevation and atmospheric path than total radiation
-        air_mass = self._calculate_air_mass(solar_elevation)
-        max_uv_index = max(
-            0.5, 12 * math.exp(-0.05 * air_mass)
-        )  # Exponential decay with air mass
-
-        # Calculate cloud cover from each measurement using realistic maximums
-        # SAFETY CHECK: If measured radiation exceeds clear-sky max, it indicates
-        # either sensor miscalibration or an incorrect zenith_max_radiation setting
-        radiation_ratio = avg_solar_radiation / max_solar_radiation
-
-        # If ratio > 1.0, the zenith_max_radiation is likely miscalibrated (too low)
-        # In this case, treat measured value as near-clear-sky and estimate cloud cover
-        # based on lux/UV measurements instead
-        if radiation_ratio > 1.05:  # Allow 5% overage for measurement noise
-            _LOGGER.warning(
-                "CLOUD COVER CALIBRATION WARNING: Solar radiation (%.1f W/m²) "
-                "exceeds calculated clear-sky maximum (%.1f W/m²). "
-                "This indicates zenith_max_radiation is set too low. "
-                "Current zenith_max: %.1f W/m². Consider increasing to 950-1000 W/m². "
-                "Home Assistant setting: Settings → Devices & Services → Micro Weather Station → Configure",
-                avg_solar_radiation,
-                max_solar_radiation,
-                self.zenith_max_radiation,
-            )
-            # Use conservative estimate: assume high radiation = some clouds
-            # Use lux and UV for better accuracy
-            radiation_ratio = 1.0  # Clamp to treat as nearly clear-sky
-
-        cloud_cover_reduction = radiation_ratio * 100
-        solar_cloud_cover = max(0, min(100, 100 - cloud_cover_reduction))
-        lux_cloud_cover = max(0, min(100, 100 - (solar_lux / max_solar_lux * 100)))
-        uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
-
-        # Weight the measurements (solar radiation is most reliable for cloud cover)
-        # Use astronomical calculations whenever we have meaningful solar measurements
-        if avg_solar_radiation > 0 or solar_lux > 0 or uv_index > 0:
-            if (
-                avg_solar_radiation > 10
-            ):  # Primary: use all measurements when radiation is good
-                # Only include UV in weighting if we have a meaningful UV reading
-                if uv_index > 0:
-                    # Check if UV is consistent with solar radiation
-                    # If UV indicates much cloudier conditions than solar, it may be faulty
-                    uv_solar_diff = abs(solar_cloud_cover - uv_cloud_cover)
-                    if uv_solar_diff > 30.0:  # UV differs significantly from solar
-                        _LOGGER.debug(
-                            "UV measurement inconsistent with solar radiation "
-                            "(UV: %.1f%%, Solar: %.1f%%, diff: %.1f%%) - ignoring UV",
-                            uv_cloud_cover,
-                            solar_cloud_cover,
-                            uv_solar_diff,
-                        )
-                        # Ignore UV and redistribute weights to solar and lux
-                        cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15
-                    else:
-                        # UV is consistent - use all three measurements
-                        cloud_cover = (
-                            solar_cloud_cover * 0.8
-                            + lux_cloud_cover * 0.15
-                            + uv_cloud_cover * 0.05
-                        )
-                else:
-                    # No UV data - redistribute weights to solar and lux
-                    cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15
-            elif solar_lux > 100:  # Secondary: use lux and UV when radiation is low
-                cloud_cover = (
-                    lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
-                    if uv_index > 0
-                    else lux_cloud_cover
-                )
-            elif uv_index > 0:  # Tertiary: use UV as last resort
-                cloud_cover = uv_cloud_cover
-            else:
-                # Very low measurements but some solar data - use solar radiation primarily
-                cloud_cover = solar_cloud_cover
-        elif avg_solar_radiation == 0 and solar_lux == 0 and uv_index == 0:
-            # No solar input at all - could be night, could be sensor issue
-            # Check if we have recent solar readings to distinguish between night and sensor glitch
-            solar_history: deque[Dict[str, Any]] = self._sensor_history.get(
-                "solar_radiation", deque()
-            )
-            recent_solar_readings = [
-                entry["value"]
-                for entry in list(solar_history)[-10:]
-                if entry["value"] is not None and entry["value"] > 0
-            ]
-
-            if recent_solar_readings:
-                # We RECENTLY had solar readings but now they're all 0
-                # This is likely a sensor transition, not true night
-                recent_avg = sum(recent_solar_readings) / len(recent_solar_readings)
-                cloud_cover = 50.0  # Assume partly cloudy as safe default
-                _LOGGER.debug(
-                    "No solar data but recent history shows readings (avg: %.1f W/m²) - "
-                    "likely sensor transition, not assuming overcast",
-                    recent_avg,
-                )
-            else:
-                # No recent solar readings - truly night or always been cloudy
-                cloud_cover = 100
-        else:
-            cloud_cover = 50.0  # Unknown - assume partly cloudy
-
-        # Apply pressure trend adjustment to cloud cover estimation
-        # Falling pressure indicates approaching weather systems (more clouds)
-        # Rising pressure indicates clearing conditions (fewer clouds)
-        pressure_adjustment = self._calculate_pressure_trend_cloud_adjustment(
-            pressure_trends
-        )
-        cloud_cover = max(0.0, min(100.0, cloud_cover + pressure_adjustment))
-
-        # Apply hysteresis to prevent extreme jumps in cloud cover
-        # Cloud cover should change gradually, not 0→100% in seconds
-        # Check if this is a drastic change from recent history
-        recent_readings: deque[Dict[str, Any]] = self._sensor_history.get(
-            "cloud_cover", deque()
-        )
-        if len(recent_readings) > 0:
-            # Get the last non-None reading
-            last_reading = None
-            for entry in reversed(
-                list(recent_readings)[-10:]
-            ):  # Check last 10 readings
-                if entry["value"] is not None:
-                    last_reading = entry["value"]
-                    break
-
-            if last_reading is not None:
-                cover_change = abs(cloud_cover - last_reading)
-                # If change is > 40% in a single update, apply smoothing
-                if cover_change > 40:
-                    # Limit change to max 30% per update
-                    max_change = 30
-                    if cloud_cover > last_reading:
-                        cloud_cover = min(cloud_cover, last_reading + max_change)
-                    else:
-                        cloud_cover = max(cloud_cover, last_reading - max_change)
-
-                    _LOGGER.debug(
-                        "Cloud cover change limited: %.1f%% → %.1f%% (max change: %.1f%%, "
-                        "likely sensor glitch)",
-                        last_reading,
-                        cloud_cover,
-                        max_change,
-                    )
-
-        _LOGGER.debug(
-            "Final cloud cover: %.1f%% (solar-based: %.1f%%, pressure adjustment: %.1f%%)",
-            cloud_cover,
-            cloud_cover - pressure_adjustment,
-            pressure_adjustment,
-        )
-
-        # Store cloud cover for hysteresis and trend analysis
-        if "cloud_cover" not in self._sensor_history:
-            self._sensor_history["cloud_cover"] = deque(maxlen=50)
-        self._sensor_history["cloud_cover"].append(
-            {"timestamp": datetime.now(), "value": cloud_cover}
-        )
-
-        return cloud_cover
-
-    def _map_cloud_cover_to_condition(self, cloud_cover: float) -> str:
-        """
-        Map cloud cover percentage to weather condition.
-
-        Uses meteorological standards:
-        - 0-25%: Clear/few clouds = sunny
-        - 25-50%: Partly cloudy/scattered clouds = partlycloudy
-        - 50-75%: Mostly cloudy/broken clouds = cloudy
-        - 75%+: Overcast = cloudy (no overcast condition available)
-
-        Args:
-            cloud_cover: Cloud cover percentage (0-100)
-
-        Returns:
-            str: Weather condition constant
-        """
-        if cloud_cover <= CloudCoverThresholds.FEW:
-            return ATTR_CONDITION_SUNNY
-        elif cloud_cover <= CloudCoverThresholds.SCATTERED:
-            return ATTR_CONDITION_PARTLYCLOUDY
-        elif cloud_cover <= CloudCoverThresholds.THRESHOLD_CLOUDY:
-            return ATTR_CONDITION_CLOUDY
-        else:
-            return ATTR_CONDITION_CLOUDY
-
-    def _apply_condition_hysteresis(
-        self, proposed_condition: str, current_cloud_cover: float
-    ) -> str:
-        """
-        Apply hysteresis to prevent rapid condition changes.
-
-        Weather conditions should be stable and only change when there's
-        a significant and sustained change in cloud cover. This prevents
-        the annoying oscillation between "sunny" and "partly cloudy"
-        that can occur with small solar radiation fluctuations.
-
-        Uses time-based history (last 1 hour) rather than fixed count to ensure
-        hysteresis always compares against recent conditions, regardless of
-        update frequency.
-
-        Args:
-            proposed_condition: The condition suggested by current cloud cover
-            current_cloud_cover: Current cloud cover percentage
-
-        Returns:
-            str: Final condition after applying hysteresis
-        """
-        # Clean up old entries (keep last 24 hours to prevent unbounded growth)
-        cutoff_time = datetime.now() - timedelta(hours=24)
-        self._condition_history = deque(
-            [
-                entry
-                for entry in self._condition_history
-                if entry["timestamp"] > cutoff_time
-            ]
-        )
-
-        # Get recent history (last 1 hour for hysteresis comparison)
-        hysteresis_cutoff = datetime.now() - timedelta(hours=1)
-        recent_history = [
-            entry
-            for entry in self._condition_history
-            if entry["timestamp"] > hysteresis_cutoff
-        ]
-
-        # If we have no recent history, use the proposed condition
-        if not recent_history:
-            self._condition_history.append(
-                {
-                    "condition": proposed_condition,
-                    "cloud_cover": current_cloud_cover,
-                    "timestamp": datetime.now(),
-                }
-            )
-            return proposed_condition
-
-        # Get the most recent condition from the time window
-        last_entry = recent_history[-1]
-        last_condition = last_entry["condition"]
-        last_cloud_cover = last_entry["cloud_cover"]
-
-        # If the proposed condition is the same as the last one, keep it
-        if proposed_condition == last_condition:
-            self._condition_history.append(
-                {
-                    "condition": proposed_condition,
-                    "cloud_cover": current_cloud_cover,
-                    "timestamp": datetime.now(),
-                }
-            )
-            return proposed_condition
-
-        # Calculate the cloud cover difference
-        cloud_cover_change = abs(current_cloud_cover - last_cloud_cover)
-
-        # Define hysteresis thresholds based on condition transitions
-        hysteresis_thresholds = {
-            # From sunny to partly cloudy: require significant cloud increase
-            (ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY): 10.0,
-            # From partly cloudy to sunny: require significant clearing
-            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_SUNNY): 10.0,
-            # From partly cloudy to cloudy: moderate threshold
-            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY): 10.0,
-            # From cloudy to partly cloudy: moderate threshold
-            (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_PARTLYCLOUDY): 10.0,
-            # Other transitions: low threshold (allow easier changes)
-        }
-
-        transition_key = (last_condition, proposed_condition)
-        hysteresis_threshold = hysteresis_thresholds.get(transition_key, 5.0)
-
-        # Check if the change is significant enough
-        if cloud_cover_change >= hysteresis_threshold:
-            # Significant change - allow the transition
-            _LOGGER.debug(
-                "Condition change: %s -> %s (cloud cover: %.1f -> %.1f, "
-                "change: %.1f >= threshold: %.1f)",
-                last_condition,
-                proposed_condition,
-                last_cloud_cover,
-                current_cloud_cover,
-                cloud_cover_change,
-                hysteresis_threshold,
-            )
-            self._condition_history.append(
-                {
-                    "condition": proposed_condition,
-                    "cloud_cover": current_cloud_cover,
-                    "timestamp": datetime.now(),
-                }
-            )
-            return proposed_condition
-        else:
-            # Not significant enough - maintain previous condition
-            _LOGGER.debug(
-                "Condition stable: keeping %s (proposed: %s, cloud cover: %.1f -> %.1f, "
-                "change: %.1f < threshold: %.1f)",
-                last_condition,
-                proposed_condition,
-                last_cloud_cover,
-                current_cloud_cover,
-                cloud_cover_change,
-                hysteresis_threshold,
-            )
-            # Still record the current data but keep the old condition
-            self._condition_history.append(
-                {
-                    "condition": last_condition,  # Keep the stable condition
-                    "cloud_cover": current_cloud_cover,
-                    "timestamp": datetime.now(),
-                }
-            )
-            return last_condition
-
-    def _get_solar_radiation_average(self, current_radiation: float) -> float:
-        """
-        Calculate moving average of solar radiation to filter temporary fluctuations.
-
-        Uses recent historical data to smooth out short-term variations like
-        passing clouds, while still responding to genuine weather changes.
-        This prevents rapid condition changes due to brief solar interruptions.
-
-        Args:
-            current_radiation: Current solar radiation reading in W/m²
-
-        Returns:
-            float: Averaged solar radiation value
-        """
-        if current_radiation is None:
-            current_radiation = 0.0
-
-        if "solar_radiation" not in self._sensor_history:
-            return current_radiation
-
-        # Get readings from the last 15 minutes (assuming 1-minute update intervals)
-        # This provides ~15 readings for averaging while being responsive to changes
-        cutoff_time = datetime.now() - timedelta(minutes=15)
-        recent_readings = [
-            entry["value"]
-            for entry in self._sensor_history["solar_radiation"]
-            if entry["timestamp"] > cutoff_time and entry["value"] > 0
-        ]
-
-        # Need at least 3 readings for meaningful averaging
-        if len(recent_readings) < 3:
-            return current_radiation
-
-        # Calculate weighted average favoring recent readings
-        # Give more weight to recent values to remain responsive
-        weights = []
-        for i in range(len(recent_readings)):
-            # Linear weighting: most recent = 1.0, oldest = 0.3
-            weight = 0.3 + (0.7 * i / (len(recent_readings) - 1))
-            weights.append(weight)
-
-        weighted_sum = sum(
-            value * weight for value, weight in zip(recent_readings, weights)
-        )
-        total_weight = sum(weights)
-
-        if total_weight > 0:
-            averaged_radiation = weighted_sum / total_weight
-            _LOGGER.debug(
-                "Solar radiation average: %.1f W/m² "
-                "(from %d readings, current: %.1f)",
-                averaged_radiation,
-                len(recent_readings),
-                current_radiation,
-            )
-            return averaged_radiation
-
-        return current_radiation
-
-    def _calculate_clear_sky_max_radiation(
-        self, solar_elevation: float, current_date: datetime | None = None
-    ) -> float:
-        """
-        Calculate theoretical clear-sky maximum solar radiation using astronomical principles.
-
-        This method computes the maximum possible solar irradiance under clear sky conditions
-        by accounting for:
-        - Solar constant variation throughout the year (Earth-Sun distance)
-        - Air mass correction for atmospheric path length
-        - Atmospheric extinction (Rayleigh scattering, ozone absorption, water vapor)
-        - Local calibration factor for your specific location/setup
-
-        Args:
             solar_elevation: Solar elevation angle in degrees
-            current_date: Optional datetime to use for seasonal calculations (for testing)
+            pressure_trends: Optional pressure trend analysis
 
         Returns:
-            float: Theoretical clear-sky maximum solar radiation in W/m²
+            Estimated cloud cover percentage (0-100)
         """
-        if solar_elevation <= 0:
-            return 50.0  # Minimum value for very low elevation
-
-        # Get current date for seasonal calculations
-        now = current_date if current_date is not None else datetime.now()
-        day_of_year = now.timetuple().tm_yday
-
-        # 1. Solar constant variation (Earth-Sun distance)
-        # The solar constant varies by ±3.3% throughout the year due to elliptical orbit
-        # Day 4 (Jan 4) = closest to sun, Day 183-184 (Jun 21-22) = farthest
-        solar_constant_variation = 1 + 0.033 * math.cos(
-            2 * math.pi * (day_of_year - 4) / 365.25
-        )
-        base_solar_constant = 1366.0  # W/m² (standard solar constant at 1 AU)
-
-        _LOGGER.debug(
-            "Date: %s, day_of_year: %d, solar_constant_variation: %.4f",
-            now,
-            day_of_year,
-            solar_constant_variation,
+        return self.solar.analyze_cloud_cover(
+            solar_radiation, solar_lux, uv_index, solar_elevation, pressure_trends
         )
 
-        # 2. Air mass calculation
-        air_mass = self._calculate_air_mass(solar_elevation)
-
-        # 3. Atmospheric extinction correction
-        # Rayleigh scattering: ~0.1 per air mass
-        # Ozone absorption: ~0.02 per air mass
-        # Water vapor absorption: ~0.05 per air mass (typical mid-latitude)
-        # Aerosol scattering: ~0.1 per air mass (typical clear conditions)
-        rayleigh_extinction = math.exp(-0.1 * air_mass)
-        ozone_extinction = math.exp(-0.02 * air_mass)
-        water_vapor_extinction = math.exp(-0.05 * air_mass)
-        aerosol_extinction = math.exp(-0.1 * air_mass)  # Clear sky assumption
-
-        # Combined atmospheric transmission
-        atmospheric_transmission = (
-            rayleigh_extinction
-            * ozone_extinction
-            * water_vapor_extinction
-            * aerosol_extinction
-        )
-
-        # 4. Calculate theoretical clear-sky irradiance
-        theoretical_irradiance = (
-            base_solar_constant
-            * solar_constant_variation
-            * atmospheric_transmission
-            * math.sin(math.radians(solar_elevation))  # Elevation correction
-        )
-
-        # 5. Apply local calibration factor
-        # This accounts for your specific location, sensor calibration, and typical
-        # atmospheric conditions
-        # We use the configured zenith maximum radiation, then apply astronomical corrections
-        # for the current solar elevation
-        zenith_max_radiation = self.zenith_max_radiation  # Configurable zenith maximum
-
-        # Calculate the astronomical scaling factor (what fraction of zenith
-        # irradiance we should expect)
-        astronomical_zenith_max = (
-            base_solar_constant * solar_constant_variation * atmospheric_transmission
-        )
-        astronomical_scaling = (
-            theoretical_irradiance / astronomical_zenith_max
-            if astronomical_zenith_max > 0
-            else 1.0
-        )
-
-        # Apply astronomical scaling to your calibrated zenith maximum
-        # Include seasonal solar constant variation in the final calculation
-        calibrated_max_radiation = (
-            zenith_max_radiation * solar_constant_variation * astronomical_scaling
-        )
-
-        # Ensure reasonable bounds
-        calibrated_max_radiation = max(50.0, min(2000.0, calibrated_max_radiation))
-
-        _LOGGER.debug(
-            "Clear-sky max radiation: %.1f W/m² "
-            "(elevation: %.1f°, air_mass: %.3f, "
-            "zenith_max: %.1f, astronomical_scaling: %.3f)",  # noqa: E501
-            calibrated_max_radiation,
-            solar_elevation,
-            air_mass,
-            zenith_max_radiation,
-            astronomical_scaling,
-        )
-
-        return calibrated_max_radiation
-
-    def _calculate_air_mass(self, solar_elevation: float) -> float:
-        """
-        Calculate air mass for solar radiation calculations.
-
-        Air mass is the path length through the atmosphere relative to the path
-        when the sun is directly overhead (zenith). It accounts for the increased
-        atmospheric absorption at lower solar elevations.
-
-        Uses the Gueymard 2003 formula for improved accuracy at all elevations:
-        AM = 1.002432*cos²(Z) + 0.148386*cos(Z) + 0.0096467 / (cos³(Z) + 0.149864*cos²(Z) + 0.0102963*cos(Z) + 0.000303978)
-
-        Args:
-            solar_elevation: Solar elevation angle in degrees
-
-        Returns:
-            float: Air mass (dimensionless, ≥ 1.0)
-        """
-        if solar_elevation <= 0:
-            return 38.0  # Very large air mass for sun below horizon
-
-        # Convert elevation to zenith angle
-        zenith_angle = 90.0 - solar_elevation
-        zenith_rad = math.radians(zenith_angle)
-        cos_z = math.cos(zenith_rad)
-
-        # Gueymard 2003 formula - most accurate air mass calculation
-        # AM = 1.002432*cos²(Z) + 0.148386*cos(Z) + 0.0096467 / (cos³(Z) + 0.149864*cos²(Z) + 0.0102963*cos(Z) + 0.000303978)
-        cos_z_squared = cos_z * cos_z
-        cos_z_cubed = cos_z_squared * cos_z
-
-        numerator = 1.002432 * cos_z_squared + 0.148386 * cos_z + 0.0096467
-        denominator = (
-            cos_z_cubed + 0.149864 * cos_z_squared + 0.0102963 * cos_z + 0.000303978
-        )
-
-        air_mass = numerator / denominator
-
-        # Ensure minimum air mass of 1.0 (zenith)
-        return max(1.0, air_mass)
-
-    def estimate_visibility(self, condition: str, sensor_data: Dict[str, Any]) -> float:
-        """
-        Estimate visibility based on weather condition and meteorological data.
-
-        Uses scientific visibility reduction factors:
-        - Fog: Major visibility reduction (0.1-2 km)
-        - Rain: Moderate reduction based on intensity
-        - Snow: Severe reduction, especially with wind
-        - Storms: Variable based on precipitation and wind
-        - Clear: Excellent visibility based on atmospheric clarity
-        """
-        solar_lux = sensor_data.get(KEY_SOLAR_LUX_INTERNAL, 0)
-        solar_radiation = sensor_data.get(KEY_SOLAR_RADIATION, 0)
-        rain_rate = sensor_data.get(KEY_RAIN_RATE, 0)
-        wind_speed = sensor_data.get(KEY_WIND_SPEED, 0)
-        wind_gust = sensor_data.get(KEY_WIND_GUST, 0)
-        humidity = sensor_data.get(KEY_HUMIDITY, 50)
-        outdoor_temp = sensor_data.get(KEY_OUTDOOR_TEMP, 70)
-
-        # Calculate dewpoint for more accurate fog assessment
-        dewpoint = self.calculate_dewpoint(outdoor_temp, humidity)
-        temp_dewpoint_spread = outdoor_temp - dewpoint
-
-        is_daytime = solar_radiation > 5 or solar_lux > 50
-
-        if condition == ATTR_CONDITION_FOG:
-            # Fog visibility based on multiple factors for better accuracy
-            # Use humidity and dewpoint spread for density assessment
-
-            # Dense fog: extremely high humidity + very tight spread
-            if humidity >= 98 and temp_dewpoint_spread <= 0.5:
-                return 0.2  # Dense fog: <0.3 km (very poor visibility)
-
-            # Thick fog: very high humidity + tight spread
-            elif humidity >= 95 and temp_dewpoint_spread <= 1.0:
-                return 0.5  # Thick fog: <0.5 km (poor visibility)
-
-            # Moderate fog: high humidity + moderate spread
-            elif humidity >= 92 and temp_dewpoint_spread <= 2.0:
-                return 1.0  # Moderate fog: ~1 km
-
-            # Light fog/mist: moderate humidity or wider spread
-            elif temp_dewpoint_spread <= 3.0:
-                return 2.0  # Light fog/mist: ~2 km
-
-            # Very light fog conditions (shouldn't normally happen)
-            else:
-                return 3.0  # Very light fog: ~3 km
-
-        elif condition in [ATTR_CONDITION_RAINY, ATTR_CONDITION_SNOWY]:
-            # Precipitation visibility reduction
-            base_visibility = 15.0 if condition == ATTR_CONDITION_RAINY else 8.0
-
-            # Intensity-based reduction
-            if rain_rate > 0.5:  # Heavy precipitation
-                intensity_factor = 0.3
-            elif rain_rate > 0.25:  # Moderate precipitation
-                intensity_factor = 0.5
-            elif rain_rate > 0.1:  # Light precipitation
-                intensity_factor = 0.7
-            else:  # Very light/drizzle
-                intensity_factor = 0.85
-
-            # Wind effect (blowing precipitation reduces visibility)
-            wind_factor = max(0.6, 1.0 - (wind_speed / 50))
-
-            visibility = base_visibility * intensity_factor * wind_factor
-            return round(max(0.5, visibility), 1)
-
-        elif condition == ATTR_CONDITION_LIGHTNING_RAINY:
-            # Storm visibility varies greatly
-            if rain_rate > 0.1:  # Rain with storm
-                storm_vis = 3.0 - (rain_rate * 2)
-            else:  # Dry storm (dust, debris)
-                storm_vis = 8.0 - (wind_gust / 10)
-            return round(max(0.8, storm_vis), 1)
-
-        elif condition == ATTR_CONDITION_CLEAR_NIGHT:
-            # Excellent night visibility
-            if humidity < 50:
-                return 25.0  # Very clear, dry air
-            elif humidity < 70:
-                return 20.0  # Clear
-            else:
-                return 15.0  # Slight haze
-
-        elif condition == ATTR_CONDITION_SUNNY:
-            # Daytime clear conditions
-            if solar_radiation > 800:  # Very clear atmosphere
-                return 30.0
-            elif solar_radiation >= 600:  # Clear
-                return 25.0
-            elif solar_radiation > 400:  # Good
-                return 20.0
-            else:  # Hazy
-                return 15.0
-
-        elif condition in [ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY]:
-            # Cloud-based visibility
-            if is_daytime:
-                # Use solar data to estimate atmospheric clarity
-                if solar_lux > 50000:
-                    return 25.0  # High clouds, clear air
-                elif solar_lux > 20000:
-                    return 20.0  # Some haze
-                elif solar_lux > 5000:
-                    return 15.0  # Moderate haze
-                else:
-                    return 12.0  # Overcast, some haze
-            else:
-                # Night visibility with clouds
-                if humidity < 75:
-                    return 18.0  # Clear air
-                elif humidity < 85:
-                    return 15.0  # Slight haze
-                else:
-                    return 12.0  # More humid, reduced visibility
-
-        # Default visibility
-        return 15.0
-
+    # Trends methods - delegate to trends analyzer
     def store_historical_data(
-        self, sensor_data: Dict[str, Any], weather_condition: str | None = None
+        self, sensor_data: Dict[str, Any], weather_condition: Optional[str] = None
     ) -> None:
         """Store current sensor readings in historical buffer.
 
@@ -1547,81 +214,21 @@ class WeatherAnalysis:
             sensor_data: Current sensor readings to store
             weather_condition: Current weather condition (optional)
         """
-        timestamp = datetime.now()
-
-        for sensor_key, value in sensor_data.items():
-            if sensor_key in self._sensor_history and value is not None:
-                self._sensor_history[sensor_key].append(
-                    {"timestamp": timestamp, "value": value}
-                )
-
-        # Store weather condition if provided
-        if weather_condition:
-            if "weather_condition" not in self._sensor_history:
-                self._sensor_history["weather_condition"] = deque(maxlen=50)
-            self._sensor_history["weather_condition"].append(
-                {"timestamp": timestamp, "value": weather_condition}
-            )
+        self.trends.store_historical_data(sensor_data, weather_condition)
 
     def get_historical_trends(self, sensor_key: str, hours: int = 24) -> Dict[str, Any]:
-        """Calculate historical trends for a sensor over the specified time period.
+        """Calculate historical trends for a sensor.
 
         Args:
             sensor_key: The sensor key to analyze
             hours: Number of hours to look back
 
         Returns:
-            dict: Trend analysis including:
-                - current: Most recent value
-                - average: Average over the period
-                - trend: Rate of change per hour
-                - min/max: Min/max values
-                - volatility: Standard deviation
+            Dictionary with trend analysis
         """
-        if sensor_key not in self._sensor_history:
-            return {}
+        return self.trends.get_historical_trends(sensor_key, hours)
 
-        # Get data from the last N hours
-        cutoff_time = datetime.now() - timedelta(hours=hours)
-        recent_data = [
-            entry
-            for entry in self._sensor_history[sensor_key]
-            if entry["timestamp"] > cutoff_time
-        ]
-
-        if len(recent_data) < 2:
-            return {}
-
-        values = [entry["value"] for entry in recent_data]
-        timestamps = [entry["timestamp"] for entry in recent_data]
-
-        # Calculate time differences in hours
-        time_diffs = [(t - timestamps[0]).total_seconds() / 3600 for t in timestamps]
-
-        try:
-            # Basic statistics
-            current = values[-1]
-            average = statistics.mean(values)
-            minimum = min(values)
-            maximum = max(values)
-            volatility = statistics.stdev(values) if len(values) > 1 else 0
-
-            # Trend calculation (linear regression slope)
-            trend = self.calculate_trend(time_diffs, values)
-
-            return {
-                "current": current,
-                "average": average,
-                "trend": trend,  # Change per hour
-                "min": minimum,
-                "max": maximum,
-                "volatility": volatility,
-                "sample_count": len(values),
-            }
-        except statistics.StatisticsError:
-            return {}
-
-    def calculate_trend(self, x_values: List[float], y_values: List[float]) -> float:
+    def calculate_trend(self, x_values: list[float], y_values: list[float]) -> float:
         """Calculate linear trend (slope) using simple linear regression.
 
         Args:
@@ -1629,273 +236,34 @@ class WeatherAnalysis:
             y_values: Dependent variable values (sensor readings)
 
         Returns:
-            float: Slope of the trend line (change per unit time)
+            Slope of the trend line
         """
-        if len(x_values) != len(y_values) or len(x_values) < 2:
-            return 0.0
+        return self.trends.calculate_trend(x_values, y_values)
 
-        n = len(x_values)
-        sum_x = sum(x_values)
-        sum_y = sum(y_values)
-        sum_xy = sum(x * y for x, y in zip(x_values, y_values))
-        sum_x2 = sum(x * x for x in x_values)
-
-        denominator = n * sum_x2 - sum_x * sum_x
-        if denominator == 0:
-            return 0.0
-
-        slope = (n * sum_xy - sum_x * sum_y) / denominator
-        return slope
-
+    # Additional helper methods for backward compatibility
     def get_altitude_adjusted_pressure_thresholds_hpa(
         self, altitude: float
     ) -> Dict[str, float]:
-        """Get pressure thresholds adjusted for altitude above sea level.
-
-        Barometric pressure decreases with altitude according to the barometric formula.
-        Standard sea-level thresholds need adjustment for accurate weather analysis
-        at different elevations.
+        """Get pressure thresholds in hPa adjusted for altitude.
 
         Args:
             altitude: Altitude in meters above sea level
 
         Returns:
-            dict: Pressure thresholds in hPa adjusted for altitude
+            Dictionary of pressure thresholds in hPa
         """
-        # Standard sea-level pressure thresholds (hPa)
-        sea_level_thresholds = {
-            "very_high": 1025.0,  # Very high pressure system
-            "high": 1015.0,  # High pressure system
-            "normal_high": 1005.0,  # Normal to high pressure
-            "normal": 995.0,  # Normal pressure
-            "low": 985.0,  # Low pressure system
-            "very_low": 975.0,  # Very low pressure (storm)
-        }
+        return self.atmospheric._get_altitude_adjusted_thresholds_hpa(altitude)
 
-        # Pressure decreases by approximately 1 hPa per 8 meters of elevation
-        # This is a simplified approximation of the barometric formula
-        altitude_correction = altitude / 8.0  # hPa decrease per meter
-
-        # Adjust all thresholds downward for higher altitudes
-        adjusted_thresholds = {}
-        for key, sea_level_pressure in sea_level_thresholds.items():
-            adjusted_thresholds[key] = sea_level_pressure - altitude_correction
-
-        return adjusted_thresholds
-
-    def analyze_pressure_trends(self, altitude: float | None = 0.0) -> Dict[str, Any]:
-        altitude = altitude or 0.0  # Default to 0.0 if None
-        # Get pressure trends over different time periods
-        short_trend = self.get_historical_trends("pressure", hours=3)  # 3-hour trend
-        long_trend = self.get_historical_trends("pressure", hours=24)  # 24-hour trend
-
-        if (
-            not short_trend
-            or not long_trend
-            or "trend" not in short_trend
-            or "trend" not in long_trend
-        ):
-            return {
-                "pressure_system": "unknown",
-                "storm_probability": 0.0,
-                "current_trend": 0,
-                "long_term_trend": 0,
-            }
-
-        current_pressure = long_trend.get("current", 29.92)
-        short_term_change = short_trend.get("trend", 0) * 3  # 3-hour change
-        long_term_change = long_trend.get("trend", 0) * 24  # 24-hour change
-
-        # Get altitude-adjusted pressure thresholds
-        pressure_thresholds = self.get_altitude_adjusted_pressure_thresholds_hpa(
-            altitude
-        )
-
-        # Classify pressure system using altitude-adjusted thresholds
-        if current_pressure > pressure_thresholds["very_high"]:
-            pressure_system = "high_pressure"
-        elif current_pressure < pressure_thresholds["low"]:
-            pressure_system = "low_pressure"
-        else:
-            pressure_system = "normal"
-
-        # Calculate storm probability based on pressure trends
-        storm_probability = 0.0
-
-        # Rapid pressure drop indicates approaching storm
-        if short_term_change < -2:  # Falling >2 hPa in 3 hours
-            storm_probability += 40
-
-        # Sustained pressure drop over 24 hours
-        if long_term_change < -5:  # Falling >5 hPa in 24 hours
-            storm_probability += 30
-
-        # Very low pressure indicates storm (using altitude-adjusted threshold)
-        if current_pressure < pressure_thresholds["very_low"]:
-            storm_probability += 30
-
-        # Incorporate wind direction analysis for enhanced storm prediction
-        wind_direction_analysis = self.analyze_wind_direction_trends()
-        direction_stability = wind_direction_analysis.get("direction_stability", 0.5)
-        significant_shift = wind_direction_analysis.get("significant_shift", False)
-        direction_change_rate = wind_direction_analysis.get(
-            "direction_change_rate", 0.0
-        )
-
-        # Wind direction changes can indicate approaching weather systems
-        if significant_shift:
-            # Major wind direction shift often precedes weather changes
-            storm_probability += 15
-
-        # Rapid wind direction changes with pressure drops = strong storm signal
-        if direction_change_rate > 30 and (
-            short_term_change < -1 or long_term_change < -3
-        ):
-            storm_probability += 20
-
-        # Unstable winds with low pressure = increased storm probability
-        if direction_stability < 0.3 and pressure_system == "low_pressure":
-            storm_probability += 10
-
-        # Cap storm probability
-        storm_probability = min(100.0, storm_probability)
-
-        return {
-            "current_trend": short_term_change,
-            "long_term_trend": long_term_change,
-            "pressure_system": pressure_system,
-            "storm_probability": storm_probability,
-        }
-
-    def analyze_wind_direction_trends(self) -> Dict[str, Any]:
-        """Analyze wind direction trends for weather prediction.
-
-        Wind direction analysis is complex due to circular nature (0-360°).
-        This method handles direction changes that may indicate approaching
-        weather systems or changing weather patterns.
-
-        Returns:
-            dict: Wind direction trend analysis including:
-                - average_direction: Mean wind direction in degrees
-                - direction_stability: How consistent direction has been (0-1)
-                - direction_change_rate: Rate of direction change in °/hour
-                - significant_shift: Boolean indicating major direction change
-                - prevailing_direction: Most common direction sector
-        """
-        # Get wind direction trends over different time periods
-        short_trend = self.get_historical_trends(
-            "wind_direction", hours=6
-        )  # 6-hour trend
-        long_trend = self.get_historical_trends(
-            "wind_direction", hours=24
-        )  # 24-hour trend
-
-        if (
-            not short_trend
-            or not long_trend
-            or "trend" not in short_trend
-            or "trend" not in long_trend
-        ):
-            return {
-                "average_direction": None,
-                "direction_stability": 0.0,
-                "direction_change_rate": 0.0,
-                "significant_shift": False,
-                "prevailing_direction": "unknown",
-            }
-
-        # Get recent wind direction data for detailed analysis
-        cutoff_time = datetime.now() - timedelta(hours=24)
-        recent_data = [
-            entry
-            for entry in self._sensor_history["wind_direction"]
-            if entry["timestamp"] > cutoff_time
-        ]
-
-        if len(recent_data) < 3:
-            return {
-                "average_direction": long_trend.get("current"),
-                "direction_stability": 0.0,
-                "direction_change_rate": 0.0,
-                "significant_shift": False,
-                "prevailing_direction": "unknown",
-            }
-
-        directions = [entry["value"] for entry in recent_data]
-        timestamps = [entry["timestamp"] for entry in recent_data]
-
-        # Calculate average direction (circular mean)
-        avg_direction = self.calculate_circular_mean(directions)
-
-        # Calculate direction stability (lower volatility = more stable)
-        stability = max(0.0, 1.0 - (long_trend.get("volatility", 0) / 180.0))
-
-        # Calculate direction change rate
-        if len(directions) >= 2:
-            # Calculate angular differences (handling wraparound)
-            direction_changes = []
-            for i in range(1, len(directions)):
-                change = self.calculate_angular_difference(
-                    directions[i - 1], directions[i]
-                )
-                direction_changes.append(change)
-
-            # Average change per hour
-            total_time_hours = (timestamps[-1] - timestamps[0]).total_seconds() / 3600
-            if total_time_hours > 0:
-                avg_change_per_hour = (
-                    sum(abs(c) for c in direction_changes) / total_time_hours
-                )
-            else:
-                avg_change_per_hour = 0.0
-        else:
-            avg_change_per_hour = 0.0
-
-        # Detect significant direction shift (rapid change > 45° in 6 hours)
-        significant_shift = False
-        if len(directions) >= 2:
-            recent_change = self.calculate_angular_difference(
-                directions[0], directions[-1]
-            )
-            if abs(recent_change) > 45:  # More than 45° change in 24 hours
-                significant_shift = True
-
-        # Determine prevailing direction (most common 90° sector)
-        prevailing_direction = self.calculate_prevailing_direction(directions)
-
-        return {
-            "average_direction": avg_direction,
-            "direction_stability": stability,
-            "direction_change_rate": avg_change_per_hour,
-            "significant_shift": significant_shift,
-            "prevailing_direction": prevailing_direction,
-        }
-
-    def calculate_circular_mean(self, directions: List[float]) -> float:
+    def calculate_circular_mean(self, directions: list[float]) -> float:
         """Calculate the circular mean of wind directions.
 
         Args:
             directions: List of wind directions in degrees (0-360)
 
         Returns:
-            float: Circular mean direction in degrees
+            Circular mean direction in degrees
         """
-        if not directions:
-            return 0.0
-
-        # Convert to radians
-        radians = [math.radians(d) for d in directions]
-
-        # Calculate circular mean
-        sin_sum = sum(math.sin(r) for r in radians)
-        cos_sum = sum(math.cos(r) for r in radians)
-
-        mean_radians = math.atan2(sin_sum, cos_sum)
-
-        # Convert back to degrees (0-360)
-        mean_degrees = math.degrees(mean_radians) % 360
-
-        return mean_degrees
+        return self.trends.calculate_circular_mean(directions)
 
     def calculate_angular_difference(self, dir1: float, dir2: float) -> float:
         """Calculate the smallest angular difference between two directions.
@@ -1905,157 +273,28 @@ class WeatherAnalysis:
             dir2: Second direction in degrees
 
         Returns:
-            float: Angular difference in degrees (-180 to +180)
+            Angular difference in degrees (-180 to +180)
         """
-        diff = (dir2 - dir1) % 360
-        if diff > 180:
-            diff -= 360
-        return diff
+        return self.atmospheric._calculate_angular_difference(dir1, dir2)
 
-    def calculate_prevailing_direction(self, directions: List[float]) -> str:
+    def calculate_prevailing_direction(self, directions: list[float]) -> str:
         """Determine the prevailing wind direction sector.
 
         Args:
             directions: List of wind directions in degrees
 
         Returns:
-            str: Prevailing direction as cardinal direction
+            Prevailing direction as cardinal direction
         """
-        if not directions:
-            return "unknown"
-
-        # Count directions in each 90° sector
-        sectors = {
-            "north": 0,  # 315-45°
-            "east": 0,  # 45-135°
-            "south": 0,  # 135-225°
-            "west": 0,  # 225-315°
-        }
-
-        for direction in directions:
-            normalized = direction % 360
-            if 315 <= normalized or normalized < 45:
-                sectors["north"] += 1
-            elif 45 <= normalized < 135:
-                sectors["east"] += 1
-            elif 135 <= normalized < 225:
-                sectors["south"] += 1
-            else:  # 225 <= normalized < 315
-                sectors["west"] += 1
-
-        # Return the sector with the most observations
-        prevailing = max(sectors, key=lambda k: sectors[k])
-        return prevailing
+        return self.trends.calculate_prevailing_direction(directions)
 
     def get_historical_weather_bias(self, hours: int = 6) -> Dict[str, Any]:
-        """Calculate historical weather bias for low-elevation cloud cover adjustment.
-
-        Analyzes recent weather conditions to determine if skies have been
-        predominantly clear. This helps prevent false cloudy readings at sunrise
-        and sunset when solar radiation naturally drops but atmospheric conditions
-        remain clear. Applies more conservative bias in the morning when only
-        nighttime data is available.
+        """Calculate historical weather bias for low-elevation adjustments.
 
         Args:
-            hours: Number of hours to look back for historical analysis
+            hours: Number of hours to look back
 
         Returns:
-            dict: Bias analysis including:
-                - clear_percentage: Percentage of time with clear/sunny conditions
-                - bias_strength: Strength of bias toward clear conditions (0-1)
-                - recent_conditions: List of recent weather conditions
-                - pressure_trend: Recent pressure trend analysis
-                - is_morning: Whether the analysis is for morning conditions
+            Dictionary with bias analysis
         """
-        if "weather_condition" not in self._sensor_history:
-            return {
-                "clear_percentage": 0.0,
-                "bias_strength": 0.0,
-                "recent_conditions": [],
-                "pressure_trend": None,
-                "is_morning": False,
-            }
-
-        # Determine if we're in morning conditions (more conservative bias)
-        current_hour = datetime.now().hour
-        is_morning = current_hour < 12  # Before noon = morning
-
-        # Get weather conditions from the last N hours
-        cutoff_time = datetime.now() - timedelta(hours=hours)
-        recent_conditions = [
-            entry["value"]
-            for entry in self._sensor_history["weather_condition"]
-            if entry["timestamp"] > cutoff_time
-        ]
-
-        if not recent_conditions:
-            return {
-                "clear_percentage": 0.0,
-                "bias_strength": 0.0,
-                "recent_conditions": [],
-                "pressure_trend": None,
-                "is_morning": is_morning,
-            }
-
-        # Count clear/sunny conditions
-        clear_conditions = [ATTR_CONDITION_SUNNY, ATTR_CONDITION_CLEAR_NIGHT]
-        clear_count = sum(
-            1 for condition in recent_conditions if condition in clear_conditions
-        )
-        total_count = len(recent_conditions)
-        clear_percentage = (clear_count / total_count) * 100 if total_count > 0 else 0.0
-
-        # Get recent pressure trends for additional context
-        pressure_trends = self.analyze_pressure_trends()
-
-        # Calculate bias strength based on clear percentage and pressure trends
-        # Higher clear percentage = stronger bias toward clear
-        # High pressure systems also support clear bias
-        base_bias = min(1.0, clear_percentage / 100.0)
-
-        # Boost bias if pressure system is high (clear skies more likely)
-        pressure_boost = 0.0
-        if pressure_trends.get("pressure_system") == "high_pressure":
-            pressure_boost = 0.2
-        elif pressure_trends.get("pressure_system") == "normal":
-            pressure_boost = 0.1
-
-        # Boost bias if pressure is rising (clearing conditions)
-        trend_boost = 0.0
-        long_term_trend = pressure_trends.get("long_term_trend", 0.0)
-        if long_term_trend > 1.0:  # Rising pressure over 24 hours
-            trend_boost = 0.15
-
-        bias_strength = min(1.0, base_bias + pressure_boost + trend_boost)
-
-        # Apply morning conservatism: reduce bias strength in morning
-        # since we only have nighttime data and no daytime confirmation yet
-        if is_morning and bias_strength > 0.5:
-            # Reduce strong bias to moderate in morning (require stronger evidence)
-            bias_strength = max(0.5, bias_strength * 0.8)
-            _LOGGER.debug(
-                "Morning conservatism applied: reduced bias from %.2f to %.2f "
-                "(only nighttime data available)",
-                (base_bias + pressure_boost + trend_boost),
-                bias_strength,
-            )
-
-        _LOGGER.debug(
-            "Historical weather bias: %.1f%% clear conditions, bias strength: %.2f "
-            "(pressure system: %s, trend: %.2f hPa/24h, morning: %s)",
-            clear_percentage,
-            bias_strength,
-            pressure_trends.get("pressure_system", "unknown"),
-            long_term_trend,
-            is_morning,
-        )
-
-        return {
-            "clear_percentage": clear_percentage,
-            "bias_strength": bias_strength,
-            "recent_conditions": recent_conditions[
-                -10:
-            ],  # Last 10 conditions for context
-            "pressure_trend": pressure_trends,
-            "is_morning": is_morning,
-        }
+        return self.solar._get_historical_weather_bias(hours)
