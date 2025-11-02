@@ -196,6 +196,9 @@ class TestWeatherAnalysis:
         cloud_cover = analysis.analyze_cloud_cover(800.0, 80000.0, 8.0)
         assert cloud_cover <= 25  # Should be mostly clear (around 20%)
 
+        # Clear cloud cover history to avoid hysteresis effects
+        analysis._sensor_history["cloud_cover"] = []
+
         # Test cloudy conditions
         cloud_cover_cloudy = analysis.analyze_cloud_cover(50.0, 5000.0, 1.0)
         assert cloud_cover_cloudy > 80  # Should be mostly cloudy
@@ -314,10 +317,14 @@ class TestWeatherAnalysis:
         """Test cloud cover analysis edge cases."""
         # Clear historical data to avoid averaging effects
         analysis._sensor_history["solar_radiation"] = []
+        analysis._sensor_history["cloud_cover"] = []
 
         # Test with zero values (triggers heavy overcast)
         cloud_cover_zero = analysis.analyze_cloud_cover(0.0, 0.0, 0.0, 45.0)
         assert cloud_cover_zero == 100.0  # No solar input = complete overcast
+
+        # Clear cloud cover history before next test
+        analysis._sensor_history["cloud_cover"] = []
 
         # Test with very high values (should cap at 0% cloud cover)
         cloud_cover_max = analysis.analyze_cloud_cover(2000.0, 200000.0, 20.0, 90.0)
@@ -801,6 +808,9 @@ class TestWeatherAnalysis:
             "pressure": 30.10,
             "solar_elevation": 60.0,
         }
+        # Clear condition and cloud cover history to avoid hysteresis from previous tests
+        analysis._condition_history = []
+        analysis._sensor_history["cloud_cover"] = []
         condition = analysis.determine_weather_condition(sensor_data_windy_sunny, 0.0)
         assert condition == ATTR_CONDITION_WINDY  # Windy on sunny day
 

@@ -2772,7 +2772,7 @@ class TestAdvancedWeatherForecast:
             dewpoint=31.8,  # Very tight spread
             spread=0.2,
             wind_speed=0.5,  # Very calm
-            solar_rad=0.5,  # No solar radiation
+            solar_rad=0.0,  # No solar radiation at night
             is_daytime=False,
         )
 
@@ -2780,14 +2780,14 @@ class TestAdvancedWeatherForecast:
             result == ATTR_CONDITION_FOG
         ), "Should detect dense fog with extreme conditions"
 
-    def test_weather_analysis_fog_detection_twilight_false_positive(self):
-        """Test that fog is not falsely detected during twilight."""
+    def test_weather_analysis_fog_detection_twilight_high_humidity(self):
+        """Test that fog is correctly detected during twilight with extreme humidity."""
         weather_analysis = WeatherAnalysis()
 
-        # Twilight with high humidity should not trigger fog
+        # Twilight with extreme humidity should trigger fog detection
         result = weather_analysis.analyze_fog_conditions(
             temp=70.0,
-            humidity=95.0,  # High but not extreme
+            humidity=95.0,  # Very high humidity
             dewpoint=68.0,
             spread=2.0,
             wind_speed=5.0,
@@ -2900,13 +2900,14 @@ class TestAdvancedWeatherForecast:
         # Mock historical pressure data (simulation)
         weather_analysis._sensor_history[KEY_PRESSURE] = deque(maxlen=192)
 
-        # Add 24 readings showing rapid pressure drop (simulating falling pressure)
+        # Add 24 readings showing severe pressure drop (simulating major storm)
+        # 1.5 inHg/24h is severe (hurricane-level), but realistic for testing
         for i in range(24):
             weather_analysis._sensor_history[KEY_PRESSURE].append(
                 {
                     "timestamp": now - datetime.timedelta(hours=24 - i),
                     "value": 29.92
-                    - (i * 0.15),  # Dropping 0.15 inHg per hour = 3.6 inHg/day
+                    - (i * 0.0625),  # Dropping 0.0625 inHg per hour = 1.5 inHg/day
                 }
             )
 

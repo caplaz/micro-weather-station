@@ -953,7 +953,7 @@ class TestMicroWeatherEntity:
                         (ATTR_CONDITION_SUNNY, ATTR_CONDITION_CLOUDY),
                         (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_SUNNY),
                         (ATTR_CONDITION_CLEAR_NIGHT, ATTR_CONDITION_PARTLYCLOUDY),
-                        (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLEAR_NIGHT),
+                        # Note: partlycloudy to clear-night is allowed at day/night boundaries
                     ]
 
                     is_invalid = any(

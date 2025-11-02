@@ -32,6 +32,12 @@ from .const import (
     KEY_UV_INDEX,
     KEY_WIND_SPEED,
 )
+from .meteorological_constants import (
+    CloudCoverThresholds,
+    PressureThresholds,
+    TemperatureThresholds,
+    WindThresholds,
+)
 from .weather_analysis import WeatherAnalysis
 from .weather_utils import convert_to_kmh, is_forecast_hour_daytime
 
@@ -587,15 +593,15 @@ class AdvancedWeatherForecast:
         # Wind effect - light winds allow stability, strong winds mix atmosphere
         if not isinstance(wind_speed, (int, float)):
             wind_speed = 5.0
-        if wind_speed < 5:  # Light winds
+        if wind_speed < WindThresholds.LIGHT_BREEZE:  # Light winds
             stability += 0.15
-        elif wind_speed > 15:  # Strong winds
+        elif wind_speed > WindThresholds.MODERATE_BREEZE:  # Strong winds
             stability -= 0.15
 
         # Humidity effect - high humidity can indicate stable moist air
         if not isinstance(humidity, (int, float)):
             humidity = 50.0
-        if humidity > 70:
+        if humidity > TemperatureThresholds.HUMIDITY_MODERATE_HIGH:
             stability += 0.1
         elif humidity < 30:
             stability -= 0.1
@@ -676,22 +682,26 @@ class AdvancedWeatherForecast:
                 cloud_cover = 90.0
 
         # Add pressure trend influence on cloud cover
+        # Use centralized constants for consistency with weather_analysis.py
         pressure_trend = pressure_analysis.get("current_trend", 0)
         if not isinstance(pressure_trend, (int, float)):
             pressure_trend = 0.0
-        if pressure_trend < -0.5:  # Falling pressure = increasing clouds
-            cloud_cover = min(95.0, cloud_cover + 60.0)  # Stronger influence
-        elif pressure_trend < 0:  # Slightly falling pressure
-            cloud_cover = min(95.0, cloud_cover + 40.0)  # Stronger influence
-        elif pressure_trend > 0.2:  # Rising pressure = decreasing clouds
-            cloud_cover = max(5.0, cloud_cover - 40.0)  # Stronger influence
+        if pressure_trend < PressureThresholds.TREND_3H_RAPID_FALL:
+            # Rapid fall = increasing clouds
+            cloud_cover = min(95.0, cloud_cover + 60.0)
+        elif pressure_trend < 0:
+            # Slightly falling pressure
+            cloud_cover = min(95.0, cloud_cover + 40.0)
+        elif pressure_trend > PressureThresholds.TREND_3H_MODERATE_RISE:
+            # Rising pressure = decreasing clouds
+            cloud_cover = max(5.0, cloud_cover - 40.0)
 
         # Add cloud type classification
-        if cloud_cover < 25:
+        if cloud_cover < CloudCoverThresholds.FEW:
             cloud_type = "clear"
-        elif cloud_cover < 50:
+        elif cloud_cover < CloudCoverThresholds.SCATTERED:
             cloud_type = "few_clouds"  # Fair weather clouds
-        elif cloud_cover < 75:
+        elif cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:
             cloud_type = "scattered"  # Layer clouds
         else:
             cloud_type = "overcast"  # Thick layer clouds
@@ -1190,11 +1200,61 @@ class AdvancedWeatherForecast:
         if day_idx == 0:
             confidence_value = max(confidence_value, 0.8)
 
-        if confidence_value > 0.7:
-            if cloud_cover < 20:
-                forecast_condition = ATTR_CONDITION_SUNNY
-            elif cloud_cover > 40:  # Lower threshold for cloudy
-                forecast_condition = ATTR_CONDITION_CLOUDY
+        # For day 0, be conservative but allow pressure-driven overrides
+        if day_idx == 0:
+            # Use pressure trends to determine if we should override current condition
+            pressure_system = meteorological_state["pressure_analysis"].get(
+                "pressure_system", "normal"
+            )
+            storm_probability = meteorological_state["pressure_analysis"].get(
+                "storm_probability", 0
+            )
+            current_trend = meteorological_state["pressure_analysis"].get(
+                "current_trend", 0
+            )
+
+            # High pressure systems improve conditions
+            if pressure_system == "high_pressure" and confidence_value > 0.7:
+                if cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:  # < 75%
+                    forecast_condition = (
+                        ATTR_CONDITION_SUNNY
+                        if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY
+                        else ATTR_CONDITION_PARTLYCLOUDY
+                    )
+
+            # Low pressure systems worsen conditions
+            elif pressure_system == "low_pressure" and confidence_value > 0.7:
+                if cloud_cover > CloudCoverThresholds.THRESHOLD_SUNNY:  # > 20%
+                    forecast_condition = ATTR_CONDITION_CLOUDY
+
+            # Normal pressure systems: use trend direction
+            elif pressure_system == "normal" and confidence_value > 0.7:
+                if current_trend < -0.3:  # Falling pressure in normal system
+                    if cloud_cover > CloudCoverThresholds.THRESHOLD_SUNNY:
+                        forecast_condition = ATTR_CONDITION_CLOUDY
+                elif current_trend > 0.3:  # Rising pressure in normal system
+                    if cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:
+                        forecast_condition = (
+                            ATTR_CONDITION_SUNNY
+                            if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY
+                            else ATTR_CONDITION_PARTLYCLOUDY
+                        )
+
+            # High storm probability always indicates precipitation
+            if storm_probability > 60:
+                forecast_condition = (
+                    ATTR_CONDITION_LIGHTNING_RAINY
+                    if storm_probability > 80
+                    else ATTR_CONDITION_RAINY
+                )
+
+        else:
+            # For future days, apply normal cloud cover logic
+            if confidence_value > 0.7:
+                if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY:
+                    forecast_condition = ATTR_CONDITION_SUNNY
+                elif cloud_cover > 40:  # Lower threshold for cloudy
+                    forecast_condition = ATTR_CONDITION_CLOUDY
 
         # Apply moisture analysis for precipitation potential
         moisture_analysis = meteorological_state["moisture_analysis"]

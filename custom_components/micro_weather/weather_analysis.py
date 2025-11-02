@@ -34,6 +34,14 @@ from .const import (
     KEY_WIND_GUST,
     KEY_WIND_SPEED,
 )
+from .meteorological_constants import (
+    CloudCoverThresholds,
+    FogThresholds,
+    PrecipitationThresholds,
+    PressureThresholds,
+    TemperatureThresholds,
+    WindThresholds,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,7 +105,7 @@ class WeatherAnalysis:
         else:
             dewpoint = self.calculate_dewpoint(outdoor_temp, humidity)
         temp_dewpoint_spread = outdoor_temp - dewpoint
-        is_freezing = outdoor_temp <= 32.0
+        is_freezing = outdoor_temp <= TemperatureThresholds.FREEZING
 
         # Advanced daytime detection (solar elevation proxy)
         is_daytime = solar_radiation > 5 or solar_lux > 50 or uv_index > 0.1
@@ -126,22 +134,33 @@ class WeatherAnalysis:
         )
 
         # Enhanced wind analysis (Beaufort scale adapted with turbulence detection)
-        wind_calm = wind_speed < 1  # 0-1 mph: Calm
-        wind_light = 1 <= wind_speed < 8  # 1-7 mph: Light air to light breeze
-        wind_strong = 19 <= wind_speed < 32  # 19-31 mph: Strong breeze to near gale
-        wind_gale = wind_speed >= 32  # 32+ mph: Gale force
+        wind_calm = wind_speed < WindThresholds.CALM
+        wind_light = WindThresholds.CALM <= wind_speed < WindThresholds.LIGHT_BREEZE
+        wind_strong = (
+            WindThresholds.FRESH_BREEZE <= wind_speed < WindThresholds.NEAR_GALE
+        )
+        wind_gale = wind_speed >= WindThresholds.NEAR_GALE
 
         # Enhanced gust analysis for better storm detection
         gust_factor = wind_gust / max(wind_speed, 1)  # Gust ratio for turbulence
-        is_gusty = gust_factor > 1.5 and wind_gust > 10
-        is_very_gusty = gust_factor > 2.0 and wind_gust > 15
+        is_gusty = (
+            gust_factor > WindThresholds.GUST_FACTOR_MODERATE
+            and wind_gust > WindThresholds.GUST_MODERATE
+        )
+        is_very_gusty = (
+            gust_factor > WindThresholds.GUST_FACTOR_STRONG
+            and wind_gust > WindThresholds.GUST_STRONG
+        )
 
         # Severe turbulence indicator (suggests thunderstorm activity)
-        is_severe_turbulence = (gust_factor > 3.0 and wind_gust > 20) or wind_gust > 40
+        is_severe_turbulence = (
+            gust_factor > WindThresholds.GUST_FACTOR_SEVERE
+            and wind_gust > WindThresholds.GUST_SEVERE
+        ) or wind_gust > WindThresholds.GUST_EXTREME
 
         # PRIORITY 1: ACTIVE PRECIPITATION (Highest Priority)
         # Rain/snow takes precedence over all other conditions
-        significant_rain = rain_rate > 0.01
+        significant_rain = rain_rate > PrecipitationThresholds.SIGNIFICANT
 
         # Check for precipitation (either significant rain_rate OR wet sensor)
         if significant_rain or rain_state == "wet":
@@ -157,21 +176,32 @@ class WeatherAnalysis:
             if (
                 pressure_extremely_low  # Severe storm pressure (< 29.20 inHg)
                 or (
-                    pressure_very_low and wind_strong and rain_rate > 0.1
+                    pressure_very_low
+                    and wind_strong
+                    and rain_rate > PrecipitationThresholds.LIGHT
                 )  # Storm pressure + strong winds + moderate+ rain
                 or (
-                    pressure_very_low and is_very_gusty and rain_rate > 0.25
+                    pressure_very_low
+                    and is_very_gusty
+                    and rain_rate > PrecipitationThresholds.MODERATE
                 )  # Storm pressure + very gusty + heavy rain
                 or (
-                    is_severe_turbulence and rain_rate > 0.05
+                    is_severe_turbulence
+                    and rain_rate > PrecipitationThresholds.STORM_MIN_RATE
                 )  # Severe wind turbulence + any precipitation (thunderstorm indicator)
             ):
                 return ATTR_CONDITION_LIGHTNING_RAINY  # Thunderstorm/severe weather
 
             # Regular rain classification
-            if precipitation_intensity == "heavy" or rain_rate > 0.25:
+            if (
+                precipitation_intensity == "heavy"
+                or rain_rate > PrecipitationThresholds.MODERATE
+            ):
                 return ATTR_CONDITION_POURING  # Heavy rain
-            elif precipitation_intensity == "moderate" or rain_rate > 0.1:
+            elif (
+                precipitation_intensity == "moderate"
+                or rain_rate > PrecipitationThresholds.LIGHT
+            ):
                 return ATTR_CONDITION_RAINY  # Moderate rain
             else:
                 return ATTR_CONDITION_RAINY  # Light rain/drizzle
@@ -222,9 +252,16 @@ class WeatherAnalysis:
                         "using atmospheric fallback analysis"
                     )
                     # Use atmospheric conditions for weather determination
-                    if humidity < 50 and temp_dewpoint_spread > 10:
+                    if (
+                        humidity < TemperatureThresholds.HUMIDITY_MODERATE
+                        and temp_dewpoint_spread > TemperatureThresholds.SPREAD_MODERATE
+                    ):
                         return ATTR_CONDITION_SUNNY
-                    elif humidity < 70 and temp_dewpoint_spread > 5 and pressure_normal:
+                    elif (
+                        humidity < TemperatureThresholds.HUMIDITY_MODERATE_HIGH
+                        and temp_dewpoint_spread > TemperatureThresholds.SPREAD_HUMID
+                        and pressure_normal
+                    ):
                         return ATTR_CONDITION_SUNNY
                     elif pressure_high and humidity < 75:
                         return ATTR_CONDITION_SUNNY
@@ -275,7 +312,9 @@ class WeatherAnalysis:
             # If it's cloudy, return cloudy (not windy)
             if final_condition == ATTR_CONDITION_SUNNY:
                 # Only override sunny with windy if winds are strong
-                if wind_strong or (is_very_gusty and wind_speed >= 8):
+                if wind_strong or (
+                    is_very_gusty and wind_speed >= WindThresholds.LIGHT_BREEZE
+                ):
                     _LOGGER.debug(
                         "Overriding sunny with windy (wind_speed=%.1f mph, gusty=%s)",
                         wind_speed,
@@ -299,11 +338,19 @@ class WeatherAnalysis:
             # Order conditions from most specific to least specific
 
             # Most specific: Combined conditions
-            if pressure_low and humidity > 90 and wind_speed < 3:
+            if (
+                pressure_low
+                and humidity > TemperatureThresholds.HUMIDITY_HIGH
+                and wind_speed < 3
+            ):
                 return ATTR_CONDITION_CLOUDY  # Low pressure + very high humidity + calm = cloudy
 
             # Clear night conditions (favorable pressure/humidity combinations)
-            elif pressure_very_high and wind_calm and humidity < 70:
+            elif (
+                pressure_very_high
+                and wind_calm
+                and humidity < TemperatureThresholds.HUMIDITY_MODERATE_HIGH
+            ):
                 return ATTR_CONDITION_CLEAR_NIGHT  # Perfect clear night
             elif pressure_high and not is_gusty and humidity < 80:
                 return ATTR_CONDITION_CLEAR_NIGHT  # Clear night
@@ -475,11 +522,11 @@ class WeatherAnalysis:
 
     def classify_precipitation_intensity(self, rain_rate: float) -> str:
         """Classify precipitation intensity (meteorological standards)."""
-        if rain_rate >= 0.5:
+        if rain_rate >= PrecipitationThresholds.HEAVY:
             return "heavy"  # Heavy rain
-        elif rain_rate >= 0.1:
+        elif rain_rate >= PrecipitationThresholds.LIGHT:
             return "moderate"  # Moderate rain
-        elif rain_rate >= 0.01:
+        elif rain_rate >= PrecipitationThresholds.SIGNIFICANT:
             return "light"  # Light rain/drizzle
         else:
             return "trace"  # Trace amounts
@@ -533,71 +580,73 @@ class WeatherAnalysis:
         fog_score = 0
 
         # 1. HUMIDITY FACTOR (0-40 points) - Most important for fog
-        if humidity >= 98:
-            fog_score += 40  # Extremely high - dense fog likely
-        elif humidity >= 95:
-            fog_score += 30  # Very high - fog probable
-        elif humidity >= 92:
-            fog_score += 20  # High - fog possible
-        elif humidity >= 88:
-            fog_score += 10  # Moderately high - marginal fog conditions
+        if humidity >= FogThresholds.HUMIDITY_DENSE_FOG:
+            fog_score += FogThresholds.SCORE_DENSE
+        elif humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG:
+            fog_score += FogThresholds.SCORE_PROBABLE
+        elif humidity >= FogThresholds.HUMIDITY_POSSIBLE_FOG:
+            fog_score += FogThresholds.SCORE_POSSIBLE
+        elif humidity >= FogThresholds.HUMIDITY_MARGINAL_FOG:
+            fog_score += FogThresholds.SCORE_MARGINAL
         else:
             fog_score += 0  # Too low for fog
 
         # 2. TEMPERATURE-DEWPOINT SPREAD FACTOR (0-30 points)
-        if spread <= 0.5:
-            fog_score += 30  # Nearly saturated - fog very likely
-        elif spread <= 1.0:
-            fog_score += 25  # Very close - fog likely
-        elif spread <= 2.0:
-            fog_score += 15  # Close - fog possible
-        elif spread <= 3.0:
-            fog_score += 5  # Marginal - light fog/mist possible
+        if spread <= FogThresholds.SPREAD_SATURATED:
+            fog_score += FogThresholds.SCORE_SPREAD_SATURATED
+        elif spread <= FogThresholds.SPREAD_VERY_CLOSE:
+            fog_score += FogThresholds.SCORE_SPREAD_VERY_CLOSE
+        elif spread <= FogThresholds.SPREAD_CLOSE:
+            fog_score += FogThresholds.SCORE_SPREAD_CLOSE
+        elif spread <= FogThresholds.SPREAD_MARGINAL:
+            fog_score += FogThresholds.SCORE_SPREAD_MARGINAL
         else:
             fog_score += 0  # Too large for fog
 
         # 3. WIND FACTOR (0-15 points)
         # Light winds allow fog to form and persist
         # Strong winds disperse fog
-        if wind_speed <= 2:
-            fog_score += 15  # Calm - ideal for dense fog
-        elif wind_speed <= 5:
-            fog_score += 10  # Light - fog can persist
-        elif wind_speed <= 8:
-            fog_score += 5  # Moderate - fog may form but lighter
+        if wind_speed <= FogThresholds.WIND_CALM:
+            fog_score += FogThresholds.SCORE_WIND_CALM
+        elif wind_speed <= FogThresholds.WIND_LIGHT:
+            fog_score += FogThresholds.SCORE_WIND_LIGHT
+        elif wind_speed <= FogThresholds.WIND_MODERATE:
+            fog_score += FogThresholds.SCORE_WIND_MODERATE
         else:
-            fog_score -= 10  # Strong winds disperse fog
+            fog_score += FogThresholds.PENALTY_WIND_STRONG
 
         # 4. SOLAR RADIATION FACTOR (0-15 points)
         # Fog reduces solar radiation, but some can penetrate thin fog
         if is_daytime:
             # During daytime, solar radiation helps distinguish fog from haze
-            if solar_rad < 50:
-                fog_score += 15  # Very low - dense fog blocking sun
-            elif solar_rad < 150:
-                fog_score += 10  # Low - moderate fog or heavy overcast
-            elif solar_rad < 300:
-                fog_score += 5  # Reduced - light fog or overcast
+            if solar_rad < FogThresholds.SOLAR_VERY_LOW:
+                fog_score += FogThresholds.SCORE_SOLAR_DENSE
+            elif solar_rad < FogThresholds.SOLAR_LOW:
+                fog_score += FogThresholds.SCORE_SOLAR_MODERATE
+            elif solar_rad < FogThresholds.SOLAR_REDUCED:
+                fog_score += FogThresholds.SCORE_SOLAR_LIGHT
             else:
                 fog_score += 0  # Normal radiation - no fog indicated
         else:
             # At night, solar radiation should be negligible
-            if solar_rad <= 2:
-                fog_score += 10  # No radiation - consistent with night fog
-            elif solar_rad <= 10:
-                fog_score += 5  # Minimal - twilight or light pollution
-            elif solar_rad <= 50:
+            if solar_rad <= FogThresholds.SOLAR_MINIMAL_NIGHT:
+                fog_score += FogThresholds.SCORE_SOLAR_NIGHT
+            elif solar_rad <= FogThresholds.SOLAR_TWILIGHT:
+                fog_score += FogThresholds.SCORE_SOLAR_TWILIGHT
+            elif solar_rad <= FogThresholds.SOLAR_MODERATE_TWILIGHT:
                 fog_score += (
                     0  # Moderate twilight radiation - fog possible but less likely
                 )
             else:
-                fog_score -= (
-                    15  # Significant radiation during night - fog very unlikely
-                )
+                fog_score += FogThresholds.PENALTY_SOLAR_STRONG
 
         # 5. TEMPERATURE FACTOR (bonus points for evaporation fog)
         # Warmer temperatures after cooling can indicate evaporation fog
-        if temp > 40 and humidity >= 95 and spread <= 2:
+        if (
+            temp > FogThresholds.TEMP_WARM_THRESHOLD
+            and humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG
+            and spread <= FogThresholds.SPREAD_CLOSE
+        ):
             fog_score += 5  # Bonus for evaporation fog conditions
 
         # Apply fog detection threshold with logging
@@ -614,18 +663,28 @@ class WeatherAnalysis:
         )
 
         # Fog detection thresholds based on score
-        if fog_score >= 70:
-            _LOGGER.debug("Dense fog detected (score: %.1f >= 70)", fog_score)
+        if fog_score >= FogThresholds.THRESHOLD_DENSE_FOG:
+            _LOGGER.debug(
+                "Dense fog detected (score: %.1f >= %d)",
+                fog_score,
+                FogThresholds.THRESHOLD_DENSE_FOG,
+            )
             return ATTR_CONDITION_FOG
-        elif fog_score >= 55:
-            _LOGGER.debug("Moderate fog detected (score: %.1f >= 55)", fog_score)
+        elif fog_score >= FogThresholds.THRESHOLD_MODERATE_FOG:
+            _LOGGER.debug(
+                "Moderate fog detected (score: %.1f >= %d)",
+                fog_score,
+                FogThresholds.THRESHOLD_MODERATE_FOG,
+            )
             return ATTR_CONDITION_FOG
-        elif fog_score >= 45:
+        elif fog_score >= FogThresholds.THRESHOLD_LIGHT_FOG:
             # Marginal fog - only if humidity is very high
-            if humidity >= 95:
+            if humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG:
                 _LOGGER.debug(
-                    "Light fog detected (score: %.1f >= 45, humidity >= 95%%)",
+                    "Light fog detected (score: %.1f >= %d, humidity >= %d%%)",
                     fog_score,
+                    FogThresholds.THRESHOLD_LIGHT_FOG,
+                    FogThresholds.HUMIDITY_PROBABLE_FOG,
                 )
                 return ATTR_CONDITION_FOG
 
@@ -662,47 +721,45 @@ class WeatherAnalysis:
         # Base adjustment from short-term trend (3-hour change)
         # Falling pressure = more clouds, rising pressure = fewer clouds
         short_term_adjustment = 0.0
-        if current_trend < -0.5:  # Falling >0.5 hPa in 3 hours (more sensitive)
+        if current_trend < PressureThresholds.TREND_3H_RAPID_FALL:
             # Scale adjustment based on magnitude (capped at -20% for very rapid drops)
             short_term_adjustment = max(
-                -20.0, current_trend * 8.0
-            )  # Increased sensitivity
-        elif current_trend > 0.2:  # Rising >0.2 hPa in 3 hours (more sensitive)
+                -20.0, current_trend * PressureThresholds.SHORT_TERM_MULTIPLIER_FALL
+            )
+        elif current_trend > PressureThresholds.TREND_3H_MODERATE_RISE:
             # Scale adjustment based on magnitude (capped at +20% for rapid rises)
             short_term_adjustment = min(
-                20.0, current_trend * 15.0
-            )  # Increased sensitivity
+                20.0, current_trend * PressureThresholds.SHORT_TERM_MULTIPLIER_RISE
+            )
 
         # Long-term trend adjustment (24-hour change)
         long_term_adjustment = 0.0
-        if long_term_trend < -1.0:  # Falling >1 hPa in 24 hours (more sensitive)
+        if long_term_trend < PressureThresholds.TREND_24H_RAPID_FALL:
             # Sustained pressure drop indicates approaching weather system
             long_term_adjustment = max(
-                -25.0, long_term_trend * 6.0
-            )  # Increased sensitivity
-        elif long_term_trend > 0.1:  # Rising >0.1 hPa in 24 hours (more sensitive)
+                -25.0, long_term_trend * PressureThresholds.LONG_TERM_MULTIPLIER_FALL
+            )
+        elif long_term_trend > PressureThresholds.TREND_24H_MODERATE_RISE:
             # Sustained pressure rise indicates clearing
             long_term_adjustment = min(
-                25.0, long_term_trend * 12.0
-            )  # Increased sensitivity
+                25.0, long_term_trend * PressureThresholds.LONG_TERM_MULTIPLIER_RISE
+            )
 
         # Pressure system adjustment
         system_adjustment = 0.0
         if pressure_system == "low_pressure":
-            system_adjustment = (
-                15.0  # Low pressure systems tend to be cloudier (stronger)
-            )
+            system_adjustment = PressureThresholds.LOW_PRESSURE_CLOUD_INCREASE
         elif pressure_system == "high_pressure":
-            system_adjustment = (
-                -50.0
-            )  # High pressure systems tend to be clearer (stronger)
+            system_adjustment = PressureThresholds.HIGH_PRESSURE_CLOUD_REDUCTION
+        elif pressure_system == "storm":
+            system_adjustment = PressureThresholds.STORM_CLOUD_INCREASE
 
         # Combine adjustments with weighting
         # Short-term trends are more immediate but long-term trends are more reliable
         total_adjustment = (
             short_term_adjustment * 0.3  # 30% weight to recent changes
             + long_term_adjustment * 0.4  # 40% weight to sustained trends
-            + system_adjustment * 0.3  # 30% weight to pressure system
+            + system_adjustment * PressureThresholds.SYSTEM_WEIGHT
         )
 
         # Ensure reasonable bounds
@@ -1012,11 +1069,11 @@ class WeatherAnalysis:
         Returns:
             str: Weather condition constant
         """
-        if cloud_cover <= 25:
+        if cloud_cover <= CloudCoverThresholds.FEW:
             return ATTR_CONDITION_SUNNY
-        elif cloud_cover <= 50:
+        elif cloud_cover <= CloudCoverThresholds.SCATTERED:
             return ATTR_CONDITION_PARTLYCLOUDY
-        elif cloud_cover <= 75:
+        elif cloud_cover <= CloudCoverThresholds.THRESHOLD_CLOUDY:
             return ATTR_CONDITION_CLOUDY
         else:
             return ATTR_CONDITION_CLOUDY
