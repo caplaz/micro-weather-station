@@ -22,9 +22,9 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_SNOWY,
     ATTR_CONDITION_SUNNY,
 )
-from homeassistant.const import UnitOfSpeed
 from homeassistant.util import dt as dt_util
 
+from ..analysis.trends import TrendsAnalyzer
 from ..const import (
     KEY_CONDITION,
     KEY_HUMIDITY,
@@ -35,7 +35,6 @@ from ..const import (
     KEY_WIND_SPEED,
 )
 from ..meteorological_constants import CloudCoverThresholds
-from ..weather_analysis import WeatherAnalysis
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,13 +49,13 @@ def convert_to_kmh(speed: float) -> Optional[float]:
 class DailyForecastGenerator:
     """Handles generation of 5-day daily forecasts."""
 
-    def __init__(self, weather_analysis: WeatherAnalysis):
+    def __init__(self, trends_analyzer: TrendsAnalyzer):
         """Initialize daily forecast generator.
 
         Args:
-            weather_analysis: WeatherAnalysis instance for historical data
+            trends_analyzer: TrendsAnalyzer instance for historical data
         """
-        self.weather_analysis = weather_analysis
+        self.trends_analyzer = trends_analyzer
 
     def generate_forecast(
         self,

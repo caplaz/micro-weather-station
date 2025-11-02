@@ -150,6 +150,11 @@ class MicroWeatherCoordinator(DataUpdateCoordinator):
 
         try:
             detector = WeatherDetector(self.hass, self.entry.options)
+            # Store analyzers on coordinator for weather entity access
+            self.atmospheric_analyzer = detector.atmospheric_analyzer
+            self.solar_analyzer = detector.solar_analyzer
+            self.trends_analyzer = detector.trends_analyzer
+            self.core_analyzer = detector.core_analyzer
             return detector.get_weather_data()
         except Exception as err:
             _LOGGER.error("Error updating weather data: %s", err)

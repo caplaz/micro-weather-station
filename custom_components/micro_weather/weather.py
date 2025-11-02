@@ -80,19 +80,36 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         # Set initial state to unavailable until we have data
         self._attr_available = bool(coordinator.data)
         # Initialize the advanced weather forecast with analysis instance
-        if hasattr(coordinator, "analysis") and coordinator.analysis:
-            self._forecast = AdvancedWeatherForecast(coordinator.analysis)
+        if (
+            hasattr(coordinator, "atmospheric_analyzer")
+            and coordinator.atmospheric_analyzer
+        ):
+            self._forecast = AdvancedWeatherForecast(
+                coordinator.atmospheric_analyzer,
+                coordinator.solar_analyzer,
+                coordinator.trends_analyzer,
+                coordinator.core_analyzer,
+            )
         else:
-            # Fallback if analysis is not available
+            # Fallback if analyzers are not available
+            from .analysis.atmospheric import AtmosphericAnalyzer
+            from .analysis.core import WeatherConditionAnalyzer
+            from .analysis.solar import SolarAnalyzer
+            from .analysis.trends import TrendsAnalyzer
             from .const import CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
-            from .weather_analysis import WeatherAnalysis
 
             # Get zenith max radiation from config, default to 1000.0
             zenith_max_radiation = config_entry.options.get(
                 CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
             )
+            atmospheric_analyzer = AtmosphericAnalyzer()
+            solar_analyzer = SolarAnalyzer(None, zenith_max_radiation)
+            trends_analyzer = TrendsAnalyzer()
+            core_analyzer = WeatherConditionAnalyzer(
+                atmospheric_analyzer, solar_analyzer
+            )
             self._forecast = AdvancedWeatherForecast(
-                WeatherAnalysis(zenith_max_radiation=zenith_max_radiation)
+                atmospheric_analyzer, solar_analyzer, trends_analyzer, core_analyzer
             )
 
     async def async_added_to_hass(self) -> None:

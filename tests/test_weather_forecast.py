@@ -18,6 +18,7 @@ from homeassistant.components.weather import (
 )
 import pytest
 
+from custom_components.micro_weather.analysis.atmospheric import AtmosphericAnalyzer
 from custom_components.micro_weather.const import (
     KEY_CONDITION,
     KEY_HUMIDITY,
@@ -27,41 +28,53 @@ from custom_components.micro_weather.const import (
     KEY_WIND_GUST,
     KEY_WIND_SPEED,
 )
-from custom_components.micro_weather.weather_analysis import WeatherAnalysis
 from custom_components.micro_weather.weather_forecast import AdvancedWeatherForecast
 
 
 @pytest.fixture
-def mock_analysis():
-    """Create mock WeatherAnalysis instance."""
-    analysis = Mock(spec=WeatherAnalysis)
+def mock_analyzers():
+    """Create mock analyzer instances."""
+    atmospheric = Mock()
+    solar = Mock()
+    trends = Mock()
+    core = Mock()
 
-    # Mock the methods that forecast depends on
-    analysis.analyze_pressure_trends.return_value = {
-        "pressure_system": "normal",
-        "storm_probability": 20.0,
-        "current_trend": 0.0,
-        "long_term_trend": 0.0,
-    }
+    # Configure atmospheric methods
+    atmospheric.analyze_pressure_trends = Mock(
+        return_value={
+            "pressure_system": "normal",
+            "storm_probability": 20.0,
+            "current_trend": 0.0,
+            "long_term_trend": 0.0,
+        }
+    )
+    atmospheric.analyze_wind_direction_trends = Mock(
+        return_value={
+            "average_direction": 180.0,
+            "direction_stability": 0.8,
+            "direction_change_rate": 10.0,
+            "significant_shift": False,
+            "prevailing_direction": "south",
+        }
+    )
+    atmospheric.adjust_pressure_for_altitude = Mock(return_value=29.92)
+    atmospheric.calculate_circular_mean = Mock(return_value=180.0)
+    atmospheric.calculate_angular_difference = Mock(return_value=90.0)
+    atmospheric.analyze_fog_conditions = Mock(return_value=ATTR_CONDITION_FOG)
 
-    analysis.get_historical_trends.side_effect = lambda sensor, hours=24: {
-        "current": 60.0,
-        "average": 58.0,
-        "trend": 0.2,
-        "min": 50.0,
-        "max": 70.0,
-        "volatility": 5.0,
-    }
+    # Configure trends methods
+    trends.get_historical_trends = Mock(
+        side_effect=lambda sensor, hours=24: {
+            "current": 60.0,
+            "average": 58.0,
+            "trend": 0.2,
+            "min": 50.0,
+            "max": 70.0,
+            "volatility": 5.0,
+        }
+    )
 
-    analysis.analyze_wind_direction_trends.return_value = {
-        "average_direction": 180.0,
-        "direction_stability": 0.8,
-        "direction_change_rate": 10.0,
-        "significant_shift": False,
-        "prevailing_direction": "south",
-    }
-
-    # Mock cloud cover analysis methods with dynamic behavior
+    # Configure solar methods
     def mock_analyze_cloud_cover(*args, **kwargs):
         # Check if pressure trends indicate storm conditions
         if len(args) > 4 and isinstance(args[4], dict):
@@ -75,42 +88,44 @@ def mock_analysis():
                 return 65.0  # Moderate cloud cover for falling pressure
         return 40.0  # Normal cloud cover
 
-    def mock_map_cloud_cover_to_condition(cloud_cover):
-        if cloud_cover > 80:
-            return ATTR_CONDITION_LIGHTNING_RAINY
-        elif cloud_cover > 60:
-            return ATTR_CONDITION_RAINY
-        elif cloud_cover > 40:
-            return ATTR_CONDITION_CLOUDY
-        elif cloud_cover > 20:
-            return ATTR_CONDITION_PARTLYCLOUDY
-        else:
-            return ATTR_CONDITION_SUNNY
+    solar.analyze_cloud_cover = Mock(side_effect=mock_analyze_cloud_cover)
 
-    analysis.analyze_cloud_cover.side_effect = mock_analyze_cloud_cover
-    analysis._map_cloud_cover_to_condition.side_effect = (
-        mock_map_cloud_cover_to_condition
-    )
+    # Configure core methods
+    core.calculate_dewpoint = Mock(return_value=60.0)
+    core.determine_condition = Mock(return_value="partly_cloudy")
+    core.estimate_visibility = Mock(return_value=5.0)
 
-    return analysis
+    return {
+        "atmospheric": atmospheric,
+        "solar": solar,
+        "trends": trends,
+        "core": core,
+    }
 
 
 @pytest.fixture
-def forecast(mock_analysis):
+def forecast(mock_analyzers):
     """Create AdvancedWeatherForecast instance for testing."""
-    return AdvancedWeatherForecast(mock_analysis)
+    return AdvancedWeatherForecast(
+        mock_analyzers["atmospheric"],
+        mock_analyzers["solar"],
+        mock_analyzers["trends"],
+        mock_analyzers["core"],
+    )
 
 
 class TestWeatherForecast:
     """Test the WeatherForecast class."""
 
-    def test_init(self, mock_analysis):
+    def test_init(self, forecast):
         """Test AdvancedWeatherForecast initialization."""
-        forecast = AdvancedWeatherForecast(mock_analysis)
         assert forecast is not None
-        assert forecast.analysis == mock_analysis
+        assert forecast.atmospheric is not None
+        assert forecast.solar is not None
+        assert forecast.trends is not None
+        assert forecast.core is not None
 
-    def test_generate_enhanced_forecast(self, forecast, mock_analysis):
+    def test_generate_enhanced_forecast(self, forecast, mock_analyzers):
         """Test enhanced forecast generation."""
         sensor_data = {
             "outdoor_temp": 72.0,
@@ -137,7 +152,7 @@ class TestWeatherForecast:
         assert isinstance(forecast_item["temperature"], float)
         assert forecast_item["temperature"] > 0  # Should be reasonable Celsius value
 
-    def test_forecast_temperature_enhanced(self, forecast, mock_analysis):
+    def test_forecast_temperature_enhanced(self, forecast, mock_analyzers):
         """Test enhanced temperature forecasting."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -193,7 +208,7 @@ class TestWeatherForecast:
         for adj in adjustments:
             assert -2 <= adj <= 2
 
-    def test_forecast_condition_enhanced(self, forecast, mock_analysis):
+    def test_forecast_condition_enhanced(self, forecast, mock_analyzers):
         """Test enhanced condition forecasting."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -240,7 +255,7 @@ class TestWeatherForecast:
             ATTR_CONDITION_CLOUDY,
         ]
 
-    def test_forecast_precipitation_enhanced(self, forecast, mock_analysis):
+    def test_forecast_precipitation_enhanced(self, forecast, mock_analyzers):
         """Test enhanced precipitation forecasting."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -306,7 +321,7 @@ class TestWeatherForecast:
         expected_inches = 5.0 / 25.4  # 5.0 mm converted to inches
         assert abs(precip_inches - expected_inches) < 0.1
 
-    def test_forecast_wind_enhanced(self, forecast, mock_analysis):
+    def test_forecast_wind_enhanced(self, forecast, mock_analyzers):
         """Test enhanced wind forecasting."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -345,7 +360,7 @@ class TestWeatherForecast:
         )
         assert wind_high_pressure < wind_normal
 
-    def test_forecast_humidity(self, forecast, mock_analysis):
+    def test_forecast_humidity(self, forecast, mock_analyzers):
         """Test humidity forecasting."""
         humidity_trend = {
             "trend": 0.5,
@@ -378,7 +393,7 @@ class TestWeatherForecast:
         assert 10 <= humidity_distant <= 100
 
     def test_forecast_condition_enhanced_cloud_cover_integration(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test that forecast_condition_enhanced uses cloud cover analysis for near-term forecasts."""
         pressure_analysis = {
@@ -420,7 +435,7 @@ class TestWeatherForecast:
         )
         assert isinstance(condition_day2, str)
 
-    def test_forecast_condition_with_cloud_cover(self, forecast, mock_analysis):
+    def test_forecast_condition_with_cloud_cover(self, forecast, mock_analyzers):
         """Test the cloud cover based forecast condition method."""
         pressure_analysis = {
             "pressure_system": "low_pressure",
@@ -567,7 +582,7 @@ class TestWeatherForecast:
         progression_day4 = forecast._get_progressive_condition(ATTR_CONDITION_RAINY, 4)
         assert isinstance(progression_day4, str)
 
-    def test_forecast_condition_enhanced_all_days(self, forecast, mock_analysis):
+    def test_forecast_condition_enhanced_all_days(self, forecast, mock_analyzers):
         """Test forecast condition for all forecast days."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -601,7 +616,7 @@ class TestWeatherForecast:
             ]
 
     def test_forecast_condition_enhanced_pressure_systems(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test forecast conditions with different pressure systems."""
         sensor_data = {
@@ -644,7 +659,7 @@ class TestWeatherForecast:
             ATTR_CONDITION_PARTLYCLOUDY,
         ]
 
-    def test_forecast_condition_enhanced_wind_influence(self, forecast, mock_analysis):
+    def test_forecast_condition_enhanced_wind_influence(self, forecast, mock_analyzers):
         """Test wind direction influence on forecast conditions."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -652,7 +667,7 @@ class TestWeatherForecast:
         }
 
         # Mock wind analysis for stable conditions
-        mock_analysis.analyze_wind_direction_trends.return_value = {
+        mock_analyzers["atmospheric"].analyze_wind_direction_trends.return_value = {
             "average_direction": 180.0,
             "direction_stability": 0.9,  # Very stable
             "direction_change_rate": 5.0,
@@ -676,7 +691,7 @@ class TestWeatherForecast:
         assert isinstance(condition_stable, str)
 
         # Mock wind analysis for unstable conditions
-        mock_analysis.analyze_wind_direction_trends.return_value = {
+        mock_analyzers["atmospheric"].analyze_wind_direction_trends.return_value = {
             "average_direction": 180.0,
             "direction_stability": 0.2,  # Unstable
             "direction_change_rate": 45.0,
@@ -690,7 +705,7 @@ class TestWeatherForecast:
         )
         assert isinstance(condition_unstable, str)
 
-    def test_forecast_condition_enhanced_error_handling(self, forecast, mock_analysis):
+    def test_forecast_condition_enhanced_error_handling(self, forecast, mock_analyzers):
         """Test error handling in forecast condition enhancement."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -702,7 +717,7 @@ class TestWeatherForecast:
         }
 
         # Mock cloud cover analysis to raise exception
-        mock_analysis.analyze_cloud_cover.side_effect = Exception(
+        mock_analyzers["solar"].analyze_cloud_cover.side_effect = Exception(
             "Cloud analysis failed"
         )
 
@@ -713,11 +728,11 @@ class TestWeatherForecast:
         assert isinstance(condition, str)  # Should still return a valid condition
 
         # Reset mock
-        mock_analysis.analyze_cloud_cover.side_effect = None
-        mock_analysis.analyze_cloud_cover.return_value = 40.0
+        mock_analyzers["solar"].analyze_cloud_cover.side_effect = None
+        mock_analyzers["solar"].analyze_cloud_cover.return_value = 40.0
 
     def test_forecast_condition_enhanced_missing_sensor_data(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test forecast with missing or incomplete sensor data."""
         pressure_analysis = {
@@ -743,7 +758,7 @@ class TestWeatherForecast:
         )
         assert isinstance(condition_empty, str)
 
-    def test_sensors_unavailable_none_values(self, forecast, mock_analysis):
+    def test_sensors_unavailable_none_values(self, forecast, mock_analyzers):
         """Test forecast when sensor values are None (sensors unavailable)."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -774,7 +789,7 @@ class TestWeatherForecast:
             ATTR_CONDITION_LIGHTNING_RAINY,
         ]
 
-    def test_sensors_unavailable_missing_keys(self, forecast, mock_analysis):
+    def test_sensors_unavailable_missing_keys(self, forecast, mock_analyzers):
         """Test forecast when sensor keys are completely missing."""
         pressure_analysis = {
             "pressure_system": "low_pressure",
@@ -794,11 +809,11 @@ class TestWeatherForecast:
         assert isinstance(condition, str)
         # Should use defaults (0.0 for solar data) and still work
 
-    def test_historical_trends_unavailable(self, forecast, mock_analysis):
+    def test_historical_trends_unavailable(self, forecast, mock_analyzers):
         """Test forecast when historical trend data is unavailable."""
         # Mock get_historical_trends to return None (no historical data)
-        mock_analysis.get_historical_trends.side_effect = None
-        mock_analysis.get_historical_trends.return_value = None
+        mock_analyzers["trends"].get_historical_trends.side_effect = None
+        mock_analyzers["trends"].get_historical_trends.return_value = None
 
         # Should handle gracefully and return default values
         patterns = forecast.analyze_temperature_patterns()
@@ -809,16 +824,18 @@ class TestWeatherForecast:
         }
 
         # Reset mock
-        mock_analysis.get_historical_trends.side_effect = lambda sensor, hours=24: {
-            "current": 60.0,
-            "average": 58.0,
-            "trend": 0.2,
-            "min": 50.0,
-            "max": 70.0,
-            "volatility": 5.0,
-        }
+        mock_analyzers["trends"].get_historical_trends.side_effect = (
+            lambda sensor, hours=24: {
+                "current": 60.0,
+                "average": 58.0,
+                "trend": 0.2,
+                "min": 50.0,
+                "max": 70.0,
+                "volatility": 5.0,
+            }
+        )
 
-    def test_pressure_analysis_unavailable(self, forecast, mock_analysis):
+    def test_pressure_analysis_unavailable(self, forecast, mock_analyzers):
         """Test forecast when pressure analysis data is incomplete or None."""
         # Test with incomplete pressure analysis
         pressure_analysis_incomplete = {
@@ -846,7 +863,7 @@ class TestWeatherForecast:
             # Expected if pressure_analysis is None
             pass
 
-    def test_wind_analysis_unavailable(self, forecast, mock_analysis):
+    def test_wind_analysis_unavailable(self, forecast, mock_analyzers):
         """Test forecast when wind direction analysis is unavailable."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -859,7 +876,7 @@ class TestWeatherForecast:
         }
 
         # Mock wind analysis to return None or incomplete data
-        mock_analysis.analyze_wind_direction_trends.return_value = None
+        mock_analyzers["atmospheric"].analyze_wind_direction_trends.return_value = None
 
         # Should handle gracefully (use defaults in the calling code)
         condition = forecast.forecast_condition_enhanced(
@@ -868,7 +885,7 @@ class TestWeatherForecast:
         assert isinstance(condition, str)
 
         # Reset mock
-        mock_analysis.analyze_wind_direction_trends.return_value = {
+        mock_analyzers["atmospheric"].analyze_wind_direction_trends.return_value = {
             "average_direction": 180.0,
             "direction_stability": 0.8,
             "direction_change_rate": 10.0,
@@ -876,14 +893,16 @@ class TestWeatherForecast:
             "prevailing_direction": "south",
         }
 
-    def test_forecast_with_all_sensors_unavailable(self, forecast, mock_analysis):
+    def test_forecast_with_all_sensors_unavailable(self, forecast, mock_analyzers):
         """Test forecast when all sensors are completely unavailable."""
         # Completely empty sensor data
         sensor_data_empty = {}
 
         # Mock all analysis methods to fail or return minimal data
-        mock_analysis.analyze_cloud_cover.return_value = 40.0  # Default cloud cover
-        mock_analysis.get_historical_trends.return_value = None
+        mock_analyzers["solar"].analyze_cloud_cover.return_value = (
+            40.0  # Default cloud cover
+        )
+        mock_analyzers["trends"].get_historical_trends.return_value = None
 
         # Should still generate a forecast using defaults and fallbacks
         result = forecast.generate_enhanced_forecast("partly_cloudy", sensor_data_empty)
@@ -894,18 +913,20 @@ class TestWeatherForecast:
         assert all("condition" in item for item in result)
 
         # Reset mocks
-        mock_analysis.analyze_cloud_cover.side_effect = None
-        mock_analysis.get_historical_trends.side_effect = lambda sensor, hours=24: {
-            "current": 60.0,
-            "average": 58.0,
-            "trend": 0.2,
-            "min": 50.0,
-            "max": 70.0,
-            "volatility": 5.0,
-        }
+        mock_analyzers["solar"].analyze_cloud_cover.side_effect = None
+        mock_analyzers["trends"].get_historical_trends.side_effect = (
+            lambda sensor, hours=24: {
+                "current": 60.0,
+                "average": 58.0,
+                "trend": 0.2,
+                "min": 50.0,
+                "max": 70.0,
+                "volatility": 5.0,
+            }
+        )
 
     def test_cloud_cover_calculation_with_none_solar_data(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test cloud cover calculation when solar sensor data is None."""
         pressure_analysis = {
@@ -935,7 +956,7 @@ class TestWeatherForecast:
         ]
 
     def test_analyze_temperature_patterns_seasonal_coverage(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test seasonal pattern detection in temperature analysis."""
         # Test winter months (Dec, Jan, Feb)
@@ -991,7 +1012,7 @@ class TestWeatherForecast:
             patterns = forecast.analyze_temperature_patterns()
             assert patterns["seasonal_pattern"] == "fall"
 
-    def test_forecast_precipitation_pouring_condition(self, forecast, mock_analysis):
+    def test_forecast_precipitation_pouring_condition(self, forecast, mock_analyzers):
         """Test precipitation forecasting for pouring condition."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -1025,7 +1046,7 @@ class TestWeatherForecast:
         )
         assert precip_pouring > precip_rainy
 
-    def test_forecast_wind_condition_adjustments(self, forecast, mock_analysis):
+    def test_forecast_wind_condition_adjustments(self, forecast, mock_analyzers):
         """Test wind forecasting with various weather conditions."""
         pressure_analysis = {
             "pressure_system": "normal",
@@ -1054,7 +1075,7 @@ class TestWeatherForecast:
             assert wind_forecast > 0
 
     def test_forecast_condition_enhanced_day_2_3_4_coverage(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test specific coverage for days 2-4 in enhanced condition forecasting."""
         pressure_analysis = {
@@ -1073,7 +1094,7 @@ class TestWeatherForecast:
         assert condition_day2 == ATTR_CONDITION_POURING
 
         # Test day 3-4 with high pressure and stable wind
-        mock_analysis.analyze_wind_direction_trends.return_value = {
+        mock_analyzers["atmospheric"].analyze_wind_direction_trends.return_value = {
             "direction_stability": 0.9,  # Very stable
             "significant_shift": False,
         }
@@ -1084,7 +1105,7 @@ class TestWeatherForecast:
             )
             assert isinstance(condition, str)
 
-    def test_cloud_cover_fallback_error_handling(self, forecast, mock_analysis):
+    def test_cloud_cover_fallback_error_handling(self, forecast, mock_analyzers):
         """Test that cloud cover analysis falls back gracefully on errors."""
         pressure_analysis = {
             "pressure_system": "low_pressure",
@@ -1098,7 +1119,9 @@ class TestWeatherForecast:
         }
 
         # Mock cloud cover analysis to always raise exception
-        mock_analysis.analyze_cloud_cover.side_effect = Exception("Analysis failed")
+        mock_analyzers["solar"].analyze_cloud_cover.side_effect = Exception(
+            "Analysis failed"
+        )
 
         # Should fall back to pressure-based estimation
         condition = forecast._forecast_condition_with_cloud_cover(
@@ -1115,14 +1138,14 @@ class TestWeatherForecast:
         ]
 
         # Reset mock
-        mock_analysis.analyze_cloud_cover.side_effect = None
-        mock_analysis.analyze_cloud_cover.return_value = 40.0
+        mock_analyzers["solar"].analyze_cloud_cover.side_effect = None
+        mock_analyzers["solar"].analyze_cloud_cover.return_value = 40.0
 
 
 class TestAdvancedWeatherForecast:
     """Test the new comprehensive forecasting functionality."""
 
-    def test_generate_comprehensive_forecast(self, forecast, mock_analysis):
+    def test_generate_comprehensive_forecast(self, forecast, mock_analyzers):
         """Test comprehensive daily forecast generation using all sensor data."""
         current_condition = ATTR_CONDITION_PARTLYCLOUDY
         sensor_data = {
@@ -1181,11 +1204,11 @@ class TestAdvancedWeatherForecast:
             assert 0 <= day_forecast["humidity"] <= 100
 
     def test_generate_comprehensive_forecast_storm_conditions(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test comprehensive forecast under storm conditions."""
         # Mock high storm probability
-        mock_analysis.analyze_pressure_trends.return_value = {
+        mock_analyzers["atmospheric"].analyze_pressure_trends.return_value = {
             "pressure_system": "low_pressure",
             "storm_probability": 85.0,
             "current_trend": -1.2,
@@ -1217,11 +1240,11 @@ class TestAdvancedWeatherForecast:
         assert result[0]["precipitation"] > 10.0  # High precipitation
 
     def test_generate_comprehensive_forecast_high_pressure(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test comprehensive forecast under high pressure conditions."""
         # Mock high pressure system
-        mock_analysis.analyze_pressure_trends.return_value = {
+        mock_analyzers["atmospheric"].analyze_pressure_trends.return_value = {
             "pressure_system": "high_pressure",
             "storm_probability": 5.0,
             "current_trend": 0.3,
@@ -1252,7 +1275,7 @@ class TestAdvancedWeatherForecast:
         ]
         assert result[0]["precipitation"] < 2.0  # Low precipitation
 
-    def test_generate_hourly_forecast_comprehensive(self, forecast, mock_analysis):
+    def test_generate_hourly_forecast_comprehensive(self, forecast, mock_analyzers):
         """Test comprehensive hourly forecast generation."""
         current_temp = 22.0  # Celsius
         current_condition = ATTR_CONDITION_PARTLYCLOUDY
@@ -1294,7 +1317,7 @@ class TestAdvancedWeatherForecast:
             assert isinstance(hour_forecast["humidity"], (int, float))  # Can be float
 
     def test_generate_hourly_forecast_comprehensive_nighttime(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test hourly forecast with nighttime condition conversion."""
         current_temp = 15.0  # Celsius
@@ -1331,7 +1354,7 @@ class TestAdvancedWeatherForecast:
         assert nighttime_found, "Should have nighttime hours in forecast"
 
     def test_generate_hourly_forecast_comprehensive_missing_humidity(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test hourly forecast with missing humidity sensor data."""
         current_temp = 22.0  # Celsius
@@ -1368,7 +1391,7 @@ class TestAdvancedWeatherForecast:
             # Verify humidity defaults to around 50 when sensor is missing
             assert 45 <= hour_forecast["humidity"] <= 55
 
-    def test_analyze_comprehensive_meteorological_state(self, forecast, mock_analysis):
+    def test_analyze_comprehensive_meteorological_state(self, forecast, mock_analyzers):
         """Test comprehensive meteorological state analysis."""
         sensor_data = {
             "outdoor_temp": 75.0,
@@ -1423,7 +1446,7 @@ class TestAdvancedWeatherForecast:
         assert "persistence_factor" in weather_sys
 
     def test_analyze_comprehensive_meteorological_state_mock_handling(
-        self, forecast, mock_analysis
+        self, forecast, mock_analyzers
     ):
         """Test meteorological analysis with mock object error handling."""
         sensor_data = {
@@ -1434,10 +1457,14 @@ class TestAdvancedWeatherForecast:
         }
 
         # Mock methods to raise AttributeError (simulating mock objects)
-        mock_analysis.analyze_pressure_trends.side_effect = AttributeError("Mock error")
-        mock_analysis.get_historical_trends.side_effect = AttributeError("Mock error")
-        mock_analysis.analyze_wind_direction_trends.side_effect = AttributeError(
+        mock_analyzers["atmospheric"].analyze_pressure_trends.side_effect = (
+            AttributeError("Mock error")
+        )
+        mock_analyzers["trends"].get_historical_trends.side_effect = AttributeError(
             "Mock error"
+        )
+        mock_analyzers["atmospheric"].analyze_wind_direction_trends.side_effect = (
+            AttributeError("Mock error")
         )
 
         # Should handle errors gracefully and return valid analysis
@@ -1449,9 +1476,9 @@ class TestAdvancedWeatherForecast:
         assert "temp_trends" in result
 
         # Reset mocks
-        mock_analysis.analyze_pressure_trends.side_effect = None
-        mock_analysis.get_historical_trends.side_effect = None
-        mock_analysis.analyze_wind_direction_trends.side_effect = None
+        mock_analyzers["atmospheric"].analyze_pressure_trends.side_effect = None
+        mock_analyzers["trends"].get_historical_trends.side_effect = None
+        mock_analyzers["atmospheric"].analyze_wind_direction_trends.side_effect = None
 
     def test_calculate_atmospheric_stability(self, forecast):
         """Test atmospheric stability calculation."""
@@ -1514,7 +1541,7 @@ class TestAdvancedWeatherForecast:
         assert result3["type"] == "transitional"
         assert result3["evolution_potential"] == "moderate_change"
 
-    def test_analyze_cloud_cover_comprehensive(self, forecast, mock_analysis):
+    def test_analyze_cloud_cover_comprehensive(self, forecast, mock_analyzers):
         """Test comprehensive cloud cover analysis."""
         sensor_data = {
             "solar_radiation": 600.0,
@@ -1596,7 +1623,7 @@ class TestAdvancedWeatherForecast:
         assert result["gust_factor"] >= 1.0
         assert result["shear_intensity"] in ["low", "moderate", "high", "extreme"]
 
-    def test_analyze_historical_weather_patterns(self, forecast, mock_analysis):
+    def test_analyze_historical_weather_patterns(self, forecast, mock_analyzers):
         """Test historical weather pattern analysis."""
         result = forecast._analyze_historical_weather_patterns()
 
@@ -1836,7 +1863,7 @@ class TestAdvancedWeatherForecast:
         assert range_sunny >= range_cloudy
         assert range_sunny >= range_rainy
 
-    def test_analyze_hourly_weather_patterns(self, forecast, mock_analysis):
+    def test_analyze_hourly_weather_patterns(self, forecast, mock_analyzers):
         """Test hourly weather pattern analysis."""
         result = forecast._analyze_hourly_weather_patterns()
 
@@ -2363,7 +2390,7 @@ class TestAdvancedWeatherForecast:
         result_48h = forecast.get_historical_trends("humidity", hours=48)
         assert isinstance(result_48h, dict)
 
-    def test_comprehensive_forecast_error_handling(self, forecast, mock_analysis):
+    def test_comprehensive_forecast_error_handling(self, forecast, mock_analyzers):
         """Test error handling in comprehensive forecast methods."""
         # Test with minimal sensor data
         sensor_data_minimal = {"outdoor_temp": 70.0}
@@ -2761,12 +2788,12 @@ class TestAdvancedWeatherForecast:
     # ======== WEATHER ANALYSIS EDGE CASE TESTS ========
     # Note: These tests use a real WeatherAnalysis instance, not the mocked one
 
-    def test_weather_analysis_fog_detection_dense_fog(self):
+    def test_weather_analysis_fog_detection_dense_fog(self, mock_analyzers):
         """Test dense fog detection with extreme conditions."""
-        weather_analysis = WeatherAnalysis()
+        atmospheric = mock_analyzers["atmospheric"]
 
         # Simulate dense fog conditions
-        result = weather_analysis.analyze_fog_conditions(
+        result = atmospheric.analyze_fog_conditions(
             temp=32.0,  # At freezing
             humidity=99.9,  # Virtually saturated
             dewpoint=31.8,  # Very tight spread
@@ -2780,12 +2807,14 @@ class TestAdvancedWeatherForecast:
             result == ATTR_CONDITION_FOG
         ), "Should detect dense fog with extreme conditions"
 
-    def test_weather_analysis_fog_detection_twilight_high_humidity(self):
+    def test_weather_analysis_fog_detection_twilight_high_humidity(
+        self, mock_analyzers
+    ):
         """Test that fog is correctly detected during twilight with extreme humidity."""
-        weather_analysis = WeatherAnalysis()
+        atmospheric = mock_analyzers["atmospheric"]
 
         # Twilight with extreme humidity should trigger fog detection
-        result = weather_analysis.analyze_fog_conditions(
+        result = atmospheric.analyze_fog_conditions(
             temp=70.0,
             humidity=95.0,  # Very high humidity
             dewpoint=68.0,
@@ -2799,37 +2828,39 @@ class TestAdvancedWeatherForecast:
             result == ATTR_CONDITION_FOG
         ), "Should detect fog during twilight with extreme humidity conditions"
 
-    def test_weather_analysis_dewpoint_calculation_extremes(self):
+    def test_weather_analysis_dewpoint_calculation_extremes(self, mock_analyzers):
         """Test dewpoint calculation with extreme humidity values."""
-        weather_analysis = WeatherAnalysis()
+        core = mock_analyzers["core"]
 
         # Test with very dry air
-        dewpoint_dry = weather_analysis.calculate_dewpoint(100.0, 5.0)
+        dewpoint_dry = core.calculate_dewpoint(100.0, 5.0)
         assert dewpoint_dry < 30.0, "Very dry air should have very low dewpoint"
 
         # Test with saturated air
-        dewpoint_saturated = weather_analysis.calculate_dewpoint(70.0, 100.0)
+        dewpoint_saturated = core.calculate_dewpoint(70.0, 100.0)
         assert (
             abs(dewpoint_saturated - 70.0) < 1.0
         ), "Saturated air should have dewpoint near temp"
 
         # Test with zero humidity fallback
-        dewpoint_zero = weather_analysis.calculate_dewpoint(80.0, 0.0)
+        dewpoint_zero = core.calculate_dewpoint(80.0, 0.0)
         assert isinstance(
             dewpoint_zero, float
         ), "Should handle zero humidity gracefully"
 
-    def test_weather_analysis_pressure_altitude_adjustment_high_elevation(self):
+    def test_weather_analysis_pressure_altitude_adjustment_high_elevation(
+        self, mock_analyzers
+    ):
         """Test pressure adjustment at high altitude uses barometric formula."""
-        weather_analysis = WeatherAnalysis()
+        atmospheric = mock_analyzers["atmospheric"]
 
         # Test that the method handles altitude adjustments consistently
         # At higher altitudes, atmospheric pressure is lower
-        pressure_sea_level = weather_analysis.adjust_pressure_for_altitude(
+        pressure_sea_level = atmospheric.adjust_pressure_for_altitude(
             pressure_inhg=29.92, altitude_m=0, pressure_type="relative"
         )
 
-        pressure_high_alt = weather_analysis.adjust_pressure_for_altitude(
+        pressure_high_alt = atmospheric.adjust_pressure_for_altitude(
             pressure_inhg=29.92, altitude_m=1609, pressure_type="relative"
         )
 
@@ -2844,66 +2875,66 @@ class TestAdvancedWeatherForecast:
             10 < pressure_high_alt < 35
         ), f"Altitude pressure should be realistic, got {pressure_high_alt}"
 
-    def test_weather_analysis_pressure_altitude_adjustment_sea_level(self):
+    def test_weather_analysis_pressure_altitude_adjustment_sea_level(
+        self, mock_analyzers
+    ):
         """Test pressure adjustment at sea level."""
-        weather_analysis = WeatherAnalysis()
+        atmospheric = mock_analyzers["atmospheric"]
 
         # At sea level, atmospheric pressure should equal station pressure
-        adjusted = weather_analysis.adjust_pressure_for_altitude(
+        adjusted = atmospheric.adjust_pressure_for_altitude(
             pressure_inhg=29.92, altitude_m=0, pressure_type="relative"
         )
 
         assert abs(adjusted - 29.92) < 0.1, "Sea level pressure should not be adjusted"
 
-    def test_weather_analysis_wind_direction_circular_mean(self):
+    def test_weather_analysis_wind_direction_circular_mean(self, mock_analyzers):
         """Test circular mean calculation for wind directions."""
-        weather_analysis = WeatherAnalysis()
+        atmospheric = mock_analyzers["atmospheric"]
 
         # Directions around north (350, 10, 5 degrees)
         directions = [350.0, 10.0, 5.0, 355.0]
-        mean = weather_analysis.calculate_circular_mean(directions)
+        mean = atmospheric.calculate_circular_mean(directions)
 
         # Mean should be near 0/360 (north), not 180 (south)
         assert (
             mean < 45 or mean > 315
         ), f"Circular mean of northerly directions should be north, got {mean}°"
 
-    def test_weather_analysis_wind_direction_angular_difference(self):
+    def test_weather_analysis_wind_direction_angular_difference(self, mock_analyzers):
         """Test angular difference calculation between wind directions."""
-        weather_analysis = WeatherAnalysis()
+        atmospheric = mock_analyzers["atmospheric"]
 
         # Test normal difference
-        diff = weather_analysis.calculate_angular_difference(0.0, 90.0)
+        diff = atmospheric.calculate_angular_difference(0.0, 90.0)
         assert diff == 90.0, "Should calculate 90° difference correctly"
 
         # Test wraparound case (350° to 10°)
-        diff = weather_analysis.calculate_angular_difference(350.0, 10.0)
+        diff = atmospheric.calculate_angular_difference(350.0, 10.0)
         assert (
             abs(diff - 20.0) < 0.1
         ), "Should handle wraparound correctly (350° to 10° = 20°)"
 
         # Test reverse wraparound (10° to 350°)
-        diff = weather_analysis.calculate_angular_difference(10.0, 350.0)
+        diff = atmospheric.calculate_angular_difference(10.0, 350.0)
         assert (
             abs(diff + 20.0) < 0.1 or abs(diff - 340.0) < 0.1
         ), "Should handle reverse wraparound"
 
     def test_weather_analysis_pressure_trend_rapid_drop(self):
         """Test pressure trend analysis with rapid pressure drop."""
-        weather_analysis = WeatherAnalysis()
+        from datetime import datetime
 
-        # Create history of rapidly dropping pressure
-        import datetime
+        # Create atmospheric analyzer with sensor history
+        sensor_history = {"pressure": deque(maxlen=192)}
+        atmospheric = AtmosphericAnalyzer(sensor_history=sensor_history)
 
-        now = datetime.datetime.now()
-
-        # Mock historical pressure data (simulation)
-        weather_analysis._sensor_history[KEY_PRESSURE] = deque(maxlen=192)
+        now = datetime.now()
 
         # Add 24 readings showing severe pressure drop (simulating major storm)
         # 1.5 inHg/24h is severe (hurricane-level), but realistic for testing
         for i in range(24):
-            weather_analysis._sensor_history[KEY_PRESSURE].append(
+            sensor_history["pressure"].append(
                 {
                     "timestamp": now - datetime.timedelta(hours=24 - i),
                     "value": 29.92
@@ -2911,7 +2942,7 @@ class TestAdvancedWeatherForecast:
                 }
             )
 
-        trends = weather_analysis.analyze_pressure_trends(altitude=0)
+        trends = atmospheric.analyze_pressure_trends(altitude=0)
 
         # Rapid drop should indicate low pressure system
         assert (
@@ -2922,11 +2953,11 @@ class TestAdvancedWeatherForecast:
             trends["storm_probability"] >= 40
         ), f"Rapid pressure drop should increase storm probability, got {trends['storm_probability']}"
 
-    def test_weather_analysis_cloud_cover_low_solar_radiation(self):
+    def test_weather_analysis_cloud_cover_low_solar_radiation(self, mock_analyzers):
         """Test cloud cover calculation with very low solar radiation."""
-        weather_analysis = WeatherAnalysis()
+        solar = mock_analyzers["solar"]
 
-        cloud_cover = weather_analysis.analyze_cloud_cover(
+        cloud_cover = solar.analyze_cloud_cover(
             solar_radiation=10.0,  # Very low
             solar_lux=500.0,  # Very low
             uv_index=0.1,  # Very low
@@ -2940,11 +2971,11 @@ class TestAdvancedWeatherForecast:
             cloud_cover > 30
         ), "Very low solar radiation should indicate notable cloud cover"
 
-    def test_weather_analysis_cloud_cover_high_solar_radiation(self):
+    def test_weather_analysis_cloud_cover_high_solar_radiation(self, mock_analyzers):
         """Test cloud cover calculation with high solar radiation."""
-        weather_analysis = WeatherAnalysis()
+        solar = mock_analyzers["solar"]
 
-        cloud_cover = weather_analysis.analyze_cloud_cover(
+        cloud_cover = solar.analyze_cloud_cover(
             solar_radiation=1000.0,  # Very high
             solar_lux=100000.0,  # Very high
             uv_index=11.0,  # Very high
@@ -2957,9 +2988,9 @@ class TestAdvancedWeatherForecast:
             cloud_cover < 50
         ), "Very high solar radiation should indicate relatively clear skies (<50%)"
 
-    def test_weather_analysis_visibility_in_fog(self):
+    def test_weather_analysis_visibility_in_fog(self, mock_analyzers):
         """Test visibility estimation in fog conditions."""
-        weather_analysis = WeatherAnalysis()
+        core = mock_analyzers["core"]
 
         sensor_data = {
             KEY_OUTDOOR_TEMP: 32.0,
@@ -2967,16 +2998,14 @@ class TestAdvancedWeatherForecast:
             "dewpoint": 31.5,
         }
 
-        visibility = weather_analysis.estimate_visibility(
-            ATTR_CONDITION_FOG, sensor_data
-        )
+        visibility = core.estimate_visibility(ATTR_CONDITION_FOG, sensor_data)
 
         # Dense fog should have low visibility
         assert visibility < 1.0, "Dense fog should have visibility less than 1 km"
 
-    def test_weather_analysis_visibility_in_storm(self):
+    def test_weather_analysis_visibility_in_storm(self, mock_analyzers):
         """Test visibility estimation during thunderstorm."""
-        weather_analysis = WeatherAnalysis()
+        core = mock_analyzers["core"]
 
         sensor_data = {
             KEY_RAIN_RATE: 0.5,  # Heavy rain
@@ -2984,7 +3013,7 @@ class TestAdvancedWeatherForecast:
             KEY_WIND_GUST: 40.0,
         }
 
-        visibility = weather_analysis.estimate_visibility(
+        visibility = core.estimate_visibility(
             ATTR_CONDITION_LIGHTNING_RAINY, sensor_data
         )
 

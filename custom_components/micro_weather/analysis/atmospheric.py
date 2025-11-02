@@ -10,17 +10,12 @@ This module handles:
 from collections import deque
 from datetime import datetime, timedelta
 import logging
-import math
 import statistics
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.weather import ATTR_CONDITION_FOG
 
-from ..meteorological_constants import (
-    FogThresholds,
-    PressureThresholds,
-    TemperatureThresholds,
-)
+from ..meteorological_constants import FogThresholds
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -231,103 +226,13 @@ class AtmosphericAnalyzer:
         _LOGGER.debug("No fog detected (score: %.1f)", fog_score)
         return None
 
-    def analyze_pressure_trends(
-        self, altitude: Optional[float] = 0.0
-    ) -> Dict[str, Any]:
-        """Analyze pressure trends for weather prediction.
-
-        Args:
-            altitude: Altitude in meters for pressure thresholds
+    def analyze_wind_direction_trends(self) -> Dict[str, Any]:
+        """Analyze wind direction trends for weather prediction.
 
         Returns:
-            Dictionary with pressure analysis including:
-            - current_trend: 3-hour pressure change in hPa
-            - long_term_trend: 24-hour pressure change in hPa
-            - pressure_system: System classification
-            - storm_probability: Probability of storm (0-100)
+            Dictionary with wind direction analysis
         """
-        altitude = altitude or 0.0
-
-        # Get pressure trends
-        short_trend = self._get_historical_trends("pressure", hours=3)
-        long_trend = self._get_historical_trends("pressure", hours=24)
-
-        if not short_trend or not long_trend:
-            return {
-                "pressure_system": "unknown",
-                "storm_probability": 0.0,
-                "current_trend": 0,
-                "long_term_trend": 0,
-            }
-
-        current_pressure = long_trend.get("current", 29.92)
-        short_term_change = short_trend.get("trend", 0) * 3
-        long_term_change = long_trend.get("trend", 0) * 24
-
-        # Get altitude-adjusted thresholds
-        pressure_thresholds_hpa = self._get_altitude_adjusted_thresholds_hpa(altitude)
-
-        # Classify pressure system
-        if current_pressure > pressure_thresholds_hpa["very_high"]:
-            pressure_system = "high_pressure"
-        elif current_pressure < pressure_thresholds_hpa["low"]:
-            pressure_system = "low_pressure"
-        else:
-            pressure_system = "normal"
-
-        # Calculate storm probability
-        storm_probability = 0.0
-        if short_term_change < -2:
-            storm_probability += 40
-        if long_term_change < -5:
-            storm_probability += 30
-        if current_pressure < pressure_thresholds_hpa["very_low"]:
-            storm_probability += 30
-
-        # Wind direction analysis
-        wind_analysis = self._analyze_wind_direction()
-        if wind_analysis.get("significant_shift"):
-            storm_probability += 15
-        if wind_analysis.get("direction_change_rate", 0) > 30 and (
-            short_term_change < -1 or long_term_change < -3
-        ):
-            storm_probability += 20
-        if (
-            wind_analysis.get("direction_stability", 0.5) < 0.3
-            and pressure_system == "low_pressure"
-        ):
-            storm_probability += 10
-
-        storm_probability = min(100.0, storm_probability)
-
-        return {
-            "current_trend": short_term_change,
-            "long_term_trend": long_term_change,
-            "pressure_system": pressure_system,
-            "storm_probability": storm_probability,
-        }
-
-    def _get_altitude_adjusted_thresholds_hpa(
-        self, altitude: float
-    ) -> Dict[str, float]:
-        """Get pressure thresholds in hPa adjusted for altitude."""
-        sea_level_thresholds = {
-            "very_high": 1025.0,
-            "high": 1015.0,
-            "normal_high": 1005.0,
-            "normal": 995.0,
-            "low": 985.0,
-            "very_low": 975.0,
-        }
-
-        # Adjust for altitude
-        altitude_correction = altitude / 8.0
-
-        adjusted_thresholds = {}
-        for key, sea_level_pressure in sea_level_thresholds.items():
-            adjusted_thresholds[key] = sea_level_pressure - altitude_correction
-
-        return adjusted_thresholds
+        return self._analyze_wind_direction()
 
     def _analyze_wind_direction(self) -> Dict[str, Any]:
         """Analyze wind direction for weather prediction."""

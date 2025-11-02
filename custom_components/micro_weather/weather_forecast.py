@@ -4,36 +4,27 @@ This module now serves as a proxy/facade to the modular forecast package,
 maintaining backward compatibility while delegating to specialized components.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
-import math
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.weather import (
-    ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
-    ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
-    ATTR_CONDITION_POURING,
     ATTR_CONDITION_RAINY,
-    ATTR_CONDITION_SNOWY,
     ATTR_CONDITION_SUNNY,
-    ATTR_CONDITION_WINDY,
 )
-from homeassistant.util import dt as dt_util
 
+from .analysis.atmospheric import AtmosphericAnalyzer
+from .analysis.core import WeatherConditionAnalyzer
+from .analysis.solar import SolarAnalyzer
+from .analysis.trends import TrendsAnalyzer
 from .const import (
     KEY_CONDITION,
     KEY_HUMIDITY,
-    KEY_OUTDOOR_TEMP,
     KEY_PRECIPITATION,
-    KEY_PRESSURE,
-    KEY_RAIN_RATE,
-    KEY_SOLAR_LUX_INTERNAL,
-    KEY_SOLAR_RADIATION,
     KEY_TEMPERATURE,
-    KEY_UV_INDEX,
     KEY_WIND_SPEED,
 )
 from .forecast import (
@@ -44,14 +35,6 @@ from .forecast import (
     MeteorologicalAnalyzer,
     PatternAnalyzer,
 )
-from .meteorological_constants import (
-    CloudCoverThresholds,
-    PressureThresholds,
-    TemperatureThresholds,
-    WindThresholds,
-)
-from .weather_analysis import WeatherAnalysis
-from .weather_utils import convert_to_kmh, is_forecast_hour_daytime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,23 +49,37 @@ class AdvancedWeatherForecast:
     maintaining backward compatibility while providing a cleaner architecture.
     """
 
-    def __init__(self, weather_analysis: WeatherAnalysis):
-        """Initialize advanced weather forecast with analysis instance and specialized modules.
+    def __init__(
+        self,
+        atmospheric_analyzer: AtmosphericAnalyzer,
+        solar_analyzer: SolarAnalyzer,
+        trends_analyzer: TrendsAnalyzer,
+        core_analyzer: WeatherConditionAnalyzer,
+    ):
+        """Initialize advanced weather forecast with specialized analyzers.
 
         Args:
-            weather_analysis: WeatherAnalysis instance for comprehensive trend data
+            atmospheric_analyzer: AtmosphericAnalyzer instance
+            solar_analyzer: SolarAnalyzer instance
+            trends_analyzer: TrendsAnalyzer instance
+            core_analyzer: WeatherConditionAnalyzer instance
         """
-        self.analysis = weather_analysis
+        self.atmospheric = atmospheric_analyzer
+        self.solar = solar_analyzer
+        self.trends = trends_analyzer
+        self.core = core_analyzer
 
         # Initialize specialized forecast modules
-        self.meteorological_analyzer = MeteorologicalAnalyzer(weather_analysis)
-        self.pattern_analyzer = PatternAnalyzer(weather_analysis)
-        self.evolution_modeler = EvolutionModeler(weather_analysis)
-        self.astronomical_calculator = (
-            AstronomicalCalculator()
-        )  # No weather_analysis needed
-        self.daily_generator = DailyForecastGenerator(weather_analysis)
-        self.hourly_generator = HourlyForecastGenerator(weather_analysis)
+        self.meteorological_analyzer = MeteorologicalAnalyzer(
+            atmospheric_analyzer, core_analyzer, solar_analyzer, trends_analyzer
+        )
+        self.pattern_analyzer = PatternAnalyzer(trends_analyzer)
+        self.evolution_modeler = EvolutionModeler()
+        self.astronomical_calculator = AstronomicalCalculator()  # No analyzers needed
+        self.daily_generator = DailyForecastGenerator(trends_analyzer)
+        self.hourly_generator = HourlyForecastGenerator(
+            atmospheric_analyzer, solar_analyzer, trends_analyzer
+        )
 
     def generate_comprehensive_forecast(
         self,
@@ -207,6 +204,66 @@ class AdvancedWeatherForecast:
         """
         return self.pattern_analyzer.analyze_historical_patterns()
 
+    def _analyze_hourly_weather_patterns(self) -> Dict[str, Any]:
+        """Analyze hourly weather patterns for diurnal cycles.
+
+        Returns:
+            Dictionary with diurnal patterns and volatility for temperature, humidity, and wind.
+        """
+        # Get historical patterns as base
+        historical_patterns = self.pattern_analyzer.analyze_historical_patterns()
+
+        # Extract volatility from historical patterns
+        temp_volatility = historical_patterns.get("temperature", {}).get(
+            "volatility", 5.0
+        )
+        humidity_volatility = historical_patterns.get("pressure", {}).get(
+            "volatility", 2.0
+        )
+        wind_volatility = (
+            temp_volatility * 0.8
+        )  # Wind typically less volatile than temp
+
+        # Create diurnal patterns based on typical weather cycles
+        diurnal_patterns = {
+            "temperature": {
+                "dawn": -2.0,  # Cooling before sunrise
+                "morning": 1.0,  # Warming after sunrise
+                "noon": 3.0,  # Peak daytime warming
+                "afternoon": 2.0,  # Afternoon warming
+                "evening": -1.0,  # Evening cooling
+                "night": -3.0,  # Night cooling
+                "midnight": -2.0,  # Late night cooling
+            },
+            "humidity": {
+                "dawn": 5,  # Morning humidity increase
+                "morning": -5,  # Morning drying
+                "noon": -10,  # Afternoon drying
+                "afternoon": -5,  # Afternoon drying
+                "evening": 5,  # Evening humidity increase
+                "night": 10,  # Night humidity peak
+                "midnight": 5,  # Late night humidity
+            },
+            "wind": {
+                "dawn": -1.0,  # Early morning calm
+                "morning": 0.5,  # Morning wind increase
+                "noon": 1.0,  # Afternoon wind peak
+                "afternoon": 1.5,  # Peak afternoon wind
+                "evening": 0.5,  # Evening wind decrease
+                "night": -1.0,  # Night wind calm
+                "midnight": -0.5,  # Late night calm
+            },
+        }
+
+        return {
+            "diurnal_patterns": diurnal_patterns,
+            "volatility": {
+                "temperature": temp_volatility,
+                "humidity": humidity_volatility,
+                "wind": wind_volatility,
+            },
+        }
+
     def _calculate_seasonal_factor(self) -> float:
         """Calculate seasonal temperature variation factor.
 
@@ -246,6 +303,84 @@ class AdvancedWeatherForecast:
         """
         return self.evolution_modeler.model_system_evolution(meteorological_state)
 
+    def _model_hourly_weather_evolution(
+        self, meteorological_state: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Model hourly weather evolution for micro-changes.
+
+        Returns:
+            Dictionary with evolution rate, stability factor, and micro-changes.
+        """
+        # Extract stability from meteorological state
+        stability = meteorological_state.get("atmospheric_stability", 0.5)
+
+        # Calculate evolution rate based on stability (lower stability = faster evolution)
+        evolution_rate = 1.0 - stability
+
+        # Create micro-changes structure for hourly variations
+        micro_changes = {
+            "max_change_per_hour": evolution_rate * 2.0,  # Max change per hour
+            "change_probability": min(
+                0.8, evolution_rate + 0.2
+            ),  # Probability of change
+            "stability_threshold": stability,
+        }
+
+        return {
+            "evolution_rate": evolution_rate,
+            "stability_factor": stability,
+            "micro_changes": micro_changes,
+        }
+
+    def _calculate_atmospheric_stability(
+        self,
+        temperature: float,
+        humidity: float,
+        wind_speed: float,
+        pressure_trends: Dict[str, Any],
+    ) -> float:
+        """Calculate atmospheric stability based on weather conditions.
+
+        Args:
+            temperature: Current temperature in Celsius
+            humidity: Current humidity percentage
+            wind_speed: Current wind speed
+            pressure_trends: Pressure trend analysis
+
+        Returns:
+            Stability factor between 0.0 (very unstable) and 1.0 (very stable)
+        """
+        # Base stability factors
+        stability = 0.5  # Neutral starting point
+
+        # Temperature effect: moderate temperatures are more stable
+        if 15 <= temperature <= 25:  # Comfortable range
+            stability += 0.2
+        elif temperature < 0 or temperature > 35:  # Extreme temperatures
+            stability -= 0.2
+
+        # Humidity effect: moderate humidity is more stable
+        if 40 <= humidity <= 70:  # Comfortable range
+            stability += 0.1
+        elif humidity < 20 or humidity > 90:  # Extreme humidity
+            stability -= 0.1
+
+        # Wind effect: calm winds are more stable
+        if wind_speed < 5:  # Light winds
+            stability += 0.15
+        elif wind_speed > 15:  # Strong winds
+            stability -= 0.15
+
+        # Pressure trends effect
+        long_trend = pressure_trends.get("long_term_trend", 0)
+        if abs(long_trend) < 0.5:  # Stable pressure
+            stability += 0.1
+        elif abs(long_trend) > 2.0:  # Rapid pressure changes
+            stability -= 0.2
+
+        # Ensure stability is within bounds
+        return max(0.0, min(1.0, stability))
+
     # =========================================================================
     # LEGACY METHODS - For backward compatibility with existing tests
     # =========================================================================
@@ -265,6 +400,12 @@ class AdvancedWeatherForecast:
         meteorological_state = {
             "pressure_analysis": pressure_analysis,
             "atmospheric_stability": 0.5,
+            "cloud_analysis": {"cloud_cover": 50.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
+            "wind_pattern_analysis": {
+                "gradient_wind_effect": 0,
+                "direction_stability": 0.5,
+            },
         }
         historical_patterns = temp_patterns if temp_patterns else {}
         system_evolution = {}
@@ -286,11 +427,22 @@ class AdvancedWeatherForecast:
         self, day_index, current_condition, pressure_analysis, sensor_data
     ):
         """Legacy method - delegates to DailyForecastGenerator."""
+        # Sanitize sensor data to handle None values
+        sanitized_sensor_data = {}
+        if sensor_data:
+            for key, value in sensor_data.items():
+                if value is not None:
+                    sanitized_sensor_data[key] = value
+
         meteorological_state = {
             "pressure_analysis": pressure_analysis,
             "cloud_analysis": {"cloud_cover": 50.0},
             "moisture_analysis": {"condensation_potential": 0.3},
             "atmospheric_stability": 0.5,
+            "wind_pattern_analysis": {
+                "gradient_wind_effect": 0,
+                "direction_stability": 0.5,
+            },
         }
         historical_patterns = {}
         system_evolution = {}
@@ -298,7 +450,7 @@ class AdvancedWeatherForecast:
         # Generate full forecast and extract condition for the specified day
         forecast = self.daily_generator.generate_forecast(
             current_condition,
-            sensor_data,
+            sanitized_sensor_data,
             0.0,
             meteorological_state,
             historical_patterns,
@@ -312,6 +464,13 @@ class AdvancedWeatherForecast:
         self, day_index, condition, pressure_analysis, humidity_trend, sensor_data
     ):
         """Legacy method - delegates to DailyForecastGenerator."""
+        # Sanitize sensor data to handle None values
+        sanitized_sensor_data = {}
+        if sensor_data:
+            for key, value in sensor_data.items():
+                if value is not None:
+                    sanitized_sensor_data[key] = value
+
         meteorological_state = {
             "pressure_analysis": pressure_analysis,
             "moisture_analysis": {
@@ -319,6 +478,11 @@ class AdvancedWeatherForecast:
                 "condensation_potential": 0.3,
             },
             "atmospheric_stability": 0.5,
+            "cloud_analysis": {"cloud_cover": 50.0},
+            "wind_pattern_analysis": {
+                "gradient_wind_effect": 0,
+                "direction_stability": 0.5,
+            },
         }
         historical_patterns = {}
         system_evolution = {}
@@ -326,7 +490,7 @@ class AdvancedWeatherForecast:
         # Generate full forecast and extract precipitation for the specified day
         forecast = self.daily_generator.generate_forecast(
             condition,
-            sensor_data,
+            sanitized_sensor_data,
             0.0,
             meteorological_state,
             historical_patterns,
@@ -349,6 +513,8 @@ class AdvancedWeatherForecast:
                 "gust_factor": 1.0,
             },
             "atmospheric_stability": 0.5,
+            "cloud_analysis": {"cloud_cover": 50.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
         }
         historical_patterns = {}
         system_evolution = {}
@@ -368,11 +534,20 @@ class AdvancedWeatherForecast:
 
     def forecast_humidity(self, day_index, current_humidity, humidity_trend, condition):
         """Legacy method - delegates to DailyForecastGenerator."""
-        sensor_data = {KEY_HUMIDITY: current_humidity}
+        # Sanitize sensor data to handle None values
+        sanitized_sensor_data = {
+            KEY_HUMIDITY: current_humidity if current_humidity is not None else 50
+        }
+
         meteorological_state = {
             "moisture_analysis": {"trend_direction": "stable"},
             "atmospheric_stability": 0.5,
             "pressure_analysis": {"pressure_system": "normal"},
+            "cloud_analysis": {"cloud_cover": 50.0},
+            "wind_pattern_analysis": {
+                "gradient_wind_effect": 0,
+                "direction_stability": 0.5,
+            },
         }
         historical_patterns = {}
         system_evolution = {}
@@ -380,7 +555,7 @@ class AdvancedWeatherForecast:
         # Generate full forecast and extract humidity for the specified day
         forecast = self.daily_generator.generate_forecast(
             condition,
-            sensor_data,
+            sanitized_sensor_data,
             0.0,
             meteorological_state,
             historical_patterns,
@@ -388,7 +563,7 @@ class AdvancedWeatherForecast:
         )
         if forecast and day_index < len(forecast):
             return forecast[day_index][KEY_HUMIDITY]
-        return current_humidity
+        return current_humidity if current_humidity is not None else 50
 
     def analyze_temperature_patterns(self, *args, **kwargs):
         """Legacy method."""
@@ -408,11 +583,22 @@ class AdvancedWeatherForecast:
         self, day_index, pressure_analysis, sensor_data
     ):
         """Legacy method - delegates to DailyForecastGenerator."""
+        # Sanitize sensor data to handle None values
+        sanitized_sensor_data = {}
+        if sensor_data:
+            for key, value in sensor_data.items():
+                if value is not None:
+                    sanitized_sensor_data[key] = value
+
         meteorological_state = {
             "pressure_analysis": pressure_analysis,
             "cloud_analysis": {"cloud_cover": 50.0},
             "moisture_analysis": {"condensation_potential": 0.3},
             "atmospheric_stability": 0.5,
+            "wind_pattern_analysis": {
+                "gradient_wind_effect": 0,
+                "direction_stability": 0.5,
+            },
         }
         historical_patterns = {}
         system_evolution = {}
@@ -420,7 +606,7 @@ class AdvancedWeatherForecast:
         # Generate full forecast and extract condition for the specified day
         forecast = self.daily_generator.generate_forecast(
             ATTR_CONDITION_PARTLYCLOUDY,
-            sensor_data,
+            sanitized_sensor_data,
             0.0,
             meteorological_state,
             historical_patterns,
@@ -504,7 +690,7 @@ class AdvancedWeatherForecast:
     def get_historical_trends(self, sensor_key: str, hours: int = 24) -> Dict[str, Any]:
         """Get historical trends for a sensor (wrapper for analysis method)."""
         try:
-            result = self.analysis.get_historical_trends(sensor_key, hours)
+            result = self.trends.get_historical_trends(sensor_key, hours)
             # Check if the result is a MagicMock (in test environments)
             if hasattr(result, "_mock_name"):
                 raise AttributeError("Mock object returned")

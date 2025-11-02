@@ -11,6 +11,10 @@ This module handles comprehensive meteorological analysis including:
 import logging
 from typing import Any, Dict, Optional
 
+from ..analysis.atmospheric import AtmosphericAnalyzer
+from ..analysis.core import WeatherConditionAnalyzer
+from ..analysis.solar import SolarAnalyzer
+from ..analysis.trends import TrendsAnalyzer
 from ..const import (
     KEY_HUMIDITY,
     KEY_OUTDOOR_TEMP,
@@ -27,7 +31,6 @@ from ..meteorological_constants import (
     TemperatureThresholds,
     WindThresholds,
 )
-from ..weather_analysis import WeatherAnalysis
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,13 +38,25 @@ _LOGGER = logging.getLogger(__name__)
 class MeteorologicalAnalyzer:
     """Analyzes comprehensive meteorological state for forecasting."""
 
-    def __init__(self, weather_analysis: WeatherAnalysis):
+    def __init__(
+        self,
+        atmospheric_analyzer: AtmosphericAnalyzer,
+        core_analyzer: WeatherConditionAnalyzer,
+        solar_analyzer: SolarAnalyzer,
+        trends_analyzer: TrendsAnalyzer,
+    ):
         """Initialize meteorological analyzer.
 
         Args:
-            weather_analysis: WeatherAnalysis instance for data access
+            atmospheric_analyzer: AtmosphericAnalyzer instance for pressure and wind analysis
+            core_analyzer: WeatherConditionAnalyzer instance for dewpoint calculations
+            solar_analyzer: SolarAnalyzer instance for cloud cover analysis
+            trends_analyzer: TrendsAnalyzer instance for historical data
         """
-        self.analysis = weather_analysis
+        self.atmospheric_analyzer = atmospheric_analyzer
+        self.core_analyzer = core_analyzer
+        self.solar_analyzer = solar_analyzer
+        self.trends_analyzer = trends_analyzer
 
     def analyze_state(
         self, sensor_data: Dict[str, Any], altitude: Optional[float] = 0.0
@@ -64,7 +79,9 @@ class MeteorologicalAnalyzer:
         """
         # Get all available trend analyses with error handling for mock objects
         try:
-            pressure_analysis = self.analysis.analyze_pressure_trends(altitude)
+            pressure_analysis = self.atmospheric_analyzer.analyze_pressure_trends(
+                altitude
+            )
             if hasattr(pressure_analysis, "_mock_name"):
                 pressure_analysis = {
                     "pressure_system": "normal",
@@ -88,7 +105,7 @@ class MeteorologicalAnalyzer:
             }
 
         try:
-            wind_analysis = self.analysis.analyze_wind_direction_trends()
+            wind_analysis = self.atmospheric_analyzer.analyze_wind_direction_trends()
             if hasattr(wind_analysis, "_mock_name"):
                 wind_analysis = {"direction_stability": 0.5, "gust_factor": 1.0}
             elif isinstance(wind_analysis, dict):
@@ -102,7 +119,9 @@ class MeteorologicalAnalyzer:
             wind_analysis = {"direction_stability": 0.5, "gust_factor": 1.0}
 
         try:
-            temp_trends = self.analysis.get_historical_trends("outdoor_temp", hours=24)
+            temp_trends = self.trends_analyzer.get_historical_trends(
+                "outdoor_temp", hours=24
+            )
             if hasattr(temp_trends, "_mock_name"):
                 temp_trends = {"trend": 0, "volatility": 2.0}
             elif isinstance(temp_trends, dict):
@@ -116,7 +135,7 @@ class MeteorologicalAnalyzer:
             temp_trends = {"trend": 0, "volatility": 2.0}
 
         try:
-            humidity_trends = self.analysis.get_historical_trends(
+            humidity_trends = self.trends_analyzer.get_historical_trends(
                 KEY_HUMIDITY, hours=24
             )
             if hasattr(humidity_trends, "_mock_name"):
@@ -132,7 +151,9 @@ class MeteorologicalAnalyzer:
             humidity_trends = {"trend": 0, "volatility": 5.0}
 
         try:
-            wind_trends = self.analysis.get_historical_trends(KEY_WIND_SPEED, hours=24)
+            wind_trends = self.trends_analyzer.get_historical_trends(
+                KEY_WIND_SPEED, hours=24
+            )
             if hasattr(wind_trends, "_mock_name"):
                 wind_trends = {"trend": 0, "volatility": 2.0}
             elif isinstance(wind_trends, dict):
@@ -188,7 +209,9 @@ class MeteorologicalAnalyzer:
 
         # Calculate dewpoint with error handling
         try:
-            dewpoint = self.analysis.calculate_dewpoint(current_temp, current_humidity)
+            dewpoint = self.core_analyzer.calculate_dewpoint(
+                current_temp, current_humidity
+            )
             if not isinstance(dewpoint, (int, float)):
                 humidity_val = (
                     current_humidity
@@ -357,7 +380,7 @@ class MeteorologicalAnalyzer:
         solar_elevation = sensor_data.get("solar_elevation", 45.0)
 
         try:
-            cloud_cover = self.analysis.analyze_cloud_cover(
+            cloud_cover = self.solar_analyzer.analyze_cloud_cover(
                 solar_radiation, solar_lux, uv_index, solar_elevation, pressure_analysis
             )
             if not isinstance(cloud_cover, (int, float)):

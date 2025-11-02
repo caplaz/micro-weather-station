@@ -12,8 +12,8 @@ from typing import Any, Dict, Optional
 
 from homeassistant.util import dt as dt_util
 
+from ..analysis.trends import TrendsAnalyzer
 from ..const import KEY_HUMIDITY, KEY_PRESSURE, KEY_TEMPERATURE
-from ..weather_analysis import WeatherAnalysis
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,13 +21,13 @@ _LOGGER = logging.getLogger(__name__)
 class PatternAnalyzer:
     """Analyzes historical weather patterns for forecasting."""
 
-    def __init__(self, weather_analysis: WeatherAnalysis):
+    def __init__(self, trends_analyzer: TrendsAnalyzer):
         """Initialize pattern analyzer.
 
         Args:
-            weather_analysis: WeatherAnalysis instance for historical data
+            trends_analyzer: TrendsAnalyzer instance for historical data
         """
-        self.analysis = weather_analysis
+        self.analysis = trends_analyzer
 
     def analyze_historical_patterns(self) -> Dict[str, Any]:
         """Analyze historical weather patterns for pattern recognition.

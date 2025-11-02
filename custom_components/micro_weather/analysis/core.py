@@ -55,15 +55,17 @@ class WeatherConditionAnalyzer:
     5. Default conditions
     """
 
-    def __init__(self, atmospheric_analyzer, solar_analyzer):
+    def __init__(self, atmospheric_analyzer, solar_analyzer, trends_analyzer):
         """Initialize with required analyzers.
 
         Args:
             atmospheric_analyzer: AtmosphericAnalyzer instance for pressure/fog
             solar_analyzer: SolarAnalyzer instance for cloud cover
+            trends_analyzer: TrendsAnalyzer instance for historical trends
         """
         self.atmospheric = atmospheric_analyzer
         self.solar = solar_analyzer
+        self.trends = trends_analyzer
 
     def determine_condition(
         self,
@@ -296,7 +298,7 @@ class WeatherConditionAnalyzer:
                 return self._atmospheric_fallback_condition(sensors, params)
 
         # Analyze pressure trends for cloud prediction
-        pressure_trends = self.atmospheric.analyze_pressure_trends(
+        pressure_trends = self.trends.analyze_pressure_trends(
             params.get("altitude", 0.0)
         )
 

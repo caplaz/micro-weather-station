@@ -642,7 +642,7 @@ class TestWeatherDetector:
 
         # Check initial history is empty (except for any defaults)
         initial_temp_history = len(
-            detector.analysis._sensor_history.get("outdoor_temp", [])
+            detector.trends_analyzer._sensor_history.get("outdoor_temp", [])
         )
 
         # Get weather data (this should store historical data)
@@ -650,7 +650,7 @@ class TestWeatherDetector:
 
         # Check that historical data was added
         final_temp_history = len(
-            detector.analysis._sensor_history.get("outdoor_temp", [])
+            detector.trends_analyzer._sensor_history.get("outdoor_temp", [])
         )
         assert final_temp_history >= initial_temp_history
 

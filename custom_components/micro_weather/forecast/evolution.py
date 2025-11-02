@@ -9,8 +9,6 @@ This module handles modeling how weather systems evolve over time:
 import logging
 from typing import Any, Dict
 
-from ..weather_analysis import WeatherAnalysis
-
 _LOGGER = logging.getLogger(__name__)
 
 # Type alias
@@ -20,13 +18,8 @@ EvolutionModel = Dict[str, Any]
 class EvolutionModeler:
     """Models weather system evolution over time."""
 
-    def __init__(self, weather_analysis: WeatherAnalysis):
-        """Initialize evolution modeler.
-
-        Args:
-            weather_analysis: WeatherAnalysis instance for historical data
-        """
-        self.analysis = weather_analysis
+    def __init__(self):
+        """Initialize evolution modeler."""
 
     def model_system_evolution(
         self, meteorological_state: Dict[str, Any]

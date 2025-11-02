@@ -28,6 +28,9 @@ from homeassistant.components.weather import (
 )
 from homeassistant.util import dt as dt_util
 
+from ..analysis.atmospheric import AtmosphericAnalyzer
+from ..analysis.solar import SolarAnalyzer
+from ..analysis.trends import TrendsAnalyzer
 from ..const import (
     KEY_CONDITION,
     KEY_HUMIDITY,
@@ -35,7 +38,6 @@ from ..const import (
     KEY_TEMPERATURE,
     KEY_WIND_SPEED,
 )
-from ..weather_analysis import WeatherAnalysis
 from ..weather_utils import is_forecast_hour_daytime
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,13 +53,22 @@ def convert_to_kmh(speed: float) -> Optional[float]:
 class HourlyForecastGenerator:
     """Handles generation of 24-hour hourly forecasts."""
 
-    def __init__(self, weather_analysis: WeatherAnalysis):
+    def __init__(
+        self,
+        atmospheric_analyzer: AtmosphericAnalyzer,
+        solar_analyzer: SolarAnalyzer,
+        trends_analyzer: TrendsAnalyzer,
+    ):
         """Initialize hourly forecast generator.
 
         Args:
-            weather_analysis: WeatherAnalysis instance for historical data
+            atmospheric_analyzer: AtmosphericAnalyzer instance
+            solar_analyzer: SolarAnalyzer instance
+            trends_analyzer: TrendsAnalyzer instance
         """
-        self.weather_analysis = weather_analysis
+        self.atmospheric_analyzer = atmospheric_analyzer
+        self.solar_analyzer = solar_analyzer
+        self.trends_analyzer = trends_analyzer
 
     def generate_forecast(
         self,
@@ -324,10 +335,6 @@ class HourlyForecastGenerator:
                 current_trend = 0.0
             if not isinstance(long_term_trend, (int, float)):
                 long_term_trend = 0.0
-
-            trend_analysis = self._analyze_pressure_trend_severity(
-                current_trend, long_term_trend
-            )
 
             pressure_driven_condition = self._determine_pressure_driven_condition(
                 pressure_analysis,

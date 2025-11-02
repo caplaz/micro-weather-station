@@ -318,6 +318,17 @@ class TrendsAnalyzer:
 
         return correlations
 
+    def analyze_pressure_trends(self, altitude: float = 0.0) -> Dict[str, Any]:
+        """Analyze historical pressure trends.
+
+        Args:
+            altitude: Altitude in meters (for future pressure correction)
+
+        Returns:
+            Dictionary with pressure trend analysis
+        """
+        return self.get_historical_trends("pressure", hours=24)
+
     def calculate_circular_mean(self, directions: List[float]) -> float:
         """Calculate the circular mean of wind directions.
 
@@ -345,38 +356,3 @@ class TrendsAnalyzer:
         mean_degrees = math.degrees(mean_radians) % 360
 
         return mean_degrees
-
-    def calculate_prevailing_direction(self, directions: List[float]) -> str:
-        """Determine the prevailing wind direction sector.
-
-        Args:
-            directions: List of wind directions in degrees
-
-        Returns:
-            Prevailing direction as cardinal direction
-        """
-        if not directions:
-            return "unknown"
-
-        # Count directions in each 90° sector
-        sectors = {
-            "north": 0,  # 315-45°
-            "east": 0,  # 45-135°
-            "south": 0,  # 135-225°
-            "west": 0,  # 225-315°
-        }
-
-        for direction in directions:
-            normalized = direction % 360
-            if 315 <= normalized or normalized < 45:
-                sectors["north"] += 1
-            elif 45 <= normalized < 135:
-                sectors["east"] += 1
-            elif 135 <= normalized < 225:
-                sectors["south"] += 1
-            else:  # 225 <= normalized < 315
-                sectors["west"] += 1
-
-        # Return the sector with the most observations
-        prevailing = max(sectors, key=lambda k: sectors[k])
-        return prevailing

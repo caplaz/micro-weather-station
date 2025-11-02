@@ -30,6 +30,10 @@ from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
 
+from .analysis.atmospheric import AtmosphericAnalyzer
+from .analysis.core import WeatherConditionAnalyzer
+from .analysis.solar import SolarAnalyzer
+from .analysis.trends import TrendsAnalyzer
 from .const import (
     CONF_ALTITUDE,
     CONF_DEWPOINT_SENSOR,
@@ -69,7 +73,6 @@ from .const import (
     KEY_WIND_SPEED,
     KEY_WIND_SPEED_UNIT,
 )
-from .weather_analysis import WeatherAnalysis
 from .weather_forecast import AdvancedWeatherForecast
 from .weather_utils import (
     convert_altitude_to_meters,
@@ -133,11 +136,24 @@ class WeatherDetector:
         zenith_max_radiation = options.get(
             CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
         )
-        self.analysis = WeatherAnalysis(
-            sensor_history=self._sensor_history,
-            zenith_max_radiation=zenith_max_radiation,
+        self.atmospheric_analyzer = AtmosphericAnalyzer(self._sensor_history)
+        self.solar_analyzer = SolarAnalyzer(self._sensor_history, zenith_max_radiation)
+        self.trends_analyzer = TrendsAnalyzer(self._sensor_history)
+        self.core_analyzer = WeatherConditionAnalyzer(
+            self.atmospheric_analyzer, self.solar_analyzer, self.trends_analyzer
         )
-        self.forecast = AdvancedWeatherForecast(self.analysis)
+
+        # Keep backward compatibility with self.analysis for existing code
+        self.analysis = (
+            self.core_analyzer
+        )  # Point to core analyzer for methods that still use self.analysis
+
+        self.forecast = AdvancedWeatherForecast(
+            self.atmospheric_analyzer,
+            self.solar_analyzer,
+            self.trends_analyzer,
+            self.core_analyzer,
+        )
 
         # Sensor entity IDs mapping
         self.sensors = {
@@ -181,7 +197,7 @@ class WeatherDetector:
         sensor_data = self._get_sensor_values()
 
         # Store historical data
-        self.analysis.store_historical_data(
+        self.trends_analyzer.store_historical_data(
             self._prepare_analysis_sensor_data(sensor_data)
         )
 
@@ -195,7 +211,7 @@ class WeatherDetector:
         condition = self._determine_weather_condition(sensor_data)
 
         # Store the final condition in historical data
-        self.analysis.store_historical_data(
+        self.trends_analyzer.store_historical_data(
             {}, condition  # Empty sensor data, just the condition
         )
 
@@ -435,7 +451,7 @@ class WeatherDetector:
         analysis_data = self._prepare_analysis_sensor_data(sensor_data)
 
         # Use the weather analysis module for condition determination
-        return self.analysis.determine_weather_condition(analysis_data, altitude)
+        return self.analysis.determine_condition(analysis_data, altitude)
 
     def _convert_temperature(
         self, temp: Optional[float], unit: Optional[str]
