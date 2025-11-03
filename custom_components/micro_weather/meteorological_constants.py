@@ -364,3 +364,408 @@ class DefaultSensorValues:
     WIND_SPEED = 0.0  # mph - Calm conditions
     SOLAR_RADIATION = 0.0  # W/m² - No radiation (night/clouds)
     ZENITH_MAX_RADIATION = 1000.0  # W/m² - Typical maximum at zenith
+
+
+@dataclass(frozen=True)
+class ForecastConstants:
+    """Constants for weather forecasting algorithms.
+
+    These values are used in daily and hourly forecast generation to model
+    weather system evolution, temperature trends, and atmospheric dynamics.
+    """
+
+    # Seasonal temperature adjustments (°C)
+    MAX_SEASONAL_ADJUSTMENT: float = 2.0  # Maximum daily temperature shift
+    MIN_SEASONAL_ADJUSTMENT: float = -2.0  # Minimum daily temperature shift
+
+    # Pressure system temperature influence (°C)
+    HIGH_PRESSURE_TEMP_INFLUENCE: float = 2.0  # Warming effect of high pressure
+    LOW_PRESSURE_TEMP_INFLUENCE: float = -3.0  # Cooling effect of low pressure
+
+    # Trend calculation weights
+    CURRENT_TREND_WEIGHT: float = 0.5  # Weight for current trend
+    LONG_TERM_TREND_WEIGHT: float = 0.3  # Weight for long-term trend
+
+    # Distance dampening factors (forecast confidence decay)
+    DAILY_MIN_DAMPENING: float = 0.3  # Minimum confidence for distant days
+    DAILY_DAMPENING_RATE: float = 0.15  # Confidence decay per day
+    HOURLY_MIN_DAMPENING: float = 0.5  # Minimum confidence for distant hours
+    HOURLY_DAMPENING_RATE: float = 0.02  # Confidence decay per hour
+    HOURLY_NATURAL_VARIATION_DAMPENING: float = 0.3  # Min dampening for variation
+    HOURLY_VARIATION_DECAY: float = 0.05  # Decay rate for natural variation
+
+    # Uncertainty factors (exponential confidence decay)
+    UNCERTAINTY_DECAY_RATE: float = 0.5  # Exponential decay rate
+    MAX_FORECAST_CONFIDENCE: float = 0.95  # Day 1 confidence (95%)
+    MIN_FORECAST_CONFIDENCE: float = 0.05  # Baseline minimum confidence
+
+    # Storm probability thresholds (%)
+    STORM_THRESHOLD_SEVERE: int = 70  # Severe storm threshold
+    STORM_THRESHOLD_MODERATE: int = 40  # Moderate storm threshold
+    STORM_THRESHOLD_HIGH: int = 60  # High storm probability
+
+    # Pressure trend thresholds (inHg/3h or hPa/3h)
+    PRESSURE_RAPID_FALL: float = -1.0  # Rapid pressure fall
+    PRESSURE_SLOW_FALL: float = -0.5  # Slow pressure fall
+    PRESSURE_MODERATE_RISE: float = 1.0  # Moderate pressure rise
+    PRESSURE_RAPID_RISE: float = 1.5  # Rapid pressure rise
+
+    # Precipitation multipliers
+    PRECIP_MULT_STORM_HIGH: float = 1.8  # Storm probability >70%
+    PRECIP_MULT_STORM_MODERATE: float = 1.4  # Storm probability >40%
+    PRECIP_MULT_RAPID_FALL: float = 1.5  # Rapidly falling pressure
+    PRECIP_MULT_SLOW_FALL: float = 1.25  # Slowly falling pressure
+    PRECIP_MULT_RISING: float = 0.4  # Rising pressure (clearing)
+
+    # Atmospheric stability adjustments
+    STABILITY_DAMPENING_FACTOR: float = 0.3  # Stability impact on variation
+    INSTABILITY_PRECIP_MULT: float = 0.5  # Unstable air precipitation boost
+
+    # Moisture transport multiplier
+    MOISTURE_TRANSPORT_DIVISOR: float = 10.0  # Normalize transport potential
+
+    # Pressure influence multipliers
+    PRESSURE_TREND_INFLUENCE_MULT: float = 0.5  # Current trend influence
+    PRESSURE_LONG_TREND_MULT: float = 0.3  # Long-term trend influence
+    PRESSURE_TEMP_MODULATION: float = 0.1  # Hourly pressure modulation
+
+    # Distance-based reductions
+    DAILY_DISTANCE_FACTOR_MIN: float = 0.2  # Minimum distance factor
+    DAILY_DISTANCE_DECAY: float = 0.15  # Distance decay per day
+    HOURLY_DISTANCE_FACTOR_MIN: float = 0.2  # Minimum hourly distance factor
+    HOURLY_DISTANCE_DECAY: float = 0.03  # Distance decay per hour
+    WIND_DISTANCE_FACTOR_MIN: float = 0.4  # Minimum wind distance factor
+    WIND_DISTANCE_DECAY: float = 0.12  # Wind forecast decay per day
+
+    # Natural variation parameters
+    NATURAL_VARIATION_AMPLITUDE: float = 0.3  # Natural variation amplitude
+    NATURAL_VARIATION_PERIOD: int = 3  # Natural variation period (hours)
+
+    # Additional constants for daily forecast calculations
+    # Default values (using DefaultSensorValues as reference)
+    DEFAULT_TEMPERATURE: float = 70.0  # °F - Fallback temperature
+    DEFAULT_HUMIDITY: float = 50.0  # % - Fallback humidity
+    DEFAULT_WIND_SPEED: float = 5.0  # mph - Fallback wind speed
+
+    # Confidence thresholds
+    CONFIDENCE_THRESHOLD_HIGH: float = 0.7  # High confidence threshold
+    DAY_ZERO_MIN_CONFIDENCE: float = 0.8  # Minimum confidence for day 0
+
+    # Temperature range calculations (°C)
+    DEFAULT_TEMP_RANGE: float = 8.0  # Default diurnal temperature range
+    TEMP_RANGE_SUNNY: float = 12.0  # Large range on clear days
+    TEMP_RANGE_PARTLYCLOUDY: float = 10.0
+    TEMP_RANGE_CLOUDY: float = 6.0  # Small range on cloudy days
+    TEMP_RANGE_RAINY: float = 4.0  # Very small range during rain
+    TEMP_RANGE_LIGHTNING_RAINY: float = 3.0
+    TEMP_RANGE_FOG: float = 2.0  # Minimal range in fog
+    TEMP_RANGE_STABILITY_BASE: float = 0.5  # Base stability factor
+    MIN_TEMP_RANGE: float = 2.0  # Minimum temperature range
+    MAX_TEMP_RANGE: float = 15.0  # Maximum temperature range
+
+    # Wind speed bounds (km/h)
+    MIN_WIND_SPEED: float = 1.0  # Minimum reported wind speed
+
+    # Humidity bounds (%)
+    MIN_HUMIDITY: int = 10
+    MAX_HUMIDITY: int = 100
+
+    # Cloud cover thresholds
+    CLOUD_COVER_CLOUDY_THRESHOLD: float = 40.0  # % - Threshold for cloudy condition
+
+    # Condensation and precipitation thresholds
+    CONDENSATION_RAIN_THRESHOLD: float = 0.7  # Condensation potential for rain
+    STORM_PRECIPITATION_THRESHOLD: int = 60  # Storm probability for precipitation
+    POURING_DAY_THRESHOLD: int = 2  # Day index for pouring vs lightning-rainy
+
+    # Pressure trend thresholds for conditions
+    PRESSURE_TREND_FALLING_THRESHOLD: float = 0.3  # Falling pressure threshold
+    PRESSURE_TREND_RISING_THRESHOLD: float = 0.3  # Rising pressure threshold
+
+    # Seasonal adjustment parameters
+    SEASONAL_ADJUSTMENT_CENTER: float = 2.0  # Center point for adjustment
+    SEASONAL_ADJUSTMENT_BASE_RATE: float = 0.3  # Base rate per day
+    SEASONAL_ADJUSTMENT_VARIATION: float = 0.5  # Variation amplitude
+    SEASONAL_ADJUSTMENT_CYCLE: int = 3  # Cycle period
+    SEASONAL_ADJUSTMENT_CYCLE_OFFSET: int = 1  # Cycle offset
+    SEASONAL_ADJUSTMENT_MAX_RANGE: float = 2.0  # Maximum adjustment range
+
+    # Pattern influence parameters
+    PATTERN_VOLATILITY_MULTIPLIER: float = 2.0  # Volatility scaling
+    MIN_PATTERN_INFLUENCE: float = 0.2  # Minimum pattern influence
+    PATTERN_DISTANCE_DECAY: float = 0.2  # Pattern decay per day
+    PATTERN_ALTERNATION_BASELINE: float = 0.5  # Alternation baseline
+
+    # Evolution influence
+    EVOLUTION_BASE_INFLUENCE: float = 1.0  # Base evolution influence
+
+    # Precipitation calculation factors
+    RAIN_HISTORY_NORMALIZER: float = 10.0  # Rain history normalization
+    MIN_PRECIPITATION_DISTANCE_FACTOR: float = 0.2  # Min precipitation distance factor
+
+    # Humidity forecasting
+    HUMIDITY_CHANGE_DAMPENING: float = 0.15  # Humidity change dampening
+
+    # Wind forecasting
+    MIN_WIND_DISTANCE_DAMPENING: float = 0.4  # Minimum wind distance dampening
+    WIND_DISTANCE_DAMPENING_RATE: float = 0.12  # Wind distance decay rate
+
+
+@dataclass(frozen=True)
+class PrecipitationConstants:
+    """Base precipitation amounts by weather condition.
+
+    These values represent typical precipitation rates for different
+    weather conditions. Units are in mm/day for daily forecasts.
+    """
+
+    # Base daily precipitation by condition (mm/day)
+    LIGHTNING_RAINY: float = 15.0  # Thunderstorms with heavy rain
+    POURING: float = 20.0  # Heavy continuous rain
+    RAINY: float = 5.0  # Moderate rain
+    SNOWY: float = 3.0  # Snow (liquid equivalent)
+    CLOUDY: float = 0.5  # Overcast with possible drizzle
+    FOG: float = 0.1  # Fog/mist
+
+    # Conversion factor
+    MM_TO_INCHES: float = 25.4  # Millimeters to inches conversion
+
+
+@dataclass(frozen=True)
+class WindAdjustmentConstants:
+    """Wind speed adjustment factors by weather condition.
+
+    Multipliers applied to base wind speed based on weather conditions.
+    Also includes pressure system effects on wind speed.
+    """
+
+    # Condition-based wind multipliers
+    LIGHTNING_RAINY: float = 1.6  # Strong winds with thunderstorms
+    POURING: float = 1.4  # Increased winds with heavy rain
+    RAINY: float = 1.3  # Moderate wind increase with rain
+    WINDY: float = 2.2  # Explicitly windy conditions
+    CLOUDY: float = 0.9  # Slightly reduced winds
+    PARTLYCLOUDY: float = 0.95  # Minimal wind reduction
+    SUNNY: float = 0.8  # Calm sunny conditions
+    CLEAR_NIGHT: float = 0.8  # Calm clear nights
+    FOG: float = 0.7  # Light winds in fog
+    SNOWY: float = 1.1  # Moderate winds with snow
+
+    # Pressure system effects
+    LOW_PRESSURE_MULT: float = 1.3  # Stronger winds in low pressure
+    HIGH_PRESSURE_MULT: float = 0.8  # Lighter winds in high pressure
+
+    # Wind stability effects
+    DIRECTION_UNSTABLE_THRESHOLD: float = 0.3  # Threshold for unstable direction
+    DIRECTION_STABLE_THRESHOLD: float = 0.8  # Threshold for stable direction
+    DIRECTION_UNSTABLE_MULTIPLIER: float = 1.2  # Variable direction = stronger
+    DIRECTION_STABLE_MULTIPLIER: float = 0.9  # Steady direction = lighter
+    UNSTABLE_DIRECTION_MULT: float = 1.2  # Variable direction = stronger (legacy)
+    STABLE_DIRECTION_MULT: float = 0.9  # Steady direction = lighter (legacy)
+
+    # Gradient wind effect multiplier
+    GRADIENT_WIND_MULTIPLIER: float = 2.0  # Pressure gradient influence
+    GRADIENT_EFFECT_MULT: float = 2.0  # Pressure gradient influence (legacy)
+
+
+@dataclass(frozen=True)
+class HumidityTargetConstants:
+    """Target humidity levels by weather condition.
+
+    These represent typical humidity percentages for different
+    weather conditions, used in forecast humidity calculations.
+    """
+
+    # Target humidity by condition (%)
+    LIGHTNING_RAINY: int = 85  # High humidity with thunderstorms
+    POURING: int = 90  # Very high humidity with heavy rain
+    RAINY: int = 80  # High humidity with rain
+    SNOWY: int = 75  # Moderate-high with snow
+    CLOUDY: int = 70  # Elevated humidity
+    PARTLYCLOUDY: int = 60  # Moderate humidity
+    SUNNY: int = 50  # Lower humidity
+    CLEAR_NIGHT: int = 65  # Night moisture increase
+    WINDY: int = 55  # Moderate with wind
+    FOG: int = 95  # Near saturation in fog
+
+    # Moisture trend adjustments (%)
+    MOISTURE_TREND_ADJUSTMENT: int = 5  # Moisture trend adjustment magnitude
+    INCREASING_ADJUSTMENT: int = 5  # Added when moisture increasing
+    DECREASING_ADJUSTMENT: int = -5  # Subtracted when moisture decreasing
+
+    # Stability effects (%)
+    STABILITY_HUMIDITY_ADJUSTMENT: int = 3  # Humidity adjustment for stability
+    STABLE_ADJUSTMENT: int = 3  # Stable air retains moisture
+    UNSTABLE_ADJUSTMENT: int = -3  # Unstable air mixes and reduces humidity
+
+    # Stability thresholds
+    STABILITY_HIGH_THRESHOLD: float = 0.7  # High stability threshold
+    STABILITY_LOW_THRESHOLD: float = 0.3  # Low stability threshold
+
+
+@dataclass(frozen=True)
+class DiurnalPatternConstants:
+    """Diurnal (time-of-day) variation patterns.
+
+    Typical daily cycles for temperature, wind, and humidity based
+    on solar heating and boundary layer dynamics.
+    """
+
+    # Temperature patterns (°C adjustment by time of day)
+    TEMP_DAWN: float = -2.0  # Coolest period before sunrise
+    TEMP_MORNING: float = 1.0  # Warming period
+    TEMP_NOON: float = 3.0  # Peak heating
+    TEMP_AFTERNOON: float = 2.0  # Still warm but decreasing
+    TEMP_EVENING: float = -1.0  # Cooling begins
+    TEMP_NIGHT: float = -3.0  # Cool night period
+    TEMP_MIDNIGHT: float = -2.0  # Late night cooling
+
+    # Wind patterns (km/h adjustment by time of day)
+    WIND_DAWN: float = -1.0  # Light winds at dawn
+    WIND_MORNING: float = 0.5  # Winds picking up
+    WIND_NOON: float = 1.0  # Peak daytime winds
+    WIND_AFTERNOON: float = 1.5  # Maximum boundary layer mixing
+    WIND_EVENING: float = 0.5  # Winds decreasing
+    WIND_NIGHT: float = -0.5  # Light night winds
+    WIND_MIDNIGHT: float = -1.0  # Calm late night
+
+    # Humidity patterns (% adjustment by time of day)
+    HUMIDITY_DAWN: int = 5  # High morning moisture
+    HUMIDITY_MORNING: int = -5  # Evaporation begins
+    HUMIDITY_NOON: int = -10  # Lowest humidity
+    HUMIDITY_AFTERNOON: int = -5  # Still relatively dry
+    HUMIDITY_EVENING: int = 5  # Moisture increases
+    HUMIDITY_NIGHT: int = 10  # High night humidity
+    HUMIDITY_MIDNIGHT: int = 5  # Elevated late night
+
+    # Micro-pattern parameters for fine-grained variations
+    TEMP_MICRO_AMPLITUDE: float = 0.5  # Temperature micro-variation (°C)
+    TEMP_MICRO_PERIOD: int = 12  # Temperature cycle period (hours)
+    CLOUD_MICRO_AMPLITUDE: float = 2.0  # Cloud cover micro-variation (%)
+    CLOUD_MICRO_PERIOD: int = 8  # Cloud cycle period (hours)
+
+
+@dataclass(frozen=True)
+class EvolutionConstants:
+    """Weather system evolution confidence levels and transition rates.
+
+    Defines how weather systems evolve over time and the confidence
+    we have in predicting different evolution stages.
+    """
+
+    # Confidence levels by system type (tuple of confidence for each stage)
+    # Format: (Day 1, Day 2, Day 3, Day 4)
+    STABLE_HIGH_CONFIDENCE: tuple[float, float, float, float] = (0.9, 0.7, 0.5, 0.3)
+    ACTIVE_LOW_CONFIDENCE: tuple[float, float, float, float] = (0.8, 0.6, 0.4, 0.3)
+    FRONTAL_SYSTEM_CONFIDENCE: tuple[float, float, float, float] = (0.7, 0.8, 0.6, 0.4)
+    TRANSITIONAL_CONFIDENCE: tuple[float, float, float, float] = (0.8, 0.5, 0.3, 0.2)
+
+    # Confidence decay rates
+    HOURLY_CONFIDENCE_DECAY: float = 0.98  # Per-hour confidence decay (2% per hour)
+    RAPID_CHANGE_THRESHOLD: float = 0.5  # Threshold for rapid system change
+
+    # Evolution frequency by pressure trend severity (hours between updates)
+    EVOLUTION_FREQ_RAPID: int = 2  # Rapid pressure changes
+    EVOLUTION_FREQ_MODERATE: int = 3  # Moderate pressure changes
+    EVOLUTION_FREQ_SLOW: int = 6  # Slow/stable pressure changes
+
+
+@dataclass(frozen=True)
+class StabilityConstants:
+    """Atmospheric stability calculation thresholds.
+
+    Used to determine how stable or unstable the atmosphere is,
+    which affects forecast persistence and weather patterns.
+    """
+
+    # Temperature trend thresholds (°C/12h)
+    TEMP_TREND_STABLE: float = 2.0  # Below this = stable
+    TEMP_TREND_UNSTABLE: float = 5.0  # Above this = unstable
+
+    # Stability adjustments (added/subtracted from base 0.5)
+    TEMP_STABLE_ADJUSTMENT: float = 0.2  # Stable temperature boost
+    TEMP_UNSTABLE_ADJUSTMENT: float = -0.2  # Unstable temperature penalty
+    WIND_STABLE_ADJUSTMENT: float = 0.15  # Light wind stability boost
+    WIND_UNSTABLE_ADJUSTMENT: float = -0.15  # Strong wind stability penalty
+    HUMIDITY_HIGH_ADJUSTMENT: float = 0.1  # High humidity stability boost
+    HUMIDITY_LOW_ADJUSTMENT: float = -0.1  # Low humidity stability penalty
+
+    # Humidity thresholds (%)
+    HUMIDITY_LOW_THRESHOLD: int = 30  # Below this = dry/unstable
+
+    # Weather system classification thresholds
+    FRONTAL_WIND_STABILITY: float = 0.4  # Wind instability for frontal system
+    FRONTAL_STORM_PROBABILITY: int = 50  # Storm probability for frontal system
+    AIR_MASS_TEMP_CHANGE: float = 2.0  # Temperature trend for air mass change
+    AIR_MASS_MIN_STABILITY: float = 0.6  # Minimum stability for air mass change
+
+
+@dataclass(frozen=True)
+class PressureTrendConstants:
+    """Pressure trend classification and severity thresholds.
+
+    Used to classify pressure trends and determine their impact
+    on weather evolution and condition changes.
+    """
+
+    # Severity classification thresholds (inHg/3h)
+    STABLE_THRESHOLD: float = 0.2  # Below this = stable
+    SLOW_THRESHOLD: float = 0.5  # Slow change threshold
+    MODERATE_THRESHOLD: float = 1.5  # Moderate change threshold
+    # Above MODERATE_THRESHOLD = rapid
+
+    # Trend direction thresholds (inHg/3h)
+    DIRECTION_STABLE: float = 0.1  # Below this = stable
+    DIRECTION_FALLING_MODERATE: float = -0.5  # Moderate falling
+    DIRECTION_RISING_MODERATE: float = 0.5  # Moderate rising
+
+    # Urgency calculation
+    MAX_URGENCY_RATE: float = 3.0  # Maximum trend for urgency calculation
+
+    # Cloud cover adjustments by pressure trend
+    MAX_CLOUD_COVER: float = 95.0  # Maximum cloud cover limit
+    MIN_CLOUD_COVER: float = 5.0  # Minimum cloud cover limit
+    RAPID_FALL_CLOUD_INCREASE: float = 60.0  # Cloud increase for rapid fall
+    SLOW_FALL_CLOUD_INCREASE: float = 40.0  # Cloud increase for slow fall
+    RISING_CLOUD_DECREASE: float = 40.0  # Cloud decrease for rising pressure
+
+
+@dataclass(frozen=True)
+class MoistureConstants:
+    """Moisture analysis and dewpoint spread thresholds.
+
+    Used to analyze atmospheric moisture content, transport,
+    and condensation potential for precipitation forecasting.
+    """
+
+    # Dewpoint spread thresholds (°F)
+    SPREAD_HIGH_MOISTURE: float = 5.0  # Tight spread = high moisture
+    SPREAD_MODERATE_MOISTURE: float = 10.0  # Moderate spread threshold
+
+    # Condensation potential by dewpoint spread
+    CONDENSATION_HIGH: float = 0.8  # High condensation potential
+    CONDENSATION_MODERATE: float = 0.5  # Moderate condensation potential
+    CONDENSATION_LOW: float = 0.2  # Low condensation potential
+
+    # Humidity trend classification threshold (% change/12h)
+    HUMIDITY_TREND_THRESHOLD: float = 5.0  # Significant humidity change
+
+    # Transport potential multiplier
+    TRANSPORT_MULTIPLIER: float = 10.0  # Wind stability to transport conversion
+
+
+@dataclass(frozen=True)
+class WindShearConstants:
+    """Wind shear intensity classification thresholds.
+
+    Used to classify wind shear based on wind speed changes
+    over time, important for storm development and aviation.
+    """
+
+    # Shear intensity thresholds (mph/hour)
+    EXTREME_THRESHOLD: float = 5.0  # Extreme wind shear
+    MODERATE_THRESHOLD: float = 2.0  # Moderate wind shear
+    # Below MODERATE = low shear
+
+    # Gradient wind calculation
+    GRADIENT_WIND_MULTIPLIER: float = 2.0  # Pressure gradient to wind effect

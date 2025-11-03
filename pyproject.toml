@@ -42,6 +42,8 @@ warn_unused_ignores = true
 disallow_any_generics = true
 check_untyped_defs = true
 no_implicit_reexport = true
+namespace_packages = true
+mypy_path = "custom_components"
 
 [tool.coverage.run]
 source = ["custom_components/micro_weather"]

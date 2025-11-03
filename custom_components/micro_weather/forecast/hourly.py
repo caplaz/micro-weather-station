@@ -38,16 +38,16 @@ from ..const import (
     KEY_TEMPERATURE,
     KEY_WIND_SPEED,
 )
-from ..weather_utils import is_forecast_hour_daytime
+from ..meteorological_constants import (
+    DiurnalPatternConstants,
+    ForecastConstants,
+    HumidityTargetConstants,
+    PressureTrendConstants,
+    WindAdjustmentConstants,
+)
+from ..weather_utils import convert_to_kmh, is_forecast_hour_daytime
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def convert_to_kmh(speed: float) -> Optional[float]:
-    """Convert wind speed to km/h (assuming input is already km/h or missing)."""
-    if speed is None:
-        return None
-    return speed
 
 
 class HourlyForecastGenerator:
@@ -149,7 +149,9 @@ class HourlyForecastGenerator:
                 # Advanced hourly wind with boundary layer effects
                 wind_speed = self._forecast_wind(
                     hour_idx,
-                    sensor_data.get(KEY_WIND_SPEED, 5),
+                    sensor_data.get(
+                        KEY_WIND_SPEED, ForecastConstants.DEFAULT_WIND_SPEED
+                    ),
                     forecast_condition,
                     meteorological_state,
                     hourly_patterns,
@@ -158,7 +160,7 @@ class HourlyForecastGenerator:
                 # Advanced hourly humidity with moisture dynamics
                 humidity = self._forecast_humidity(
                     hour_idx,
-                    sensor_data.get(KEY_HUMIDITY, 50),
+                    sensor_data.get(KEY_HUMIDITY, ForecastConstants.DEFAULT_HUMIDITY),
                     meteorological_state,
                     hourly_patterns,
                     forecast_condition,
@@ -181,7 +183,11 @@ class HourlyForecastGenerator:
             # Log error and return a simple default forecast to prevent UI issues
             _LOGGER.warning("Comprehensive hourly forecast generation failed: %s", e)
             fallback_forecast: List[Dict[str, Any]] = []
-            base_temp = current_temp if isinstance(current_temp, (int, float)) else 20.0
+            base_temp = (
+                current_temp
+                if isinstance(current_temp, (int, float))
+                else ForecastConstants.DEFAULT_TEMPERATURE
+            )
             base_condition = (
                 current_condition
                 if isinstance(current_condition, str)
@@ -218,8 +224,8 @@ class HourlyForecastGenerator:
                         KEY_TEMPERATURE: base_temp,
                         KEY_CONDITION: forecast_condition,
                         KEY_PRECIPITATION: 0.0,
-                        KEY_WIND_SPEED: 5.0,
-                        KEY_HUMIDITY: 50,
+                        KEY_WIND_SPEED: ForecastConstants.DEFAULT_WIND_SPEED,
+                        KEY_HUMIDITY: ForecastConstants.DEFAULT_HUMIDITY,
                         "is_nighttime": False,
                     }
                 )
@@ -237,7 +243,7 @@ class HourlyForecastGenerator:
         """Forecast temperature for a specific hour with comprehensive modulation."""
         # Ensure current_temp is not None
         if current_temp is None:
-            current_temp = 20.0
+            current_temp = ForecastConstants.DEFAULT_TEMPERATURE
         forecast_temp = current_temp
 
         # Astronomical diurnal variation (inlined from AstronomicalCalculator)
@@ -248,13 +254,13 @@ class HourlyForecastGenerator:
 
         # Default diurnal patterns
         default_patterns = {
-            "dawn": -2.0,
-            "morning": 1.0,
-            "noon": 3.0,
-            "afternoon": 2.0,
-            "evening": -1.0,
-            "night": -3.0,
-            "midnight": -2.0,
+            "dawn": DiurnalPatternConstants.TEMP_DAWN,
+            "morning": DiurnalPatternConstants.TEMP_MORNING,
+            "noon": DiurnalPatternConstants.TEMP_NOON,
+            "afternoon": DiurnalPatternConstants.TEMP_AFTERNOON,
+            "evening": DiurnalPatternConstants.TEMP_EVENING,
+            "night": DiurnalPatternConstants.TEMP_NIGHT,
+            "midnight": DiurnalPatternConstants.TEMP_MIDNIGHT,
         }
 
         # Merge provided patterns with defaults
@@ -277,7 +283,10 @@ class HourlyForecastGenerator:
             diurnal_variation = patterns["midnight"]
 
         # Apply distance-based dampening to diurnal variation for distant forecasts
-        diurnal_dampening = max(0.5, 1.0 - (hour_idx * 0.02))
+        diurnal_dampening = max(
+            ForecastConstants.HOURLY_MIN_DAMPENING,
+            1.0 - (hour_idx * ForecastConstants.HOURLY_DAMPENING_RATE),
+        )
         diurnal_variation *= diurnal_dampening
         forecast_temp += diurnal_variation
 
@@ -294,8 +303,13 @@ class HourlyForecastGenerator:
         forecast_temp += evolution_influence
 
         # Natural variation
-        natural_variation = (hour_idx % 3 - 1) * 0.3
-        distance_dampening = max(0.3, 1.0 - (hour_idx * 0.05))
+        natural_variation = (
+            hour_idx % ForecastConstants.NATURAL_VARIATION_PERIOD - 1
+        ) * ForecastConstants.NATURAL_VARIATION_AMPLITUDE
+        distance_dampening = max(
+            ForecastConstants.HOURLY_NATURAL_VARIATION_DAMPENING,
+            1.0 - (hour_idx * ForecastConstants.HOURLY_VARIATION_DECAY),
+        )
         natural_variation *= distance_dampening
         forecast_temp += natural_variation
 
@@ -323,7 +337,10 @@ class HourlyForecastGenerator:
         if is_daytime:
             if forecast_condition == ATTR_CONDITION_CLEAR_NIGHT:
                 forecast_condition = ATTR_CONDITION_SUNNY
-            elif forecast_condition == ATTR_CONDITION_CLOUDY and cloud_cover <= 50:
+            elif (
+                forecast_condition == ATTR_CONDITION_CLOUDY
+                and cloud_cover <= ForecastConstants.CLOUD_COVER_CLOUDY_THRESHOLD + 10
+            ):
                 forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
         else:
             if forecast_condition == ATTR_CONDITION_SUNNY:
@@ -338,7 +355,11 @@ class HourlyForecastGenerator:
                 if not isinstance(storm_prob, (int, float)):
                     storm_prob = 0.0
 
-                if pressure_trend < -0.5 or storm_prob > 40 or cloud_cover > 70:
+                if (
+                    pressure_trend < -abs(ForecastConstants.PRESSURE_SLOW_FALL)
+                    or storm_prob > ForecastConstants.STORM_THRESHOLD_MODERATE
+                    or cloud_cover > 70
+                ):
                     forecast_condition = ATTR_CONDITION_CLOUDY
                 else:
                     forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
@@ -403,8 +424,11 @@ class HourlyForecastGenerator:
         """Calculate pressure-based temperature modulation for the hour."""
         pressure_analysis = meteorological_state.get("pressure_analysis", {})
         current_trend = pressure_analysis.get("current_trend", 0)
-        modulation = current_trend * 0.1
-        time_dampening = max(0.5, 1.0 - (hour_idx * 0.02))
+        modulation = current_trend * ForecastConstants.PRESSURE_TEMP_MODULATION
+        time_dampening = max(
+            ForecastConstants.HOURLY_MIN_DAMPENING,
+            1.0 - (hour_idx * ForecastConstants.HOURLY_DAMPENING_RATE),
+        )
         modulation *= time_dampening
         return max(-1.0, min(1.0, modulation))
 
@@ -412,12 +436,17 @@ class HourlyForecastGenerator:
         self, micro_evolution: Dict[str, Any], hour_idx: int
     ) -> float:
         """Calculate micro-evolution influence on temperature."""
-        evolution_rate = micro_evolution.get("evolution_rate", 0.3)
+        evolution_rate = micro_evolution.get(
+            "evolution_rate", ForecastConstants.NATURAL_VARIATION_AMPLITUDE
+        )
         max_change = micro_evolution.get("micro_changes", {}).get(
-            "max_change_per_hour", 1.0
+            "max_change_per_hour", ForecastConstants.EVOLUTION_BASE_INFLUENCE
         )
         influence = evolution_rate * max_change * (0.5 - (hour_idx % 2))
-        distance_dampening = max(0.2, 1.0 - (hour_idx * 0.03))
+        distance_dampening = max(
+            ForecastConstants.HOURLY_DISTANCE_FACTOR_MIN,
+            1.0 - (hour_idx * ForecastConstants.HOURLY_DISTANCE_DECAY),
+        )
         influence *= distance_dampening
         return influence
 
@@ -431,11 +460,11 @@ class HourlyForecastGenerator:
             long_term_trend = 0.0
 
         current_abs = abs(current_trend)
-        if current_abs < 0.2:
+        if current_abs < PressureTrendConstants.STABLE_THRESHOLD:
             severity = "stable"
-        elif current_abs < 0.5:
+        elif current_abs < PressureTrendConstants.SLOW_THRESHOLD:
             severity = "slow"
-        elif current_abs < 1.5:
+        elif current_abs < PressureTrendConstants.MODERATE_THRESHOLD:
             severity = "moderate"
         else:
             severity = "rapid"
@@ -447,7 +476,7 @@ class HourlyForecastGenerator:
         else:
             direction = "rising"
 
-        if abs(long_term_trend) < 0.5:
+        if abs(long_term_trend) < PressureTrendConstants.SLOW_THRESHOLD:
             long_term_direction = "stable"
         elif long_term_trend < 0:
             long_term_direction = "falling"
@@ -495,22 +524,24 @@ class HourlyForecastGenerator:
         """Determine condition based on pressure trends and storm probability."""
         current_trend = pressure_analysis.get("current_trend", 0)
 
-        if storm_probability > 70:
-            if cloud_cover > 60:
+        if storm_probability > ForecastConstants.STORM_THRESHOLD_SEVERE:
+            if cloud_cover > ForecastConstants.STORM_PRECIPITATION_THRESHOLD:
                 return ATTR_CONDITION_LIGHTNING_RAINY
             else:
                 return ATTR_CONDITION_RAINY
-        elif storm_probability > 40:
-            if current_trend < -0.5 or (cloud_cover > 70):
+        elif storm_probability > ForecastConstants.STORM_THRESHOLD_MODERATE:
+            if current_trend < -abs(ForecastConstants.PRESSURE_SLOW_FALL) or (
+                cloud_cover > 70
+            ):
                 return ATTR_CONDITION_RAINY
 
-        if abs(current_trend) > 1.5:
-            if current_trend < -1.5:
+        if abs(current_trend) > PressureTrendConstants.MODERATE_THRESHOLD:
+            if current_trend < -PressureTrendConstants.MODERATE_THRESHOLD:
                 if current_condition == ATTR_CONDITION_SUNNY:
                     return ATTR_CONDITION_PARTLYCLOUDY
                 elif current_condition == ATTR_CONDITION_PARTLYCLOUDY:
                     return ATTR_CONDITION_CLOUDY
-            elif current_trend > 1.5:
+            elif current_trend > PressureTrendConstants.MODERATE_THRESHOLD:
                 if current_condition == ATTR_CONDITION_CLOUDY:
                     return ATTR_CONDITION_PARTLYCLOUDY
                 elif current_condition == ATTR_CONDITION_PARTLYCLOUDY:
@@ -569,18 +600,20 @@ class HourlyForecastGenerator:
         hourly_patterns: Dict[str, Any],
     ) -> float:
         """Comprehensive hourly wind forecasting."""
-        wind_kmh = convert_to_kmh(current_wind) or 10
+        wind_kmh = convert_to_kmh(current_wind) or convert_to_kmh(
+            ForecastConstants.DEFAULT_WIND_SPEED
+        )
         hour = (dt_util.now() + timedelta(hours=hour_idx + 1)).hour
         diurnal_patterns = hourly_patterns.get("diurnal_patterns", {}).get("wind", {})
 
         default_wind_patterns = {
-            "dawn": -1.0,
-            "morning": 0.5,
-            "noon": 1.0,
-            "afternoon": 1.5,
-            "evening": 0.5,
-            "night": -0.5,
-            "midnight": -1.0,
+            "dawn": DiurnalPatternConstants.WIND_DAWN,
+            "morning": DiurnalPatternConstants.WIND_MORNING,
+            "noon": DiurnalPatternConstants.WIND_NOON,
+            "afternoon": DiurnalPatternConstants.WIND_AFTERNOON,
+            "evening": DiurnalPatternConstants.WIND_EVENING,
+            "night": DiurnalPatternConstants.WIND_NIGHT,
+            "midnight": DiurnalPatternConstants.WIND_MIDNIGHT,
         }
 
         diurnal_patterns = {**default_wind_patterns, **diurnal_patterns}
@@ -601,14 +634,14 @@ class HourlyForecastGenerator:
         wind_kmh += diurnal_factor
 
         condition_factors = {
-            ATTR_CONDITION_WINDY: 1.5,
-            ATTR_CONDITION_LIGHTNING_RAINY: 1.3,
-            ATTR_CONDITION_RAINY: 1.2,
-            ATTR_CONDITION_CLOUDY: 0.9,
-            ATTR_CONDITION_SUNNY: 0.8,
+            ATTR_CONDITION_WINDY: WindAdjustmentConstants.WINDY,
+            ATTR_CONDITION_LIGHTNING_RAINY: WindAdjustmentConstants.LIGHTNING_RAINY,
+            ATTR_CONDITION_RAINY: WindAdjustmentConstants.RAINY,
+            ATTR_CONDITION_CLOUDY: WindAdjustmentConstants.CLOUDY,
+            ATTR_CONDITION_SUNNY: WindAdjustmentConstants.SUNNY,
         }
         wind_kmh *= condition_factors.get(condition, 1.0)
-        return round(max(1.0, wind_kmh), 1)
+        return round(max(ForecastConstants.MIN_WIND_SPEED, wind_kmh), 1)
 
     def _forecast_humidity(
         self,
@@ -620,7 +653,7 @@ class HourlyForecastGenerator:
     ) -> float:
         """Comprehensive hourly humidity forecasting."""
         if current_humidity is None:
-            current_humidity = 50.0
+            current_humidity = ForecastConstants.DEFAULT_HUMIDITY
         humidity = current_humidity
 
         hour = (dt_util.now() + timedelta(hours=hour_idx + 1)).hour
@@ -629,13 +662,13 @@ class HourlyForecastGenerator:
         )
 
         default_humidity_patterns = {
-            "dawn": 5,
-            "morning": -5,
-            "noon": -10,
-            "afternoon": -5,
-            "evening": 5,
-            "night": 10,
-            "midnight": 5,
+            "dawn": DiurnalPatternConstants.HUMIDITY_DAWN,
+            "morning": DiurnalPatternConstants.HUMIDITY_MORNING,
+            "noon": DiurnalPatternConstants.HUMIDITY_NOON,
+            "afternoon": DiurnalPatternConstants.HUMIDITY_AFTERNOON,
+            "evening": DiurnalPatternConstants.HUMIDITY_EVENING,
+            "night": DiurnalPatternConstants.HUMIDITY_NIGHT,
+            "midnight": DiurnalPatternConstants.HUMIDITY_MIDNIGHT,
         }
 
         diurnal_patterns = {**default_humidity_patterns, **diurnal_patterns}
@@ -656,16 +689,21 @@ class HourlyForecastGenerator:
         humidity += diurnal_change
 
         condition_humidity = {
-            ATTR_CONDITION_LIGHTNING_RAINY: 85,
-            ATTR_CONDITION_POURING: 90,
-            ATTR_CONDITION_RAINY: 80,
-            ATTR_CONDITION_FOG: 95,
-            ATTR_CONDITION_CLOUDY: 70,
-            ATTR_CONDITION_PARTLYCLOUDY: 60,
-            ATTR_CONDITION_SUNNY: 50,
-            ATTR_CONDITION_CLEAR_NIGHT: 65,
+            ATTR_CONDITION_LIGHTNING_RAINY: HumidityTargetConstants.LIGHTNING_RAINY,
+            ATTR_CONDITION_POURING: HumidityTargetConstants.POURING,
+            ATTR_CONDITION_RAINY: HumidityTargetConstants.RAINY,
+            ATTR_CONDITION_FOG: HumidityTargetConstants.FOG,
+            ATTR_CONDITION_CLOUDY: HumidityTargetConstants.CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY: HumidityTargetConstants.PARTLYCLOUDY,
+            ATTR_CONDITION_SUNNY: HumidityTargetConstants.SUNNY,
+            ATTR_CONDITION_CLEAR_NIGHT: HumidityTargetConstants.CLEAR_NIGHT,
         }
 
         target_humidity = condition_humidity.get(condition, current_humidity)
         humidity = current_humidity + (target_humidity - current_humidity) * 0.1
-        return int(max(10, min(100, humidity)))
+        return int(
+            max(
+                ForecastConstants.MIN_HUMIDITY,
+                min(ForecastConstants.MAX_HUMIDITY, humidity),
+            )
+        )
