@@ -138,32 +138,6 @@ class TestTrendsAnalyzer:
         mean_empty = analyzer.calculate_circular_mean([])
         assert mean_empty == 0.0
 
-    def test_calculate_prevailing_direction(self, analyzer):
-        """Test prevailing direction calculation."""
-        # Test with north directions
-        directions_north = [350, 10, 20, 340]
-        direction_north = analyzer.calculate_prevailing_direction(directions_north)
-        assert direction_north == "north"
-
-        # Test with east directions
-        directions_east = [80, 90, 100, 70]
-        direction_east = analyzer.calculate_prevailing_direction(directions_east)
-        assert direction_east == "east"
-
-        # Test with south directions
-        directions_south = [170, 180, 190, 160]
-        direction_south = analyzer.calculate_prevailing_direction(directions_south)
-        assert direction_south == "south"
-
-        # Test with west directions
-        directions_west = [260, 270, 280, 250]
-        direction_west = analyzer.calculate_prevailing_direction(directions_west)
-        assert direction_west == "west"
-
-        # Test empty list
-        direction_empty = analyzer.calculate_prevailing_direction([])
-        assert direction_empty == "unknown"
-
     def test_get_historical_trends_error_handling(self, analyzer):
         """Test historical trends with error conditions."""
         # Test with future timestamps

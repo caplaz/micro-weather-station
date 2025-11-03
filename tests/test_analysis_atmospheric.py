@@ -128,19 +128,31 @@ class TestAtmosphericAnalyzer:
         """Test pressure trend analysis."""
         pressure_analysis = analyzer.analyze_pressure_trends()
         assert isinstance(pressure_analysis, dict)
-        assert "pressure_system" in pressure_analysis
-        assert "storm_probability" in pressure_analysis
 
-        # Should have valid pressure system classification
-        assert pressure_analysis["pressure_system"] in [
-            "high_pressure",
-            "low_pressure",
-            "normal",
-            "unknown",
+        # Check for expected keys from historical trends analysis
+        expected_keys = [
+            "current",
+            "average",
+            "trend",
+            "min",
+            "max",
+            "volatility",
+            "sample_count",
         ]
+        for key in expected_keys:
+            assert key in pressure_analysis
 
-        # Storm probability should be between 0 and 100
-        assert 0 <= pressure_analysis["storm_probability"] <= 100
+        # Check data types
+        assert isinstance(pressure_analysis["current"], (int, float))
+        assert isinstance(pressure_analysis["average"], (int, float))
+        assert isinstance(pressure_analysis["trend"], (int, float))
+        assert isinstance(pressure_analysis["min"], (int, float))
+        assert isinstance(pressure_analysis["max"], (int, float))
+        assert isinstance(pressure_analysis["volatility"], (int, float))
+        assert isinstance(pressure_analysis["sample_count"], int)
+
+        # Sample count should be reasonable
+        assert pressure_analysis["sample_count"] > 0
 
     def test_analyze_wind_direction_trends(self, analyzer):
         """Test wind direction trend analysis."""
@@ -148,11 +160,9 @@ class TestAtmosphericAnalyzer:
         assert isinstance(wind_analysis, dict)
 
         expected_keys = [
-            "average_direction",
             "direction_stability",
             "direction_change_rate",
             "significant_shift",
-            "prevailing_direction",
         ]
         for key in expected_keys:
             assert key in wind_analysis
@@ -160,14 +170,11 @@ class TestAtmosphericAnalyzer:
         # Direction stability should be between 0 and 1
         assert 0 <= wind_analysis["direction_stability"] <= 1
 
-        # Prevailing direction should be a cardinal direction or unknown
-        assert wind_analysis["prevailing_direction"] in [
-            "north",
-            "east",
-            "south",
-            "west",
-            "unknown",
-        ]
+        # Direction change rate should be a number
+        assert isinstance(wind_analysis["direction_change_rate"], (int, float))
+
+        # Significant shift should be boolean
+        assert isinstance(wind_analysis["significant_shift"], bool)
 
     def test_calculate_angular_difference(self, analyzer):
         """Test angular difference calculation."""
@@ -211,8 +218,7 @@ class TestAtmosphericAnalyzer:
         analyzer._sensor_history = {}  # Clear history
 
         pressure_analysis = analyzer.analyze_pressure_trends()
-        assert pressure_analysis["pressure_system"] == "unknown"
-        assert pressure_analysis["storm_probability"] == 0.0
+        assert pressure_analysis == {}  # Should return empty dict with no data
 
         # Test with insufficient data
         analyzer._sensor_history["pressure"] = [
@@ -220,8 +226,9 @@ class TestAtmosphericAnalyzer:
         ]
 
         pressure_analysis_short = analyzer.analyze_pressure_trends()
-        assert pressure_analysis_short["pressure_system"] == "unknown"
-        assert pressure_analysis_short["storm_probability"] == 0.0
+        assert (
+            pressure_analysis_short == {}
+        )  # Should return empty dict with insufficient data
 
     def test_analyze_wind_direction_trends_error_handling(self, analyzer):
         """Test wind direction trend analysis error handling."""
@@ -229,56 +236,19 @@ class TestAtmosphericAnalyzer:
         analyzer._sensor_history = {}
 
         wind_analysis = analyzer.analyze_wind_direction_trends()
-        assert wind_analysis["average_direction"] is None
-        assert wind_analysis["direction_stability"] == 0.0
+        assert wind_analysis["direction_stability"] == 0.5
+        assert wind_analysis["direction_change_rate"] == 0.0
         assert wind_analysis["significant_shift"] is False
 
-        # Test with invalid direction values
+        # Test with insufficient data
         analyzer._sensor_history["wind_direction"] = [
-            {"timestamp": datetime.now(), "value": 400.0},  # Invalid direction > 360
-            {
-                "timestamp": datetime.now() - timedelta(hours=1),
-                "value": -50.0,
-            },  # Invalid negative
+            {"timestamp": datetime.now(), "value": 180.0},  # Only one data point
         ]
 
-        wind_analysis_invalid = analyzer.analyze_wind_direction_trends()
-        assert isinstance(
-            wind_analysis_invalid["average_direction"], (float, type(None))
-        )
-
-    def test_calculate_circular_mean_error_handling(self, analyzer):
-        """Test circular mean calculation error handling."""
-        # Test with empty list
-        mean_empty = analyzer._calculate_circular_mean([])
-        assert mean_empty == 0.0
-
-        # Test with invalid values (should filter out invalid ones)
-        mean_invalid = analyzer._calculate_circular_mean([400, -50, 90, 180])
-        assert isinstance(mean_invalid, float)
-        assert 0 <= mean_invalid < 360
-
-        # Test with extreme values
-        mean_extreme = analyzer._calculate_circular_mean(
-            [0, 720, 1080, 90]
-        )  # Multiples of 360
-        assert isinstance(mean_extreme, float)
-
-    def test_calculate_prevailing_direction_error_handling(self, analyzer):
-        """Test prevailing direction calculation error handling."""
-        # Test with empty list
-        direction_empty = analyzer._calculate_prevailing_direction([])
-        assert direction_empty == "unknown"
-
-        # Test with invalid values (should filter out invalid ones)
-        direction_invalid = analyzer._calculate_prevailing_direction(
-            [400, -50, 90, 180]
-        )
-        assert direction_invalid in ["north", "east", "south", "west", "unknown"]
-
-        # Test with boundary values
-        direction_boundary = analyzer._calculate_prevailing_direction([0, 360, 359.9])
-        assert direction_boundary == "north"  # All should map to north sector
+        wind_analysis_insufficient = analyzer.analyze_wind_direction_trends()
+        assert wind_analysis_insufficient["direction_stability"] == 0.5
+        assert wind_analysis_insufficient["direction_change_rate"] == 0.0
+        assert wind_analysis_insufficient["significant_shift"] is False
 
     def test_get_altitude_adjusted_pressure_thresholds_hpa(self, analyzer):
         """Test altitude-adjusted pressure thresholds in hPa."""
@@ -287,7 +257,7 @@ class TestAtmosphericAnalyzer:
         assert "very_high" in thresholds
         assert "high" in thresholds
         assert "normal_high" in thresholds
-        assert "normal" in thresholds
+        assert "normal_low" in thresholds
         assert "low" in thresholds
         assert "very_low" in thresholds
 
@@ -295,4 +265,4 @@ class TestAtmosphericAnalyzer:
         sea_level_thresholds = analyzer.get_altitude_adjusted_pressure_thresholds_hpa(
             0.0
         )
-        assert thresholds["normal"] < sea_level_thresholds["normal"]
+        assert thresholds["normal_low"] < sea_level_thresholds["normal_low"]

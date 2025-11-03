@@ -57,9 +57,11 @@ class TestWeatherDetector:
         assert detector.options == mock_options
         # Check that analysis and forecast modules are initialized
         assert hasattr(detector, "analysis")
-        assert hasattr(detector, "forecast")
+        assert hasattr(detector, "meteorological_analyzer")
+        assert hasattr(detector, "daily_generator")
         assert detector.analysis is not None
-        assert detector.forecast is not None
+        assert detector.meteorological_analyzer is not None
+        assert detector.daily_generator is not None
 
     def test_detect_sunny_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of sunny conditions."""
@@ -211,15 +213,15 @@ class TestWeatherDetector:
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "solar_radiation":
                 state = Mock()
-                state.state = "450.0"  # Moderate solar radiation for cloudy
+                state.state = "300.0"  # Moderate solar radiation for partly cloudy (75% of clear sky max)
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "solar_lux":
                 state = Mock()
-                state.state = "45000.0"  # Moderate lux for cloudy
+                state.state = "30000.0"  # Moderate lux for partly cloudy
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "uv_index":
                 state = Mock()
-                state.state = "4.5"  # Moderate UV for cloudy
+                state.state = "3.0"  # Moderate UV for partly cloudy
                 mock_states[f"sensor.{sensor_key}"] = state
             else:
                 state = Mock()
@@ -237,16 +239,17 @@ class TestWeatherDetector:
         # Set up sensor data for clear night
         detector = WeatherDetector(mock_hass, mock_options)
 
-        # Mock states for clear night (high pressure, calm winds, low humidity)
+        # Mock states for clear night (very high pressure, very calm winds, low humidity)
         mock_states = {
             "sensor.outdoor_temperature": Mock(state="70.0"),
             "sensor.humidity": Mock(state="40.0"),
-            "sensor.pressure": Mock(state="30.10"),  # High pressure
-            "sensor.wind_speed": Mock(state="2.0"),  # Calm winds
-            "sensor.wind_gust": Mock(state="5.0"),
+            "sensor.pressure": Mock(
+                state="30.8", attributes={"unit_of_measurement": "inHg"}
+            ),  # Very high pressure for clear night
+            "sensor.wind_speed": Mock(state="0.5"),  # Very calm winds
+            "sensor.wind_gust": Mock(state="1.0"),
             "sensor.solar_radiation": Mock(state="0.0"),  # Night
             "sensor.solar_lux": Mock(state="0.0"),
-            "sensor.rain_rate": Mock(state="0.0"),
         }
 
         mock_hass.states.get.side_effect = lambda entity_id: mock_states.get(entity_id)

@@ -19,7 +19,9 @@ _LOGGER = logging.getLogger(__name__)
 class TrendsAnalyzer:
     """Analyzes historical sensor data for trends and patterns."""
 
-    def __init__(self, sensor_history: Optional[Dict[str, deque]] = None):
+    def __init__(
+        self, sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None
+    ):
         """Initialize with sensor history.
 
         Args:

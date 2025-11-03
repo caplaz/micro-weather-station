@@ -73,7 +73,7 @@ from .const import (
     KEY_WIND_SPEED,
     KEY_WIND_SPEED_UNIT,
 )
-from .weather_forecast import AdvancedWeatherForecast
+from .forecast import DailyForecastGenerator, MeteorologicalAnalyzer
 from .weather_utils import (
     convert_altitude_to_meters,
     convert_to_celsius,
@@ -148,12 +148,14 @@ class WeatherDetector:
             self.core_analyzer
         )  # Point to core analyzer for methods that still use self.analysis
 
-        self.forecast = AdvancedWeatherForecast(
+        # Initialize new modular forecast components directly
+        self.meteorological_analyzer = MeteorologicalAnalyzer(
             self.atmospheric_analyzer,
+            self.core_analyzer,
             self.solar_analyzer,
             self.trends_analyzer,
-            self.core_analyzer,
         )
+        self.daily_generator = DailyForecastGenerator(self.trends_analyzer)
 
         # Sensor entity IDs mapping
         self.sensors = {
@@ -232,8 +234,15 @@ class WeatherDetector:
 
         # Prepare forecast data
         try:
-            forecast_data = self.forecast.generate_enhanced_forecast(
-                condition, self._prepare_forecast_sensor_data(sensor_data), altitude
+            forecast_data = self.daily_generator.generate_forecast(
+                condition,
+                self._prepare_forecast_sensor_data(sensor_data),
+                altitude,
+                self.meteorological_analyzer.analyze_state(
+                    self._prepare_analysis_sensor_data(sensor_data), altitude
+                ),
+                {},  # historical_patterns - empty for now
+                {},  # system_evolution - empty for now
             )
             # Convert forecast temperatures from Fahrenheit to Celsius for HA compatibility
             for day_forecast in forecast_data:

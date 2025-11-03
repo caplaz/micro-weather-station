@@ -16,6 +16,7 @@ import pytest
 from custom_components.micro_weather.analysis.atmospheric import AtmosphericAnalyzer
 from custom_components.micro_weather.analysis.core import WeatherConditionAnalyzer
 from custom_components.micro_weather.analysis.solar import SolarAnalyzer
+from custom_components.micro_weather.analysis.trends import TrendsAnalyzer
 
 
 class TestWeatherConditionAnalyzer:
@@ -61,8 +62,14 @@ class TestWeatherConditionAnalyzer:
         """Create analyzer instances for testing."""
         atmospheric = AtmosphericAnalyzer(mock_sensor_history)
         solar = SolarAnalyzer(mock_sensor_history)
-        core = WeatherConditionAnalyzer(atmospheric, solar)
-        return {"atmospheric": atmospheric, "solar": solar, "core": core}
+        trends = TrendsAnalyzer(mock_sensor_history)
+        core = WeatherConditionAnalyzer(atmospheric, solar, trends)
+        return {
+            "atmospheric": atmospheric,
+            "solar": solar,
+            "trends": trends,
+            "core": core,
+        }
 
     def test_calculate_dewpoint(self, analyzers):
         """Test dewpoint calculation."""
@@ -163,9 +170,7 @@ class TestWeatherConditionAnalyzer:
             "pressure": 29.92,
             "solar_elevation": 45.0,
         }
-        condition = analyzers["core"].determine_weather_condition(
-            sensor_data_rain_fog, 0.0
-        )
+        condition = analyzers["core"].determine_condition(sensor_data_rain_fog, 0.0)
         assert condition == ATTR_CONDITION_RAINY  # Rain takes priority over fog
 
         # PRIORITY 2: Fog should override cloudy
@@ -183,7 +188,7 @@ class TestWeatherConditionAnalyzer:
             "pressure": 29.92,
             "solar_elevation": 45.0,
         }
-        condition = analyzers["core"].determine_weather_condition(sensor_data_fog, 0.0)
+        condition = analyzers["core"].determine_condition(sensor_data_fog, 0.0)
         assert condition == ATTR_CONDITION_FOG  # Fog takes priority over cloudy
 
         # PRIORITY 5: Windy should ONLY apply on sunny days
@@ -201,9 +206,7 @@ class TestWeatherConditionAnalyzer:
             "pressure": 29.92,
             "solar_elevation": 45.0,
         }
-        condition = analyzers["core"].determine_weather_condition(
-            sensor_data_windy_cloudy, 0.0
-        )
+        condition = analyzers["core"].determine_condition(sensor_data_windy_cloudy, 0.0)
         assert condition in [
             ATTR_CONDITION_CLOUDY,
             ATTR_CONDITION_PARTLYCLOUDY,
@@ -227,9 +230,7 @@ class TestWeatherConditionAnalyzer:
         # Clear condition and cloud cover history to avoid hysteresis from previous tests
         analyzers["solar"]._condition_history = []
         analyzers["solar"]._sensor_history["cloud_cover"] = []
-        condition = analyzers["core"].determine_weather_condition(
-            sensor_data_windy_sunny, 0.0
-        )
+        condition = analyzers["core"].determine_condition(sensor_data_windy_sunny, 0.0)
         assert condition == ATTR_CONDITION_WINDY  # Windy on sunny day
 
         # Test that cloudy with moderate winds stays cloudy (not windy)
@@ -247,7 +248,7 @@ class TestWeatherConditionAnalyzer:
             "pressure": 29.80,
             "solar_elevation": 45.0,
         }
-        condition = analyzers["core"].determine_weather_condition(
+        condition = analyzers["core"].determine_condition(
             sensor_data_cloudy_moderate_wind, 0.0
         )
         assert condition in [
@@ -255,7 +256,7 @@ class TestWeatherConditionAnalyzer:
             ATTR_CONDITION_PARTLYCLOUDY,
         ]  # Should stay cloudy (winds not strong enough)
 
-    def test_determine_weather_condition_with_hysteresis(self, analyzers):
+    def test_determine_condition_with_hysteresis(self, analyzers):
         """Test that determine_weather_condition applies hysteresis correctly."""
         # Mock the cloud cover analysis to return controlled values
         original_analyze_cloud_cover = analyzers["solar"].analyze_cloud_cover
@@ -264,7 +265,7 @@ class TestWeatherConditionAnalyzer:
         analyzers["solar"].analyze_cloud_cover = (
             lambda *args, **kwargs: 20.0
         )  # Sunny (≤25%)
-        condition1 = analyzers["core"].determine_weather_condition(
+        condition1 = analyzers["core"].determine_condition(
             {
                 "solar_radiation": 800.0,
                 "solar_lux": 80000.0,
@@ -280,7 +281,7 @@ class TestWeatherConditionAnalyzer:
         analyzers["solar"].analyze_cloud_cover = (
             lambda *args, **kwargs: 28.0
         )  # Partly cloudy range (25-50%)
-        condition2 = analyzers["core"].determine_weather_condition(
+        condition2 = analyzers["core"].determine_condition(
             {
                 "solar_radiation": 750.0,  # Slightly less radiation
                 "solar_lux": 75000.0,
@@ -297,7 +298,7 @@ class TestWeatherConditionAnalyzer:
         analyzers["solar"].analyze_cloud_cover = (
             lambda *args, **kwargs: 45.0
         )  # Still partly cloudy
-        condition3 = analyzers["core"].determine_weather_condition(
+        condition3 = analyzers["core"].determine_condition(
             {
                 "solar_radiation": 600.0,  # Much less radiation
                 "solar_lux": 60000.0,
@@ -331,7 +332,7 @@ class TestWeatherConditionAnalyzer:
 
         assert result == ATTR_CONDITION_SUNNY  # Should be rejected
         assert "Condition stable: keeping sunny" in caplog.text
-        assert "change: 5.0 < threshold: 10.0" in caplog.text
+        assert "change: 5.0 < 10.0" in caplog.text
 
         # Clear log and test acceptance (large change from most recent baseline)
         caplog.clear()
@@ -342,7 +343,7 @@ class TestWeatherConditionAnalyzer:
 
         assert result == ATTR_CONDITION_PARTLYCLOUDY  # Should be accepted
         assert "Condition change: sunny -> partlycloudy" in caplog.text
-        assert "change: 10.0 >= threshold: 10.0" in caplog.text
+        assert "change: 10.0 >= 10.0" in caplog.text
 
     def test_estimate_visibility_error_handling(self, analyzers):
         """Test visibility estimation with invalid inputs."""

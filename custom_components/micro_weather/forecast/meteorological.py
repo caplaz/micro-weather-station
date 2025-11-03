@@ -80,7 +80,7 @@ class MeteorologicalAnalyzer:
         # Get all available trend analyses with error handling for mock objects
         try:
             pressure_analysis = self.atmospheric_analyzer.analyze_pressure_trends(
-                altitude
+                altitude or 0.0
             )
             if hasattr(pressure_analysis, "_mock_name"):
                 pressure_analysis = {

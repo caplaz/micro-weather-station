@@ -31,7 +31,7 @@ class SolarAnalyzer:
 
     def __init__(
         self,
-        sensor_history: Optional[Dict[str, deque]] = None,
+        sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None,
         zenith_max_radiation: float = DEFAULT_ZENITH_MAX_RADIATION,
     ):
         """Initialize with sensor history and calibration data.
@@ -41,7 +41,7 @@ class SolarAnalyzer:
             zenith_max_radiation: Maximum solar radiation at zenith (W/m²)
         """
         self._sensor_history = sensor_history or {}
-        self._condition_history: deque = deque()
+        self._condition_history: deque[Dict[str, Any]] = deque()
         self.zenith_max_radiation = zenith_max_radiation
 
     def analyze_cloud_cover(
@@ -252,10 +252,6 @@ class SolarAnalyzer:
         )
 
         # Calculate astronomical scaling
-        base_solar_constant = 1366.0  # W/m² at 1 AU
-        astronomical_zenith_max = (
-            base_solar_constant * solar_constant_variation * atmospheric_transmission
-        )
         astronomical_scaling = atmospheric_transmission * math.sin(
             math.radians(solar_elevation)
         )

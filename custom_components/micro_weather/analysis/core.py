@@ -128,7 +128,7 @@ class WeatherConditionAnalyzer:
         }
 
     def _calculate_parameters(
-        self, sensors: Dict[str, float], altitude: float
+        self, sensors: Dict[str, float], altitude: Optional[float]
     ) -> Dict[str, Any]:
         """Calculate derived meteorological parameters."""
         # Calculate dewpoint (use sensor if available, otherwise calculate)
@@ -153,10 +153,10 @@ class WeatherConditionAnalyzer:
                 or (sensors["solar_radiation"] > 1 and sensors["solar_radiation"] < 50)
             ),
             "adjusted_pressure": self.atmospheric.adjust_pressure_for_altitude(
-                sensors["pressure"], altitude, "relative"
+                sensors["pressure"], altitude or 0.0, "relative"
             ),
             "pressure_thresholds": self.atmospheric.get_altitude_adjusted_pressure_thresholds(
-                altitude
+                altitude or 0.0
             ),
             "gust_factor": sensors["wind_gust"] / max(sensors["wind_speed"], 1),
         }

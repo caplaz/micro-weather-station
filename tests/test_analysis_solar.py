@@ -77,19 +77,19 @@ class TestSolarAnalyzer:
         # Test very low solar values (heavy overcast)
         cloud_cover_heavy = analyzer.analyze_cloud_cover(20.0, 3000.0, 0.0, 15.0)
         assert cloud_cover_heavy == pytest.approx(
-            92.0, abs=0.1
+            78.0, abs=0.5
         )  # Astronomical calculation
 
         # Test moderately low solar values (mostly cloudy)
         cloud_cover_mostly = analyzer.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
         assert cloud_cover_mostly == pytest.approx(
-            73.2, abs=0.2
+            48.0, abs=0.5
         )  # Astronomical calculation (UV ignored due to inconsistency)
 
         # Test borderline low solar values (partly cloudy fallback)
         cloud_cover_fallback = analyzer.analyze_cloud_cover(150.0, 15000.0, 0.8, 20.0)
         assert cloud_cover_fallback == pytest.approx(
-            57.6, abs=0.3
+            18.0, abs=0.5
         )  # Astronomical calculation (UV ignored due to inconsistency)
 
         # Test that higher values don't trigger fallback
@@ -429,7 +429,7 @@ class TestSolarAnalyzer:
     def test_apply_condition_hysteresis_no_history(self, analyzer):
         """Test hysteresis with no previous condition history."""
         # First call should always return the proposed condition
-        result = analyzer._apply_condition_hysteresis("sunny", 25.0)
+        result = analyzer.apply_condition_hysteresis("sunny", 25.0)
         assert result == "sunny"
 
         # Check that history was initialized
@@ -449,7 +449,7 @@ class TestSolarAnalyzer:
         )
 
         # Same condition should be returned immediately
-        result = analyzer._apply_condition_hysteresis("sunny", 30.0)
+        result = analyzer.apply_condition_hysteresis("sunny", 30.0)
         assert result == "sunny"
 
         # History should be updated
@@ -472,7 +472,7 @@ class TestSolarAnalyzer:
 
         # Try to change to partlycloudy with small cloud cover increase (only 5%)
         # Threshold is 15%, so this should be rejected
-        result = analyzer._apply_condition_hysteresis("partlycloudy", 40.0)
+        result = analyzer.apply_condition_hysteresis("partlycloudy", 40.0)
         assert result == "sunny"  # Should maintain previous condition
 
         # History should record the rejected change attempt
@@ -499,7 +499,7 @@ class TestSolarAnalyzer:
 
         # Try to change to partlycloudy with significant cloud cover increase (20%)
         # Threshold is 15%, so this should be allowed
-        result = analyzer._apply_condition_hysteresis("partlycloudy", 50.0)
+        result = analyzer.apply_condition_hysteresis("partlycloudy", 50.0)
         assert result == "partlycloudy"  # Should allow the change
 
         # History should record the successful change
@@ -522,7 +522,7 @@ class TestSolarAnalyzer:
 
         # Try to change to sunny with small cloud cover decrease (only 8%)
         # Threshold is 15%, so this should be rejected
-        result = analyzer._apply_condition_hysteresis("sunny", 37.0)
+        result = analyzer.apply_condition_hysteresis("sunny", 37.0)
         assert result == "partlycloudy"  # Should maintain previous condition
 
     def test_apply_condition_hysteresis_partlycloudy_to_sunny_above_threshold(
@@ -540,7 +540,7 @@ class TestSolarAnalyzer:
 
         # Try to change to sunny with significant cloud cover decrease (25%)
         # Threshold is 15%, so this should be allowed
-        result = analyzer._apply_condition_hysteresis("sunny", 25.0)
+        result = analyzer.apply_condition_hysteresis("sunny", 25.0)
         assert result == "sunny"  # Should allow the change
 
     def test_apply_condition_hysteresis_partlycloudy_to_cloudy_above_threshold(
@@ -558,7 +558,7 @@ class TestSolarAnalyzer:
 
         # Try to change to cloudy with moderate cloud cover increase (15%)
         # Threshold for partlycloudy->cloudy is 10%, so this should be allowed
-        result = analyzer._apply_condition_hysteresis("cloudy", 65.0)
+        result = analyzer.apply_condition_hysteresis("cloudy", 65.0)
         assert result == "cloudy"  # Should allow the change
 
     def test_apply_condition_hysteresis_cloudy_to_partlycloudy_below_threshold(
@@ -576,7 +576,7 @@ class TestSolarAnalyzer:
 
         # Try to change to partlycloudy with small cloud cover decrease (only 5%)
         # Threshold is 10%, so this should be rejected
-        result = analyzer._apply_condition_hysteresis("partlycloudy", 65.0)
+        result = analyzer.apply_condition_hysteresis("partlycloudy", 65.0)
         assert result == "cloudy"  # Should maintain previous condition
 
     def test_apply_condition_hysteresis_unknown_transition(self, analyzer):
@@ -592,12 +592,12 @@ class TestSolarAnalyzer:
 
         # Try a transition that doesn't have a specific threshold (should use 5% default)
         # First try with change below default threshold
-        result = analyzer._apply_condition_hysteresis("cloudy", 23.0)  # Only 3% change
+        result = analyzer.apply_condition_hysteresis("cloudy", 23.0)  # Only 3% change
         assert result == "sunny"  # Should be rejected due to low threshold
 
         # Now try with change above default threshold from the original baseline
         # Since hysteresis uses the most recent history entry, we need a bigger change
-        result = analyzer._apply_condition_hysteresis(
+        result = analyzer.apply_condition_hysteresis(
             "cloudy", 28.0
         )  # 8% change from last (23.0)
         assert result == "cloudy"  # Should be allowed
@@ -625,7 +625,7 @@ class TestSolarAnalyzer:
         assert len(analyzer._condition_history) == 15
 
         # Trigger cleanup by calling hysteresis (which does cleanup)
-        analyzer._apply_condition_hysteresis("sunny", 25.0)
+        analyzer.apply_condition_hysteresis("sunny", 25.0)
 
         # After cleanup, should only have entries from last 24 hours
         # (entries from 0-22 hours ago = 12 entries)

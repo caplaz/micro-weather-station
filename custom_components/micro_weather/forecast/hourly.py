@@ -81,7 +81,6 @@ class HourlyForecastGenerator:
         meteorological_state: Dict[str, Any],
         hourly_patterns: Dict[str, Any],
         micro_evolution: Dict[str, Any],
-        astronomical_calculator,
     ) -> List[Dict[str, Any]]:
         """Generate comprehensive 24-hour hourly forecast.
 
@@ -121,7 +120,6 @@ class HourlyForecastGenerator:
                     meteorological_state,
                     hourly_patterns,
                     micro_evolution,
-                    astronomical_calculator,
                 )
 
                 # Advanced hourly condition with micro-evolution
@@ -235,7 +233,6 @@ class HourlyForecastGenerator:
         meteorological_state: Dict[str, Any],
         hourly_patterns: Dict[str, Any],
         micro_evolution: Dict[str, Any],
-        astronomical_calculator,
     ) -> float:
         """Forecast temperature for a specific hour with comprehensive modulation."""
         # Ensure current_temp is not None
@@ -243,16 +240,42 @@ class HourlyForecastGenerator:
             current_temp = 20.0
         forecast_temp = current_temp
 
-        # Astronomical diurnal variation
+        # Astronomical diurnal variation (inlined from AstronomicalCalculator)
         hour = astronomical_context["hour_of_day"]
-        is_daytime = astronomical_context.get("is_daytime", True)
         diurnal_patterns = hourly_patterns.get("diurnal_patterns", {}).get(
             KEY_TEMPERATURE, {}
         )
 
-        diurnal_variation = astronomical_calculator.calculate_diurnal_variation(
-            hour, is_daytime, diurnal_patterns
-        )
+        # Default diurnal patterns
+        default_patterns = {
+            "dawn": -2.0,
+            "morning": 1.0,
+            "noon": 3.0,
+            "afternoon": 2.0,
+            "evening": -1.0,
+            "night": -3.0,
+            "midnight": -2.0,
+        }
+
+        # Merge provided patterns with defaults
+        patterns = {**default_patterns, **diurnal_patterns}
+
+        # Map hour to diurnal period
+        if 5 <= hour < 7:
+            diurnal_variation = patterns["dawn"]
+        elif 7 <= hour < 12:
+            diurnal_variation = patterns["morning"]
+        elif 12 <= hour < 15:
+            diurnal_variation = patterns["noon"]
+        elif 15 <= hour < 19:
+            diurnal_variation = patterns["afternoon"]
+        elif 19 <= hour < 22:
+            diurnal_variation = patterns["evening"]
+        elif 22 <= hour < 24 or hour < 2:
+            diurnal_variation = patterns["night"]
+        else:  # 2-5 AM
+            diurnal_variation = patterns["midnight"]
+
         # Apply distance-based dampening to diurnal variation for distant forecasts
         diurnal_dampening = max(0.5, 1.0 - (hour_idx * 0.02))
         diurnal_variation *= diurnal_dampening

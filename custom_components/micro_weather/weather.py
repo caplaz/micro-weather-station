@@ -36,8 +36,12 @@ from .const import (
     KEY_WIND_DIRECTION,
     KEY_WIND_SPEED,
 )
+from .forecast import (
+    DailyForecastGenerator,
+    HourlyForecastGenerator,
+    MeteorologicalAnalyzer,
+)
 from .version import __version__
-from .weather_forecast import AdvancedWeatherForecast
 from .weather_utils import convert_to_celsius, convert_to_fahrenheit, get_sun_times
 
 _LOGGER = logging.getLogger(__name__)
@@ -84,12 +88,20 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             hasattr(coordinator, "atmospheric_analyzer")
             and coordinator.atmospheric_analyzer
         ):
-            self._forecast = AdvancedWeatherForecast(
+            # Use new modular forecast components directly
+            self._meteorological_analyzer = MeteorologicalAnalyzer(
+                coordinator.atmospheric_analyzer,
+                coordinator.core_analyzer,
+                coordinator.solar_analyzer,
+                coordinator.trends_analyzer,
+            )
+            self._daily_generator = DailyForecastGenerator(coordinator.trends_analyzer)
+            self._hourly_generator = HourlyForecastGenerator(
                 coordinator.atmospheric_analyzer,
                 coordinator.solar_analyzer,
                 coordinator.trends_analyzer,
-                coordinator.core_analyzer,
             )
+            # AstronomicalCalculator removed - diurnal logic inlined
         else:
             # Fallback if analyzers are not available
             from .analysis.atmospheric import AtmosphericAnalyzer
@@ -106,11 +118,16 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             solar_analyzer = SolarAnalyzer(None, zenith_max_radiation)
             trends_analyzer = TrendsAnalyzer()
             core_analyzer = WeatherConditionAnalyzer(
-                atmospheric_analyzer, solar_analyzer
+                atmospheric_analyzer, solar_analyzer, trends_analyzer
             )
-            self._forecast = AdvancedWeatherForecast(
-                atmospheric_analyzer, solar_analyzer, trends_analyzer, core_analyzer
+            self._meteorological_analyzer = MeteorologicalAnalyzer(
+                atmospheric_analyzer, core_analyzer, solar_analyzer, trends_analyzer
             )
+            self._daily_generator = DailyForecastGenerator(trends_analyzer)
+            self._hourly_generator = HourlyForecastGenerator(
+                atmospheric_analyzer, solar_analyzer, trends_analyzer
+            )
+            # AstronomicalCalculator removed - diurnal logic inlined
 
     async def async_added_to_hass(self) -> None:
         """Handle entity being added to Home Assistant."""
@@ -289,10 +306,13 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         )
             altitude = altitude_value
 
-            forecast_data = self._forecast.generate_comprehensive_forecast(
-                current_condition=current_condition,
-                sensor_data=sensor_data,
-                altitude=altitude,
+            forecast_data = self._daily_generator.generate_forecast(
+                current_condition,
+                sensor_data,
+                altitude,
+                self._meteorological_analyzer.analyze_state(sensor_data, altitude),
+                {},  # historical_patterns - empty for now
+                {},  # system_evolution - empty for now
             )
 
             # Convert to Forecast objects
@@ -391,13 +411,19 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         )
             altitude = altitude_value
 
-            forecast_data = self._forecast.generate_hourly_forecast_comprehensive(
+            forecast_data = self._hourly_generator.generate_forecast(
                 current_temp=float(convert_to_fahrenheit(current_temp) or 68.0),
                 current_condition=current_condition,
                 sensor_data=sensor_data,
                 sunrise_time=sunrise_time,
                 sunset_time=sunset_time,
                 altitude=altitude,
+                meteorological_state=self._meteorological_analyzer.analyze_state(
+                    sensor_data, altitude
+                ),
+                hourly_patterns={},  # hourly_patterns - empty for now
+                micro_evolution={},  # micro_evolution - empty for now
+                # astronomical_calculator removed - diurnal logic inlined
             )
             # Convert to Forecast objects
             forecast_list = []

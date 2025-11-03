@@ -23,7 +23,9 @@ _LOGGER = logging.getLogger(__name__)
 class AtmosphericAnalyzer:
     """Analyzes atmospheric conditions including pressure and fog."""
 
-    def __init__(self, sensor_history: Optional[Dict[str, deque]] = None):
+    def __init__(
+        self, sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None
+    ):
         """Initialize with sensor history.
 
         Args:
@@ -110,6 +112,24 @@ class AtmosphericAnalyzer:
             adjusted_thresholds[key] = threshold_inhg - altitude_adjustment_inhg
 
         return adjusted_thresholds
+
+    def get_altitude_adjusted_pressure_thresholds_hpa(
+        self, altitude_m: Optional[float]
+    ) -> Dict[str, float]:
+        """Get pressure thresholds adjusted for altitude in hPa.
+
+        Args:
+            altitude_m: Altitude in meters above sea level
+
+        Returns:
+            Dictionary of pressure thresholds in hPa
+        """
+        # Get thresholds in inHg and convert to hPa
+        inhg_thresholds = self.get_altitude_adjusted_pressure_thresholds(altitude_m)
+        hpa_thresholds = {}
+        for key, value_inhg in inhg_thresholds.items():
+            hpa_thresholds[key] = value_inhg * 33.8639
+        return hpa_thresholds
 
     def analyze_fog_conditions(
         self,
@@ -426,3 +446,14 @@ class AtmosphericAnalyzer:
 
         slope = (n * sum_xy - sum_x * sum_y) / denominator
         return slope
+
+    def analyze_pressure_trends(self, altitude: float = 0.0) -> Dict[str, Any]:
+        """Analyze historical pressure trends.
+
+        Args:
+            altitude: Altitude in meters (for future pressure correction)
+
+        Returns:
+            Dictionary with pressure trend analysis
+        """
+        return self._get_historical_trends("pressure", hours=24)

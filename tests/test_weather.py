@@ -368,9 +368,7 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             # Mock fromisoformat to return proper timezone-aware datetime objects
@@ -439,9 +437,7 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
 
@@ -495,9 +491,7 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
 
@@ -558,9 +552,7 @@ class TestMicroWeatherEntity:
 
         with (
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -649,9 +641,7 @@ class TestMicroWeatherEntity:
 
         with (
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -734,9 +724,7 @@ class TestMicroWeatherEntity:
 
         with (
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -870,9 +858,7 @@ class TestMicroWeatherEntity:
 
         with (
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -981,9 +967,7 @@ class TestMicroWeatherEntity:
 
         with (
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -1068,9 +1052,7 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -1130,12 +1112,8 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime.fromisoformat"
-            ) as mock_fromisoformat,
+            patch("datetime.datetime") as mock_dt_class,
+            patch("datetime.datetime.fromisoformat") as mock_fromisoformat,
         ):
             mock_dt_class.now.return_value = mock_now
             # Make fromisoformat raise an exception
@@ -1193,9 +1171,7 @@ class TestMicroWeatherEntity:
                 side_effect=lambda s: datetime.fromisoformat(s.replace("Z", "+00:00")),
             ),
             patch("homeassistant.util.dt.now", return_value=mock_now),
-            patch(
-                "custom_components.micro_weather.weather_forecast.datetime"
-            ) as mock_dt_class,
+            patch("datetime.datetime") as mock_dt_class,
         ):
             mock_dt_class.now.return_value = mock_now
             mock_dt_class.fromisoformat.side_effect = lambda s: datetime.fromisoformat(
@@ -1736,8 +1712,8 @@ class TestMicroWeatherEntity:
 
         # Mock the forecast.generate_comprehensive_forecast to raise an exception
         with patch.object(
-            weather_entity._forecast,
-            "generate_comprehensive_forecast",
+            weather_entity._daily_generator,
+            "generate_forecast",
             side_effect=Exception("Test error"),
         ):
             result = await weather_entity.async_forecast_daily()
@@ -1932,8 +1908,8 @@ class TestMicroWeatherEntity:
         ]
 
         with patch.object(
-            weather_entity._forecast,
-            "generate_comprehensive_forecast",
+            weather_entity._daily_generator,
+            "generate_forecast",
             return_value=mock_fahrenheit_forecast,
         ):
             coordinator.data = {
@@ -1991,8 +1967,8 @@ class TestMicroWeatherEntity:
         ]
 
         with patch.object(
-            weather_entity._forecast,
-            "generate_hourly_forecast_comprehensive",
+            weather_entity._hourly_generator,
+            "generate_forecast",
             return_value=mock_fahrenheit_hourly,
         ):
             coordinator.data = {
@@ -2143,8 +2119,8 @@ class TestMicroWeatherEntity:
         ]
 
         with patch.object(
-            weather_entity._forecast,
-            "generate_comprehensive_forecast",
+            weather_entity._daily_generator,
+            "generate_forecast",
             return_value=mock_extreme_forecast,
         ):
             coordinator.data = {
@@ -2220,18 +2196,27 @@ class TestMicroWeatherEntity:
         self, weather_entity, coordinator
     ):
         """Test comprehensive forecast with different pressure system scenarios."""
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import patch
 
         # Test high pressure system
-        mock_high_pressure = MagicMock()
-        mock_high_pressure.analyze_pressure_trends.return_value = {
-            "pressure_system": "high_pressure",
-            "current_trend": 2.0,
-            "long_term_trend": 1.5,
-            "storm_probability": 5,
+        mock_high_pressure_state = {
+            "pressure_analysis": {
+                "pressure_system": "high_pressure",
+                "current_trend": 2.0,
+                "long_term_trend": 1.5,
+                "storm_probability": 5,
+            },
+            "atmospheric_stability": 0.8,
+            "cloud_analysis": {"cloud_cover": 20.0},
+            "moisture_analysis": {"condensation_potential": 0.2},
+            "wind_pattern_analysis": {"direction_stability": 0.7},
         }
 
-        with patch.object(weather_entity._forecast, "analysis", mock_high_pressure):
+        with patch.object(
+            weather_entity._meteorological_analyzer,
+            "analyze_state",
+            return_value=mock_high_pressure_state,
+        ):
             coordinator.data = {
                 "temperature": 25.0,  # Warm temperature
                 "condition": ATTR_CONDITION_SUNNY,
@@ -2252,15 +2237,24 @@ class TestMicroWeatherEntity:
             assert sunny_count >= 2  # At least some sunny days
 
         # Test low pressure system
-        mock_low_pressure = MagicMock()
-        mock_low_pressure.analyze_pressure_trends.return_value = {
-            "pressure_system": "low_pressure",
-            "current_trend": -1.5,
-            "long_term_trend": -1.0,
-            "storm_probability": 60,
+        mock_low_pressure_state = {
+            "pressure_analysis": {
+                "pressure_system": "low_pressure",
+                "current_trend": -1.5,
+                "long_term_trend": -1.0,
+                "storm_probability": 60,
+            },
+            "atmospheric_stability": 0.3,
+            "cloud_analysis": {"cloud_cover": 80.0},
+            "moisture_analysis": {"condensation_potential": 0.7},
+            "wind_pattern_analysis": {"direction_stability": 0.4},
         }
 
-        with patch.object(weather_entity._forecast, "analysis", mock_low_pressure):
+        with patch.object(
+            weather_entity._meteorological_analyzer,
+            "analyze_state",
+            return_value=mock_low_pressure_state,
+        ):
             coordinator.data = {
                 "temperature": 15.0,  # Cooler temperature
                 "condition": ATTR_CONDITION_CLOUDY,
@@ -2352,8 +2346,8 @@ class TestMicroWeatherEntity:
         ]
 
         with patch.object(
-            weather_entity._forecast,
-            "generate_comprehensive_forecast",
+            weather_entity._daily_generator,
+            "generate_forecast",
             return_value=mock_comprehensive,
         ):
             coordinator.data = {
@@ -2410,8 +2404,8 @@ class TestMicroWeatherEntity:
             ]
 
             with patch.object(
-                weather_entity._forecast,
-                "generate_comprehensive_forecast",
+                weather_entity._daily_generator,
+                "generate_forecast",
                 return_value=mock_forecast,
             ):
                 coordinator.data = {
