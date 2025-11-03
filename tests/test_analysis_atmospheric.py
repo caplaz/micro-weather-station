@@ -7,6 +7,7 @@ from homeassistant.components.weather import ATTR_CONDITION_FOG
 import pytest
 
 from custom_components.micro_weather.analysis.atmospheric import AtmosphericAnalyzer
+from custom_components.micro_weather.analysis.trends import TrendsAnalyzer
 
 
 class TestAtmosphericAnalyzer:
@@ -50,7 +51,8 @@ class TestAtmosphericAnalyzer:
     @pytest.fixture
     def analyzer(self, mock_sensor_history):
         """Create AtmosphericAnalyzer instance for testing."""
-        return AtmosphericAnalyzer(mock_sensor_history)
+        trends_analyzer = TrendsAnalyzer(mock_sensor_history)
+        return AtmosphericAnalyzer(mock_sensor_history, trends_analyzer)
 
     def test_analyze_fog_conditions(self, analyzer):
         """Test fog condition analysis using unified scoring system."""
@@ -214,16 +216,22 @@ class TestAtmosphericAnalyzer:
 
     def test_analyze_pressure_trends_error_handling(self, analyzer):
         """Test pressure trend analysis error handling."""
-        # Test with empty history
-        analyzer._sensor_history = {}  # Clear history
+        # Test with empty history - need to update both analyzer and trends_analyzer
+        empty_history = {}
+        analyzer._sensor_history = empty_history
+        analyzer._trends_analyzer._sensor_history = empty_history
 
         pressure_analysis = analyzer.analyze_pressure_trends()
         assert pressure_analysis == {}  # Should return empty dict with no data
 
         # Test with insufficient data
-        analyzer._sensor_history["pressure"] = [
-            {"timestamp": datetime.now(), "value": 29.92}
-        ]
+        limited_history = {
+            "pressure": deque(
+                [{"timestamp": datetime.now(), "value": 29.92}], maxlen=192
+            )
+        }
+        analyzer._sensor_history = limited_history
+        analyzer._trends_analyzer._sensor_history = limited_history
 
         pressure_analysis_short = analyzer.analyze_pressure_trends()
         assert (

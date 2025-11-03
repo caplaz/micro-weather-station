@@ -21,7 +21,11 @@ from homeassistant.components.weather import (
 )
 
 from ..const import DEFAULT_ZENITH_MAX_RADIATION
-from ..meteorological_constants import CloudCoverThresholds, PressureThresholds
+from ..meteorological_constants import (
+    CloudCoverThresholds,
+    PressureThresholds,
+    SolarAnalysisConstants,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,39 +87,61 @@ class SolarAnalyzer:
         max_solar_radiation = self._calculate_clear_sky_max_radiation(solar_elevation)
 
         # Handle very low radiation with historical bias
-        relative_threshold = max_solar_radiation * 0.3
+        relative_threshold = (
+            max_solar_radiation * SolarAnalysisConstants.LOW_RADIATION_THRESHOLD_RATIO
+        )
         if (
             avg_solar_radiation < relative_threshold
-            and solar_lux < 20000
-            and uv_index < 1
-            and solar_elevation < 15
+            and solar_lux < SolarAnalysisConstants.MIN_SOLAR_LUX
+            and uv_index < SolarAnalysisConstants.MIN_UV_INDEX
+            and solar_elevation < SolarAnalysisConstants.LOW_ELEVATION_THRESHOLD
         ):
-            historical_bias = self._get_historical_weather_bias(hours=6)
+            historical_bias = self._get_historical_weather_bias(
+                hours=SolarAnalysisConstants.HISTORICAL_BIAS_HOURS
+            )
             bias_adjustment = 0.0
 
-            if historical_bias["bias_strength"] > 0.7:
-                bias_adjustment = -50.0 * historical_bias["bias_strength"]
-            elif historical_bias["bias_strength"] > 0.5:
-                bias_adjustment = -30.0 * historical_bias["bias_strength"]
+            if (
+                historical_bias["bias_strength"]
+                > SolarAnalysisConstants.BIAS_STRENGTH_THRESHOLD_STRONG
+            ):
+                bias_adjustment = (
+                    SolarAnalysisConstants.BIAS_ADJUSTMENT_STRONG
+                    * historical_bias["bias_strength"]
+                )
+            elif (
+                historical_bias["bias_strength"]
+                > SolarAnalysisConstants.BIAS_STRENGTH_THRESHOLD_MODERATE
+            ):
+                bias_adjustment = (
+                    SolarAnalysisConstants.BIAS_ADJUSTMENT_MODERATE
+                    * historical_bias["bias_strength"]
+                )
 
             if (
                 (
-                    avg_solar_radiation < max_solar_radiation * 0.1
-                    or avg_solar_radiation < 50
+                    avg_solar_radiation
+                    < max_solar_radiation
+                    * SolarAnalysisConstants.VERY_LOW_RADIATION_THRESHOLD_RATIO
+                    or avg_solar_radiation < SolarAnalysisConstants.MIN_SOLAR_RADIATION
                 )
                 and (solar_lux < 5000 or solar_lux < max_solar_radiation * 6)
                 and uv_index == 0
             ):
                 cloud_cover = 85.0
             elif (
-                avg_solar_radiation < max_solar_radiation * 0.2
+                avg_solar_radiation
+                < max_solar_radiation
+                * SolarAnalysisConstants.EXTREME_LOW_RADIATION_THRESHOLD_RATIO
                 or avg_solar_radiation < 100
             ) and solar_lux < 10000:
                 cloud_cover = 70.0
             else:
                 cloud_cover = 40.0
 
-            cloud_cover = max(0.0, cloud_cover + bias_adjustment)
+            cloud_cover = max(
+                SolarAnalysisConstants.MIN_CLOUD_COVER, cloud_cover + bias_adjustment
+            )
         else:
             # Calculate cloud cover from solar measurements
             cloud_cover = self._calculate_cloud_cover_from_solar(
@@ -131,7 +157,13 @@ class SolarAnalyzer:
             pressure_adjustment = self._calculate_pressure_trend_cloud_adjustment(
                 pressure_trends
             )
-            cloud_cover = max(0.0, min(100.0, cloud_cover + pressure_adjustment))
+            cloud_cover = max(
+                SolarAnalysisConstants.MIN_CLOUD_COVER,
+                min(
+                    SolarAnalysisConstants.MAX_CLOUD_COVER,
+                    cloud_cover + pressure_adjustment,
+                ),
+            )
 
         # Apply hysteresis to prevent extreme jumps
         cloud_cover = self._apply_cloud_cover_hysteresis(cloud_cover)
@@ -153,7 +185,22 @@ class SolarAnalyzer:
         max_solar_radiation: float,
         solar_elevation: float,
     ) -> float:
-        """Calculate cloud cover from solar measurements."""
+        """Calculate cloud cover from solar measurements.
+
+        Combines multiple solar sensors (radiation, lux, UV) with intelligent
+        weighting to estimate cloud cover percentage. Includes UV consistency
+        checking and dynamic weight adjustment based on sensor availability.
+
+        Args:
+            avg_solar_radiation: Averaged solar radiation in W/m²
+            solar_lux: Solar illuminance in lux
+            uv_index: UV index value
+            max_solar_radiation: Theoretical clear-sky maximum in W/m²
+            solar_elevation: Sun angle above horizon in degrees
+
+        Returns:
+            Cloud cover percentage (0-100)
+        """
         # Safety check for miscalibration
         radiation_ratio = avg_solar_radiation / max_solar_radiation
 
@@ -168,36 +215,64 @@ class SolarAnalyzer:
             radiation_ratio = 1.0
 
         # Calculate cloud cover from each measurement
-        solar_cloud_cover = max(0, min(100, 100 - (radiation_ratio * 100)))
+        solar_cloud_cover = max(
+            SolarAnalysisConstants.MIN_CLOUD_COVER,
+            min(
+                SolarAnalysisConstants.MAX_CLOUD_COVER,
+                SolarAnalysisConstants.MAX_CLOUD_COVER - (radiation_ratio * 100),
+            ),
+        )
 
         # Calculate lux and UV maximums
         max_solar_lux = max_solar_radiation * 120
         air_mass = self._calculate_air_mass(solar_elevation)
         max_uv_index = max(0.5, 12 * math.exp(-0.05 * air_mass))
 
-        lux_cloud_cover = max(0, min(100, 100 - (solar_lux / max_solar_lux * 100)))
-        uv_cloud_cover = max(0, min(100, 100 - (uv_index / max_uv_index * 100)))
+        lux_cloud_cover = max(
+            SolarAnalysisConstants.MIN_CLOUD_COVER,
+            min(
+                SolarAnalysisConstants.MAX_CLOUD_COVER,
+                SolarAnalysisConstants.MAX_CLOUD_COVER
+                - (solar_lux / max_solar_lux * 100),
+            ),
+        )
+        uv_cloud_cover = max(
+            SolarAnalysisConstants.MIN_CLOUD_COVER,
+            min(
+                SolarAnalysisConstants.MAX_CLOUD_COVER,
+                SolarAnalysisConstants.MAX_CLOUD_COVER
+                - (uv_index / max_uv_index * 100),
+            ),
+        )
 
         # Weight the measurements
         if avg_solar_radiation > 10:
             # Check UV consistency
             if uv_index > 0:
                 uv_solar_diff = abs(solar_cloud_cover - uv_cloud_cover)
-                if uv_solar_diff > 30.0:
+                if uv_solar_diff > SolarAnalysisConstants.UV_INCONSISTENCY_THRESHOLD:
                     _LOGGER.debug(
                         "UV inconsistent with solar (UV: %.1f%%, Solar: %.1f%%), ignoring UV",
                         uv_cloud_cover,
                         solar_cloud_cover,
                     )
-                    cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15
+                    cloud_cover = (
+                        solar_cloud_cover
+                        * SolarAnalysisConstants.SOLAR_RADIATION_WEIGHT
+                        + lux_cloud_cover * SolarAnalysisConstants.SOLAR_LUX_WEIGHT
+                    )
                 else:
                     cloud_cover = (
-                        solar_cloud_cover * 0.8
-                        + lux_cloud_cover * 0.15
-                        + uv_cloud_cover * 0.05
+                        solar_cloud_cover
+                        * SolarAnalysisConstants.SOLAR_RADIATION_WEIGHT
+                        + lux_cloud_cover * SolarAnalysisConstants.SOLAR_LUX_WEIGHT
+                        + uv_cloud_cover * SolarAnalysisConstants.UV_INDEX_WEIGHT
                     )
             else:
-                cloud_cover = solar_cloud_cover * 0.85 + lux_cloud_cover * 0.15
+                cloud_cover = (
+                    solar_cloud_cover * SolarAnalysisConstants.SOLAR_RADIATION_WEIGHT
+                    + lux_cloud_cover * SolarAnalysisConstants.SOLAR_LUX_WEIGHT
+                )
         elif solar_lux > 100:
             cloud_cover = (
                 lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
@@ -262,7 +337,12 @@ class SolarAnalyzer:
         )
 
         # Ensure reasonable bounds
-        calibrated_max_radiation = max(50.0, min(2000.0, calibrated_max_radiation))
+        calibrated_max_radiation = max(
+            SolarAnalysisConstants.MIN_CLEAR_SKY_RADIATION,
+            min(
+                SolarAnalysisConstants.MAX_CLEAR_SKY_RADIATION, calibrated_max_radiation
+            ),
+        )
 
         _LOGGER.debug(
             "Clear-sky max: %.1f W/m² (elevation: %.1f°, air_mass: %.3f, "
@@ -279,7 +359,7 @@ class SolarAnalyzer:
     def _calculate_air_mass(self, solar_elevation: float) -> float:
         """Calculate air mass using Gueymard 2003 formula."""
         if solar_elevation <= 0:
-            return 38.0
+            return SolarAnalysisConstants.MAX_AIR_MASS
 
         zenith_angle = 90.0 - solar_elevation
         zenith_rad = math.radians(zenith_angle)
@@ -298,27 +378,45 @@ class SolarAnalyzer:
         return max(1.0, air_mass)
 
     def _get_solar_radiation_average(self, current_radiation: float) -> float:
-        """Calculate moving average of solar radiation."""
+        """Calculate moving average of solar radiation.
+
+        Applies a weighted moving average over recent readings to smooth
+        out rapid fluctuations (e.g., passing clouds). More recent readings
+        receive higher weight.
+
+        Args:
+            current_radiation: Most recent radiation reading in W/m²
+
+        Returns:
+            Weighted average radiation in W/m², or current value if
+            insufficient history
+        """
         if current_radiation is None:
             current_radiation = 0.0
 
         if "solar_radiation" not in self._sensor_history:
             return current_radiation
 
-        cutoff_time = datetime.now() - timedelta(minutes=15)
+        cutoff_time = datetime.now() - timedelta(
+            minutes=SolarAnalysisConstants.AVERAGING_WINDOW_MINUTES
+        )
         recent_readings = [
             entry["value"]
             for entry in self._sensor_history["solar_radiation"]
             if entry["timestamp"] > cutoff_time and entry["value"] > 0
         ]
 
-        if len(recent_readings) < 3:
+        if len(recent_readings) < SolarAnalysisConstants.MINIMUM_SAMPLES_FOR_AVERAGE:
             return current_radiation
 
         # Weighted average favoring recent readings
         weights = []
         for i in range(len(recent_readings)):
-            weight = 0.3 + (0.7 * i / (len(recent_readings) - 1))
+            weight = SolarAnalysisConstants.RECENT_READING_WEIGHT_MIN + (
+                SolarAnalysisConstants.RECENT_READING_WEIGHT_MAX
+                * i
+                / (len(recent_readings) - 1)
+            )
             weights.append(weight)
 
         weighted_sum = sum(
@@ -334,7 +432,20 @@ class SolarAnalyzer:
     def _calculate_pressure_trend_cloud_adjustment(
         self, pressure_trends: Dict[str, Any]
     ) -> float:
-        """Calculate cloud cover adjustment based on pressure trends."""
+        """Calculate cloud cover adjustment based on pressure trends.
+
+        Modifies cloud cover estimate based on atmospheric pressure patterns.
+        Falling pressure typically indicates increasing cloudiness; rising
+        pressure suggests clearing skies. Considers both short-term (3h) and
+        long-term (24h) trends plus pressure system type.
+
+        Args:
+            pressure_trends: Dictionary with trend analysis from TrendsAnalyzer
+
+        Returns:
+            Cloud cover adjustment in percentage points (-40 to +35)
+            Negative = clearer than solar suggests, Positive = cloudier
+        """
         if not pressure_trends:
             return 0.0
 
@@ -393,7 +504,18 @@ class SolarAnalyzer:
         return total_adjustment
 
     def _apply_cloud_cover_hysteresis(self, cloud_cover: float) -> float:
-        """Apply hysteresis to prevent extreme cloud cover jumps."""
+        """Apply hysteresis to prevent extreme cloud cover jumps.
+
+        Limits the maximum change in cloud cover between consecutive readings
+        to prevent unrealistic rapid changes that might result from sensor
+        noise or brief cloud passages.
+
+        Args:
+            cloud_cover: Newly calculated cloud cover percentage
+
+        Returns:
+            Cloud cover percentage limited to reasonable change rate
+        """
         recent_readings = self._sensor_history.get("cloud_cover", deque())
 
         if len(recent_readings) > 0:
@@ -405,8 +527,11 @@ class SolarAnalyzer:
 
             if last_reading is not None:
                 cover_change = abs(cloud_cover - last_reading)
-                if cover_change > 40:
-                    max_change = 30
+                if (
+                    cover_change
+                    > SolarAnalysisConstants.CLOUD_COVER_HYSTERESIS_MAX_CHANGE
+                ):
+                    max_change = SolarAnalysisConstants.CLOUD_COVER_HYSTERESIS_LIMIT
                     if cloud_cover > last_reading:
                         cloud_cover = min(cloud_cover, last_reading + max_change)
                     else:
@@ -421,7 +546,22 @@ class SolarAnalyzer:
         return cloud_cover
 
     def _get_historical_weather_bias(self, hours: int = 6) -> Dict[str, Any]:
-        """Calculate historical weather bias for low-elevation adjustments."""
+        """Calculate historical weather bias for low-elevation adjustments.
+
+        Analyzes recent weather condition history to apply bias when solar
+        measurements are unreliable (low sun angles, twilight). If conditions
+        have been persistently clear, bias toward continuing clear conditions.
+
+        Args:
+            hours: Number of hours of history to analyze
+
+        Returns:
+            Dictionary containing:
+            - clear_percentage: Percent of recent readings that were clear
+            - bias_strength: 0-1 strength of bias toward clear conditions
+            - recent_conditions: List of recent condition strings
+            - is_morning: Boolean indicating morning hours (more conservative)
+        """
         if "weather_condition" not in self._sensor_history:
             return {
                 "clear_percentage": 0.0,

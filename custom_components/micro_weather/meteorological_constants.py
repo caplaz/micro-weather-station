@@ -212,6 +212,11 @@ class TemperatureThresholds:
     HUMIDITY_MODERATE_HIGH = 70  # Moderately high humidity
     HUMIDITY_MODERATE = 50  # Moderate humidity - comfortable
 
+    # Humidity thresholds for atmospheric fallback conditions (%)
+    HUMIDITY_FALLBACK_HIGH = 85  # Very high humidity threshold
+    HUMIDITY_FALLBACK_MEDIUM = 80  # Medium-high humidity threshold
+    HUMIDITY_FALLBACK_LOW = 75  # Moderate-high humidity threshold
+
 
 @dataclass(frozen=True)
 class CloudCoverThresholds:
@@ -242,19 +247,120 @@ class CloudCoverThresholds:
     RELIABILITY_BUFFER = 10.0  # +/- buffer around neutral (40-60% = unreliable)
 
 
-# Conversion constants
-MPH_TO_KMH = 1.60934  # Miles per hour to kilometers per hour
-INCHES_TO_MM = 25.4  # Inches to millimeters
-FAHRENHEIT_TO_CELSIUS_SCALE = 5.0 / 9.0  # F to C scale factor
-FAHRENHEIT_OFFSET = 32.0  # F to C offset
-HPA_TO_INHG = 0.02953  # Hectopascals to inches of mercury
-INHG_TO_HPA = 33.8639  # Inches of mercury to hectopascals
+@dataclass(frozen=True)
+class SolarAnalysisConstants:
+    """Constants for solar radiation analysis and cloud cover estimation.
+
+    These constants govern the behavior of cloud cover estimation from
+    solar radiation measurements, including sensor weighting, averaging,
+    and threshold calculations.
+    """
+
+    # Solar radiation averaging parameters
+    AVERAGING_WINDOW_MINUTES = 15  # Moving average window
+    MINIMUM_SAMPLES_FOR_AVERAGE = 3  # Minimum readings for averaging
+    RECENT_READING_WEIGHT_MIN = 0.3  # Minimum weight for recent readings
+    RECENT_READING_WEIGHT_MAX = 0.7  # Maximum weight for recent readings
+
+    # Cloud cover calculation thresholds (as fraction of clear-sky max)
+    LOW_RADIATION_THRESHOLD_RATIO = 0.3  # 30% of clear-sky max
+    VERY_LOW_RADIATION_THRESHOLD_RATIO = 0.1  # 10% of clear-sky max
+    EXTREME_LOW_RADIATION_THRESHOLD_RATIO = 0.2  # 20% of clear-sky max
+
+    # Solar measurement thresholds for fallback logic
+    MIN_SOLAR_RADIATION = 50  # W/m² - Minimum significant radiation
+    MIN_SOLAR_LUX = 20000  # lux - Minimum significant illuminance
+    MIN_UV_INDEX = 1  # Minimum significant UV index
+    LOW_ELEVATION_THRESHOLD = 15  # degrees - Low sun angle threshold
+
+    # Multi-sensor weighting factors (must sum to 1.0)
+    SOLAR_RADIATION_WEIGHT = 0.8  # Primary measurement weight
+    SOLAR_LUX_WEIGHT = 0.15  # Secondary measurement weight
+    UV_INDEX_WEIGHT = 0.05  # Tertiary measurement weight
+    UV_INCONSISTENCY_THRESHOLD = 30.0  # % - UV/solar disagreement threshold
+
+    # Cloud cover bounds
+    MIN_CLOUD_COVER = 0.0  # % - Clear sky
+    MAX_CLOUD_COVER = 100.0  # % - Complete overcast
+    CLOUD_COVER_HYSTERESIS_MAX_CHANGE = 40  # % - Maximum jump between readings
+    CLOUD_COVER_HYSTERESIS_LIMIT = 30  # % - Hysteresis damping limit
+
+    # Historical bias parameters
+    HISTORICAL_BIAS_HOURS = 6  # Hours of history to consider
+    BIAS_ADJUSTMENT_STRONG = -50.0  # % - Strong clearing bias
+    BIAS_ADJUSTMENT_MODERATE = -30.0  # % - Moderate clearing bias
+    BIAS_STRENGTH_THRESHOLD_STRONG = 0.7  # Strong bias threshold
+    BIAS_STRENGTH_THRESHOLD_MODERATE = 0.5  # Moderate bias threshold
+
+    # Astronomical calculation bounds
+    MIN_CLEAR_SKY_RADIATION = 50.0  # W/m² - Minimum theoretical max
+    MAX_CLEAR_SKY_RADIATION = 2000.0  # W/m² - Maximum theoretical max
+    MAX_AIR_MASS = 38.0  # Air mass at horizon
 
 
-# Default values for missing sensors
-DEFAULT_TEMPERATURE_F = 70.0  # °F - Typical room/moderate temperature
-DEFAULT_HUMIDITY = 50.0  # % - Mid-range humidity
-DEFAULT_PRESSURE_INHG = 29.92  # inHg - Standard sea level pressure
-DEFAULT_WIND_SPEED = 0.0  # mph - Calm
-DEFAULT_SOLAR_RADIATION = 0.0  # W/m² - No radiation (night/clouds)
-DEFAULT_ZENITH_MAX_RADIATION = 1000.0  # W/m² - Typical maximum at zenith
+@dataclass(frozen=True)
+class TrendsAnalysisConstants:
+    """Constants for historical trends and pattern analysis.
+
+    These constants define time windows, thresholds, and factors used
+    in analyzing historical weather patterns and trends.
+    """
+
+    # Historical data time windows
+    DEFAULT_TREND_HOURS = 24  # Standard lookback period
+    EXTENDED_TREND_HOURS = 168  # One week lookback
+
+    # Seasonal temperature variation factors by month
+    # Higher values indicate more variable/extreme weather
+    SEASONAL_FACTOR_JANUARY = 0.9
+    SEASONAL_FACTOR_FEBRUARY = 0.7
+    SEASONAL_FACTOR_MARCH = 0.6
+    SEASONAL_FACTOR_APRIL = 0.5
+    SEASONAL_FACTOR_MAY = 0.4
+    SEASONAL_FACTOR_JUNE = 0.3
+    SEASONAL_FACTOR_JULY = 0.4
+    SEASONAL_FACTOR_AUGUST = 0.5
+    SEASONAL_FACTOR_SEPTEMBER = 0.6
+    SEASONAL_FACTOR_OCTOBER = 0.7
+    SEASONAL_FACTOR_NOVEMBER = 0.8
+    SEASONAL_FACTOR_DECEMBER = 0.8
+
+    # Pressure cycle thresholds
+    PRESSURE_VOLATILITY_ACTIVE = 1.0  # hPa - Active system changes
+    PRESSURE_VOLATILITY_MODERATE = 0.5  # hPa - Moderate system changes
+    CYCLE_FREQUENCY_MULTIPLIER = 2.0  # Cycle frequency scaling factor
+
+    # Wind direction analysis
+    WIND_DIRECTION_SIGNIFICANT_SHIFT = 45  # degrees - Major wind shift
+
+
+@dataclass(frozen=True)
+class ConversionConstants:
+    """Unit conversion constants for meteorological calculations.
+
+    Standard conversion factors between different unit systems used
+    throughout the weather analysis.
+    """
+
+    MPH_TO_KMH = 1.60934  # Miles per hour to kilometers per hour
+    INCHES_TO_MM = 25.4  # Inches to millimeters
+    FAHRENHEIT_TO_CELSIUS_SCALE = 5.0 / 9.0  # F to C scale factor
+    FAHRENHEIT_OFFSET = 32.0  # F to C offset
+    HPA_TO_INHG = 0.02953  # Hectopascals to inches of mercury
+    INHG_TO_HPA = 33.8639  # Inches of mercury to hectopascals
+
+
+@dataclass(frozen=True)
+class DefaultSensorValues:
+    """Default values for missing or unavailable sensors.
+
+    These values are used as fallbacks when sensor data is unavailable
+    or invalid. Values represent typical moderate conditions.
+    """
+
+    TEMPERATURE_F = 70.0  # °F - Typical moderate temperature
+    HUMIDITY = 50.0  # % - Mid-range humidity
+    PRESSURE_INHG = 29.92  # inHg - Standard sea level pressure
+    WIND_SPEED = 0.0  # mph - Calm conditions
+    SOLAR_RADIATION = 0.0  # W/m² - No radiation (night/clouds)
+    ZENITH_MAX_RADIATION = 1000.0  # W/m² - Typical maximum at zenith

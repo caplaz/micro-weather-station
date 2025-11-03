@@ -111,7 +111,18 @@ class WeatherConditionAnalyzer:
             return self._determine_nighttime_condition(sensors, params)
 
     def _extract_sensors(self, sensor_data: Dict[str, Any]) -> Dict[str, float]:
-        """Extract and validate sensor values with defaults."""
+        """Extract and validate sensor values with defaults.
+
+        Extracts all relevant sensor readings from the sensor data dictionary
+        and applies default values for missing or None values to ensure
+        consistent processing downstream.
+
+        Args:
+            sensor_data: Dictionary containing raw sensor readings
+
+        Returns:
+            Dictionary with normalized sensor values (never None)
+        """
         return {
             "rain_rate": sensor_data.get(KEY_RAIN_RATE, 0.0),
             "rain_state": sensor_data.get("rain_state", "dry").lower(),
@@ -130,7 +141,20 @@ class WeatherConditionAnalyzer:
     def _calculate_parameters(
         self, sensors: Dict[str, float], altitude: Optional[float]
     ) -> Dict[str, Any]:
-        """Calculate derived meteorological parameters."""
+        """Calculate derived meteorological parameters.
+
+        Computes derived values needed for condition determination including
+        dewpoint temperature, temperature-dewpoint spread, freezing status,
+        time-of-day classification, pressure corrections, and gust factors.
+
+        Args:
+            sensors: Dictionary of normalized sensor values
+            altitude: Station altitude in meters for pressure correction
+
+        Returns:
+            Dictionary of calculated parameters including dewpoint, spreads,
+            boolean flags, and adjusted thresholds
+        """
         # Calculate dewpoint (use sensor if available, otherwise calculate)
         if sensors["dewpoint_raw"] is not None:
             dewpoint = float(sensors["dewpoint_raw"])
@@ -164,7 +188,20 @@ class WeatherConditionAnalyzer:
     def _check_precipitation(
         self, sensors: Dict[str, float], params: Dict[str, Any]
     ) -> Optional[str]:
-        """Check for active precipitation conditions."""
+        """Check for active precipitation conditions.
+
+        Determines if precipitation is occurring and classifies its type
+        (rain, snow, thunderstorm) and intensity based on temperature,
+        rain rate, and atmospheric conditions.
+
+        Args:
+            sensors: Dictionary of sensor values
+            params: Dictionary of calculated parameters
+
+        Returns:
+            Weather condition string if precipitation detected, None otherwise
+            Possible returns: rainy, pouring, snowy, lightning-rainy
+        """
         significant_rain = sensors["rain_rate"] > PrecipitationThresholds.SIGNIFICANT
 
         if not (significant_rain or sensors["rain_state"] == "wet"):
@@ -192,7 +229,19 @@ class WeatherConditionAnalyzer:
     def _is_thunderstorm(
         self, sensors: Dict[str, float], params: Dict[str, Any]
     ) -> bool:
-        """Determine if conditions indicate thunderstorm activity."""
+        """Determine if conditions indicate thunderstorm activity.
+
+        Analyzes multiple indicators including extremely low pressure,
+        strong winds, high wind gusts, severe turbulence, and heavy
+        precipitation to detect thunderstorm conditions.
+
+        Args:
+            sensors: Dictionary of sensor values
+            params: Dictionary of calculated parameters including pressure thresholds
+
+        Returns:
+            True if thunderstorm conditions are detected, False otherwise
+        """
         thresholds = params["pressure_thresholds"]
         pressure = params["adjusted_pressure"]
         gust_factor = params["gust_factor"]
@@ -234,7 +283,19 @@ class WeatherConditionAnalyzer:
     def _check_fog(
         self, sensors: Dict[str, float], params: Dict[str, Any]
     ) -> Optional[str]:
-        """Check for fog conditions using atmospheric analyzer."""
+        """Check for fog conditions using atmospheric analyzer.
+
+        Delegates to atmospheric analyzer to check for fog using a
+        comprehensive scoring system based on humidity, dewpoint spread,
+        wind speed, and solar radiation.
+
+        Args:
+            sensors: Dictionary of sensor values
+            params: Dictionary of calculated parameters including dewpoint
+
+        Returns:
+            ATTR_CONDITION_FOG if fog detected, None otherwise
+        """
         return self.atmospheric.analyze_fog_conditions(
             sensors["outdoor_temp"],
             sensors["humidity"],
@@ -248,7 +309,20 @@ class WeatherConditionAnalyzer:
     def _check_severe_weather(
         self, sensors: Dict[str, float], params: Dict[str, Any]
     ) -> Optional[str]:
-        """Check for severe weather without precipitation."""
+        """Check for severe weather without precipitation.
+
+        Detects severe weather conditions such as thunderstorms without
+        rain (dry thunderstorms) or gale-force winds based on pressure,
+        wind speed, gusts, and turbulence indicators.
+
+        Args:
+            sensors: Dictionary of sensor values
+            params: Dictionary of calculated parameters including pressure thresholds
+
+        Returns:
+            Weather condition string if severe weather detected, None otherwise
+            Possible returns: lightning, windy
+        """
         thresholds = params["pressure_thresholds"]
         pressure = params["adjusted_pressure"]
         gust_factor = params["gust_factor"]
@@ -281,7 +355,19 @@ class WeatherConditionAnalyzer:
     def _determine_daytime_condition(
         self, sensors: Dict[str, float], params: Dict[str, Any]
     ) -> str:
-        """Determine daytime condition based on cloud cover."""
+        """Determine daytime condition based on cloud cover.
+
+        Analyzes solar measurements to estimate cloud cover and maps it
+        to appropriate daytime weather conditions (sunny, partly cloudy,
+        cloudy, windy). Includes hysteresis to prevent rapid oscillation.
+
+        Args:
+            sensors: Dictionary of sensor values including solar measurements
+            params: Dictionary of calculated parameters
+
+        Returns:
+            Daytime weather condition string (sunny, partlycloudy, cloudy, windy)
+        """
         # Get solar elevation with fallback
         solar_elevation = sensors["solar_elevation"]
         has_solar_data = (
@@ -338,7 +424,19 @@ class WeatherConditionAnalyzer:
     def _atmospheric_fallback_condition(
         self, sensors: Dict[str, float], params: Dict[str, Any]
     ) -> str:
-        """Fallback condition determination using atmospheric data."""
+        """Fallback condition determination using atmospheric data.
+
+        Used when solar data is unavailable or unreliable. Estimates
+        weather condition based on humidity, dewpoint spread, and
+        atmospheric pressure patterns.
+
+        Args:
+            sensors: Dictionary of sensor values
+            params: Dictionary of calculated parameters including pressure
+
+        Returns:
+            Weather condition string based on atmospheric indicators
+        """
         humidity = sensors["humidity"]
         spread = params["temp_dewpoint_spread"]
         pressure = params["adjusted_pressure"]
@@ -356,11 +454,17 @@ class WeatherConditionAnalyzer:
             and thresholds["normal_low"] <= pressure <= thresholds["normal_high"]
         ):
             return ATTR_CONDITION_SUNNY
-        elif pressure > thresholds["high"] and humidity < 75:
+        elif (
+            pressure > thresholds["high"]
+            and humidity < TemperatureThresholds.HUMIDITY_FALLBACK_LOW
+        ):
             return ATTR_CONDITION_SUNNY
-        elif pressure < thresholds["low"] and humidity < 80:
+        elif (
+            pressure < thresholds["low"]
+            and humidity < TemperatureThresholds.HUMIDITY_FALLBACK_MEDIUM
+        ):
             return ATTR_CONDITION_PARTLYCLOUDY
-        elif humidity >= 85:
+        elif humidity >= TemperatureThresholds.HUMIDITY_FALLBACK_HIGH:
             return ATTR_CONDITION_CLOUDY
         else:
             return ATTR_CONDITION_PARTLYCLOUDY
@@ -368,7 +472,19 @@ class WeatherConditionAnalyzer:
     def _determine_twilight_condition(
         self, sensors: Dict[str, float], params: Dict[str, Any]
     ) -> str:
-        """Determine twilight condition."""
+        """Determine twilight condition.
+
+        Handles the transition period between day and night (dawn/dusk)
+        when solar measurements are low but non-zero. Uses limited solar
+        data combined with pressure to estimate conditions.
+
+        Args:
+            sensors: Dictionary of sensor values
+            params: Dictionary of calculated parameters including pressure
+
+        Returns:
+            Weather condition string for twilight (partlycloudy or cloudy)
+        """
         thresholds = params["pressure_thresholds"]
         pressure = params["adjusted_pressure"]
 
@@ -383,7 +499,20 @@ class WeatherConditionAnalyzer:
     def _determine_nighttime_condition(
         self, sensors: Dict[str, float], params: Dict[str, Any]
     ) -> str:
-        """Determine nighttime condition based on atmospheric data."""
+        """Determine nighttime condition based on atmospheric data.
+
+        Estimates nighttime conditions using pressure, humidity, wind,
+        and atmospheric stability indicators since solar data is not
+        available. Distinguishes between clear-night, partly cloudy,
+        and cloudy conditions.
+
+        Args:
+            sensors: Dictionary of sensor values
+            params: Dictionary of calculated parameters
+
+        Returns:
+            Nighttime weather condition string (clear-night, partlycloudy, cloudy)
+        """
         humidity = sensors["humidity"]
         pressure = params["adjusted_pressure"]
         thresholds = params["pressure_thresholds"]

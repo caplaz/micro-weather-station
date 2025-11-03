@@ -136,9 +136,13 @@ class WeatherDetector:
         zenith_max_radiation = options.get(
             CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
         )
-        self.atmospheric_analyzer = AtmosphericAnalyzer(self._sensor_history)
-        self.solar_analyzer = SolarAnalyzer(self._sensor_history, zenith_max_radiation)
+        # Create trends analyzer first so it can be injected into other analyzers
         self.trends_analyzer = TrendsAnalyzer(self._sensor_history)
+        # Inject trends_analyzer to avoid code duplication
+        self.atmospheric_analyzer = AtmosphericAnalyzer(
+            self._sensor_history, self.trends_analyzer
+        )
+        self.solar_analyzer = SolarAnalyzer(self._sensor_history, zenith_max_radiation)
         self.core_analyzer = WeatherConditionAnalyzer(
             self.atmospheric_analyzer, self.solar_analyzer, self.trends_analyzer
         )

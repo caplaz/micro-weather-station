@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from homeassistant.components.weather import ATTR_CONDITION_FOG
 
 from ..meteorological_constants import FogThresholds
+from .trends import TrendsAnalyzer
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,14 +25,24 @@ class AtmosphericAnalyzer:
     """Analyzes atmospheric conditions including pressure and fog."""
 
     def __init__(
-        self, sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None
+        self,
+        sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None,
+        trends_analyzer: Optional[TrendsAnalyzer] = None,
     ):
-        """Initialize with sensor history.
+        """Initialize with sensor history and trends analyzer.
 
         Args:
             sensor_history: Dictionary of sensor historical data deques
+            trends_analyzer: TrendsAnalyzer instance for delegating trend calculations.
+                           Required for proper functionality.
         """
         self._sensor_history = sensor_history or {}
+        if trends_analyzer is None:
+            raise ValueError(
+                "trends_analyzer is required. AtmosphericAnalyzer delegates "
+                "trend calculations to TrendsAnalyzer to avoid code duplication."
+            )
+        self._trends_analyzer = trends_analyzer
 
     def adjust_pressure_for_altitude(
         self, pressure_inhg: float, altitude_m: Optional[float], pressure_type: str
@@ -255,7 +266,18 @@ class AtmosphericAnalyzer:
         return self._analyze_wind_direction()
 
     def _analyze_wind_direction(self) -> Dict[str, Any]:
-        """Analyze wind direction for weather prediction."""
+        """Analyze wind direction for weather prediction.
+
+        Examines recent wind direction history to determine direction
+        stability, rate of change, and whether significant wind shifts
+        have occurred. Handles both numeric and datetime timestamps.
+
+        Returns:
+            Dictionary containing:
+            - direction_stability: 0-1, higher = more stable direction
+            - direction_change_rate: Degrees per hour wind shift rate
+            - significant_shift: Boolean indicating major direction change (>45°)
+        """
         if "wind_direction" not in self._sensor_history:
             return {
                 "direction_stability": 0.5,
@@ -348,7 +370,20 @@ class AtmosphericAnalyzer:
         }
 
     def _calculate_angular_difference(self, dir1: float, dir2: float) -> float:
-        """Calculate smallest angular difference between two directions."""
+        """Calculate smallest angular difference between two directions.
+
+        Computes the shortest angular path between two compass directions,
+        accounting for the circular nature of degrees (e.g., 350° to 10°
+        is 20° not 340°).
+
+        Args:
+            dir1: First direction in degrees (0-360)
+            dir2: Second direction in degrees (0-360)
+
+        Returns:
+            Signed angular difference in degrees (-180 to +180)
+            Positive = clockwise rotation, Negative = counterclockwise
+        """
         diff = (dir2 - dir1) % 360
         if diff > 180:
             diff -= 360
@@ -357,95 +392,32 @@ class AtmosphericAnalyzer:
     def _get_historical_trends(
         self, sensor_key: str, hours: int = 24
     ) -> Dict[str, Any]:
-        """Get historical trends for a sensor."""
-        if sensor_key not in self._sensor_history:
-            return {}
+        """Get historical trends for a sensor.
 
-        if sensor_key not in self._sensor_history:
-            return {}
+        Delegates to TrendsAnalyzer to avoid code duplication.
 
-        if not self._sensor_history[sensor_key]:
-            return {}
+        Args:
+            sensor_key: Key of the sensor to analyze
+            hours: Number of hours of history to consider
 
-        # Separate numeric and datetime timestamps to handle mixed data
-        numeric_data = []
-        datetime_data = []
-
-        for entry in self._sensor_history[sensor_key]:
-            timestamp = entry["timestamp"]
-            if isinstance(timestamp, (int, float)):
-                numeric_data.append(entry)
-            elif isinstance(timestamp, datetime):
-                datetime_data.append(entry)
-
-        # Prefer datetime data if we have enough, otherwise use numeric
-        cutoff_time = datetime.now() - timedelta(hours=hours)
-        if datetime_data:
-            recent_data = [
-                entry for entry in datetime_data if entry["timestamp"] > cutoff_time
-            ]
-            is_numeric_timestamp = False
-        elif numeric_data:
-            recent_data = numeric_data
-            is_numeric_timestamp = True
-        else:
-            return {}
-
-        if len(recent_data) < 2:
-            return {}
-
-        values = [entry["value"] for entry in recent_data]
-        timestamps = [entry["timestamp"] for entry in recent_data]
-
-        # Calculate time differences in hours
-        if is_numeric_timestamp:
-            # For numeric timestamps (testing), use values directly as hours
-            time_diffs = [float(t - timestamps[0]) for t in timestamps]
-        else:
-            # For datetime timestamps, calculate time differences
-            time_diffs = [
-                (t - timestamps[0]).total_seconds() / 3600 for t in timestamps
-            ]
-
-        try:
-            current = values[-1]
-            average = statistics.mean(values)
-            minimum = min(values)
-            maximum = max(values)
-            volatility = statistics.stdev(values) if len(values) > 1 else 0
-
-            # Calculate trend (linear regression slope)
-            trend = self._calculate_trend(time_diffs, values)
-
-            return {
-                "current": current,
-                "average": average,
-                "trend": trend,
-                "min": minimum,
-                "max": maximum,
-                "volatility": volatility,
-                "sample_count": len(values),
-            }
-        except statistics.StatisticsError:
-            return {}
+        Returns:
+            Dictionary with trend statistics or empty dict if insufficient data
+        """
+        return self._trends_analyzer.get_historical_trends(sensor_key, hours)
 
     def _calculate_trend(self, x_values: List[float], y_values: List[float]) -> float:
-        """Calculate linear trend (slope) using simple linear regression."""
-        if len(x_values) != len(y_values) or len(x_values) < 2:
-            return 0.0
+        """Calculate linear trend (slope) using simple linear regression.
 
-        n = len(x_values)
-        sum_x = sum(x_values)
-        sum_y = sum(y_values)
-        sum_xy = sum(x * y for x, y in zip(x_values, y_values))
-        sum_x2 = sum(x * x for x in x_values)
+        Delegates to TrendsAnalyzer to avoid code duplication.
 
-        denominator = n * sum_x2 - sum_x * sum_x
-        if denominator == 0:
-            return 0.0
+        Args:
+            x_values: Independent variable (time) values
+            y_values: Dependent variable (sensor reading) values
 
-        slope = (n * sum_xy - sum_x * sum_y) / denominator
-        return slope
+        Returns:
+            Slope of linear regression line (rate of change per time unit)
+        """
+        return self._trends_analyzer.calculate_trend(x_values, y_values)
 
     def analyze_pressure_trends(self, altitude: float = 0.0) -> Dict[str, Any]:
         """Analyze historical pressure trends.
@@ -456,4 +428,4 @@ class AtmosphericAnalyzer:
         Returns:
             Dictionary with pressure trend analysis
         """
-        return self._get_historical_trends("pressure", hours=24)
+        return self._trends_analyzer.analyze_pressure_trends(altitude)

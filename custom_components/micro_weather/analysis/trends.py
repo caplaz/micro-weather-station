@@ -286,34 +286,45 @@ class TrendsAnalyzer:
     ) -> Dict[str, float]:
         """Analyze correlations between weather variables.
 
+        NOTE: This is a placeholder implementation. Real correlation analysis
+        would require Pearson correlation coefficient calculation on the actual
+        historical data points, not just trend directions.
+
         Args:
             temp_history: Temperature history data
             pressure_history: Pressure history data
             humidity_history: Humidity history data
 
         Returns:
-            Dictionary of correlation coefficients
+            Dictionary of estimated correlation indicators (not true correlations)
+            Values indicate general relationship direction, not statistical correlation
         """
         correlations = {}
 
-        # Temperature-pressure correlation
+        # Simplified correlation indicators based on trend alignment
+        # These are NOT true Pearson correlation coefficients
+        # TODO: Implement actual correlation calculation using historical data arrays
+
+        # Temperature-pressure inverse relationship indicator
         if temp_history and pressure_history:
             temp_trend = temp_history.get("trend", 0)
             pressure_trend = pressure_history.get("trend", 0)
             if isinstance(temp_trend, (int, float)) and isinstance(
                 pressure_trend, (int, float)
             ):
+                # Indicate inverse relationship if both trends are non-zero
                 correlations["temp_pressure"] = (
                     -0.6 if abs(temp_trend) > 0 and abs(pressure_trend) > 0 else 0.0
                 )
 
-        # Temperature-humidity correlation
+        # Temperature-humidity inverse relationship indicator
         if temp_history and humidity_history:
             temp_trend = temp_history.get("trend", 0)
             humidity_trend = humidity_history.get("trend", 0)
             if isinstance(temp_trend, (int, float)) and isinstance(
                 humidity_trend, (int, float)
             ):
+                # Indicate inverse relationship if both trends are non-zero
                 correlations["temp_humidity"] = (
                     -0.4 if abs(temp_trend) > 0 and abs(humidity_trend) > 0 else 0.0
                 )

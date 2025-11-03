@@ -60,9 +60,9 @@ class TestWeatherConditionAnalyzer:
     @pytest.fixture
     def analyzers(self, mock_sensor_history):
         """Create analyzer instances for testing."""
-        atmospheric = AtmosphericAnalyzer(mock_sensor_history)
-        solar = SolarAnalyzer(mock_sensor_history)
         trends = TrendsAnalyzer(mock_sensor_history)
+        atmospheric = AtmosphericAnalyzer(mock_sensor_history, trends)
+        solar = SolarAnalyzer(mock_sensor_history)
         core = WeatherConditionAnalyzer(atmospheric, solar, trends)
         return {
             "atmospheric": atmospheric,
