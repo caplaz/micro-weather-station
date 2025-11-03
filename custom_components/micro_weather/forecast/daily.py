@@ -271,7 +271,7 @@ class DailyForecastGenerator:
 
         # Apply moisture analysis for precipitation potential
         forecast_condition = self._apply_moisture_precipitation_logic(
-            forecast_condition, meteorological_state
+            forecast_condition, meteorological_state, day_idx
         )
 
         # Apply storm probability overrides (highest priority)
@@ -462,17 +462,29 @@ class DailyForecastGenerator:
         return forecast_condition
 
     def _apply_moisture_precipitation_logic(
-        self, forecast_condition: str, meteorological_state: Dict[str, Any]
+        self,
+        forecast_condition: str,
+        meteorological_state: Dict[str, Any],
+        day_idx: int,
     ) -> str:
         """Apply moisture analysis for precipitation potential.
+
+        Only applies to current day (day_idx == 0) to avoid false rain predictions
+        for future days based on current moisture conditions.
 
         Args:
             forecast_condition: Current forecast condition
             meteorological_state: Meteorological state analysis
+            day_idx: Day index (0-4)
 
         Returns:
             str: Updated forecast condition based on moisture analysis
         """
+        # Only apply moisture precipitation logic to the current day
+        # Future days should rely on pressure systems and evolution patterns
+        if day_idx != 0:
+            return forecast_condition
+
         moisture_analysis = meteorological_state["moisture_analysis"]
         condensation_potential = moisture_analysis.get("condensation_potential", 0.3)
 

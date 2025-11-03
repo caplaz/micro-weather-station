@@ -389,3 +389,47 @@ class TestDailyForecastGenerator:
 
         # Sunny should have larger range than cloudy
         assert range_sunny >= range_cloudy
+
+    def test_apply_moisture_precipitation_logic_current_day_only(
+        self, daily_forecast_generator
+    ):
+        """Test that moisture precipitation logic is only applied to current day."""
+        meteorological_state = {
+            "moisture_analysis": {
+                "condensation_potential": 0.8
+            }  # High condensation potential
+        }
+
+        # Test current day (day_idx == 0): should change cloudy to rainy
+        result_current_day = (
+            daily_forecast_generator._apply_moisture_precipitation_logic(
+                ATTR_CONDITION_CLOUDY, meteorological_state, 0
+            )
+        )
+        assert result_current_day == ATTR_CONDITION_RAINY
+
+        # Test future days (day_idx > 0): should keep cloudy condition
+        for day_idx in range(1, 5):
+            result_future_day = (
+                daily_forecast_generator._apply_moisture_precipitation_logic(
+                    ATTR_CONDITION_CLOUDY, meteorological_state, day_idx
+                )
+            )
+            assert result_future_day == ATTR_CONDITION_CLOUDY
+
+    def test_apply_moisture_precipitation_logic_low_condensation(
+        self, daily_forecast_generator
+    ):
+        """Test that moisture precipitation logic doesn't trigger with low condensation potential."""
+        meteorological_state = {
+            "moisture_analysis": {
+                "condensation_potential": 0.5
+            }  # Low condensation potential
+        }
+
+        # Should not change condition regardless of day
+        for day_idx in range(5):
+            result = daily_forecast_generator._apply_moisture_precipitation_logic(
+                ATTR_CONDITION_CLOUDY, meteorological_state, day_idx
+            )
+            assert result == ATTR_CONDITION_CLOUDY
