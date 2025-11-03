@@ -100,85 +100,16 @@ class HourlyForecastGenerator:
             List[Dict[str, Any]]: 24-hour forecast with detailed hourly predictions
         """
         try:
-            hourly_forecast: List[Dict[str, Any]] = []
-
-            for hour_idx in range(24):
-                # Start from the current hour (rounded down) and add hourly intervals
-                current_hour = dt_util.now().replace(minute=0, second=0, microsecond=0)
-                forecast_time = current_hour + timedelta(hours=hour_idx)
-
-                # Determine astronomical context
-                astronomical_context = self._calculate_astronomical_context(
-                    forecast_time, sunrise_time, sunset_time, hour_idx
-                )
-
-                # Advanced hourly temperature with multi-factor modulation
-                forecast_temp = self.forecast_temperature(
-                    hour_idx,
-                    current_temp,
-                    astronomical_context,
-                    meteorological_state,
-                    hourly_patterns,
-                    micro_evolution,
-                )
-
-                # Advanced hourly condition with micro-evolution
-                # Use previous hour's condition as base for current hour (except first hour)
-                base_condition = current_condition
-                if hour_idx > 0:
-                    base_condition = hourly_forecast[hour_idx - 1][KEY_CONDITION]
-
-                forecast_condition = self.forecast_condition(
-                    hour_idx,
-                    base_condition,
-                    astronomical_context,
-                    meteorological_state,
-                    hourly_patterns,
-                    micro_evolution,
-                )
-
-                # Advanced hourly precipitation with moisture transport
-                precipitation = self._forecast_precipitation(
-                    hour_idx,
-                    forecast_condition,
-                    meteorological_state,
-                    hourly_patterns,
-                    sensor_data,
-                )
-
-                # Advanced hourly wind with boundary layer effects
-                wind_speed = self._forecast_wind(
-                    hour_idx,
-                    sensor_data.get(
-                        KEY_WIND_SPEED, ForecastConstants.DEFAULT_WIND_SPEED
-                    ),
-                    forecast_condition,
-                    meteorological_state,
-                    hourly_patterns,
-                )
-
-                # Advanced hourly humidity with moisture dynamics
-                humidity = self._forecast_humidity(
-                    hour_idx,
-                    sensor_data.get(KEY_HUMIDITY, ForecastConstants.DEFAULT_HUMIDITY),
-                    meteorological_state,
-                    hourly_patterns,
-                    forecast_condition,
-                )
-
-                hourly_forecast.append(
-                    {
-                        "datetime": forecast_time.replace(tzinfo=None).isoformat(),
-                        KEY_TEMPERATURE: round(forecast_temp, 1),
-                        KEY_CONDITION: forecast_condition,
-                        KEY_PRECIPITATION: round(precipitation, 2),
-                        KEY_WIND_SPEED: round(wind_speed, 1),
-                        KEY_HUMIDITY: round(humidity, 0),
-                        "is_nighttime": not astronomical_context["is_daytime"],
-                    }
-                )
-
-            return hourly_forecast
+            return self._generate_hourly_forecast_loop(
+                current_temp,
+                current_condition,
+                sensor_data,
+                sunrise_time,
+                sunset_time,
+                meteorological_state,
+                hourly_patterns,
+                micro_evolution,
+            )
         except Exception as e:
             # Log error and return a simple default forecast to prevent UI issues
             _LOGGER.warning("Comprehensive hourly forecast generation failed: %s", e)
@@ -230,6 +161,110 @@ class HourlyForecastGenerator:
                     }
                 )
             return fallback_forecast
+
+    def _generate_hourly_forecast_loop(
+        self,
+        current_temp: float,
+        current_condition: str,
+        sensor_data: Dict[str, Any],
+        sunrise_time: Optional[datetime],
+        sunset_time: Optional[datetime],
+        meteorological_state: Dict[str, Any],
+        hourly_patterns: Dict[str, Any],
+        micro_evolution: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Generate the main 24-hour forecast loop.
+
+        Args:
+            current_temp: Current temperature in Celsius
+            current_condition: Current weather condition
+            sensor_data: Current sensor data in imperial units
+            sunrise_time: Sunrise time for astronomical calculations
+            sunset_time: Sunset time for astronomical calculations
+            meteorological_state: Comprehensive meteorological state analysis
+            hourly_patterns: Hourly weather patterns
+            micro_evolution: Micro-evolution model
+
+        Returns:
+            List[Dict[str, Any]]: 24-hour forecast with detailed hourly predictions
+        """
+        hourly_forecast: List[Dict[str, Any]] = []
+
+        for hour_idx in range(24):
+            # Start from the current hour (rounded down) and add hourly intervals
+            current_hour = dt_util.now().replace(minute=0, second=0, microsecond=0)
+            forecast_time = current_hour + timedelta(hours=hour_idx)
+
+            # Determine astronomical context
+            astronomical_context = self._calculate_astronomical_context(
+                forecast_time, sunrise_time, sunset_time, hour_idx
+            )
+
+            # Advanced hourly temperature with multi-factor modulation
+            forecast_temp = self.forecast_temperature(
+                hour_idx,
+                current_temp,
+                astronomical_context,
+                meteorological_state,
+                hourly_patterns,
+                micro_evolution,
+            )
+
+            # Advanced hourly condition with micro-evolution
+            # Use previous hour's condition as base for current hour (except first hour)
+            base_condition = current_condition
+            if hour_idx > 0:
+                base_condition = hourly_forecast[hour_idx - 1][KEY_CONDITION]
+
+            forecast_condition = self.forecast_condition(
+                hour_idx,
+                base_condition,
+                astronomical_context,
+                meteorological_state,
+                hourly_patterns,
+                micro_evolution,
+            )
+
+            # Advanced hourly precipitation with moisture transport
+            precipitation = self._forecast_precipitation(
+                hour_idx,
+                forecast_condition,
+                meteorological_state,
+                hourly_patterns,
+                sensor_data,
+            )
+
+            # Advanced hourly wind with boundary layer effects
+            wind_speed = self._forecast_wind(
+                hour_idx,
+                sensor_data.get(KEY_WIND_SPEED, ForecastConstants.DEFAULT_WIND_SPEED),
+                forecast_condition,
+                meteorological_state,
+                hourly_patterns,
+            )
+
+            # Advanced hourly humidity with moisture dynamics
+            humidity = self._forecast_humidity(
+                hour_idx,
+                sensor_data.get(KEY_HUMIDITY, ForecastConstants.DEFAULT_HUMIDITY),
+                meteorological_state,
+                hourly_patterns,
+                forecast_condition,
+            )
+
+            hourly_forecast.append(
+                {
+                    "datetime": forecast_time.replace(tzinfo=None).isoformat(),
+                    KEY_TEMPERATURE: round(forecast_temp, 1),
+                    KEY_CONDITION: forecast_condition,
+                    KEY_PRECIPITATION: round(precipitation, 2),
+                    KEY_WIND_SPEED: round(wind_speed, 1),
+                    KEY_HUMIDITY: round(humidity, 0),
+                    "is_nighttime": not astronomical_context["is_daytime"],
+                }
+            )
+
+        return hourly_forecast
 
     def forecast_temperature(
         self,

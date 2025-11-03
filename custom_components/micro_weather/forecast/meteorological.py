@@ -9,7 +9,7 @@ This module handles comprehensive meteorological analysis including:
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from ..analysis.atmospheric import AtmosphericAnalyzer
 from ..analysis.core import WeatherConditionAnalyzer
@@ -98,6 +98,86 @@ class MeteorologicalAnalyzer:
             - cloud_analysis: Cloud cover percentage, type, and solar efficiency
             - moisture_analysis: Moisture transport and condensation potential
             - wind_pattern_analysis: Wind shear intensity and gradient effects
+        """
+        # Get validated trend analyses
+        pressure_analysis, wind_analysis, temp_trends, humidity_trends, wind_trends = (
+            self._get_validated_trend_analyses(altitude)
+        )
+
+        # Get validated sensor data
+        (
+            current_temp,
+            current_humidity,
+            current_pressure,
+            current_wind,
+            solar_radiation,
+            solar_lux,
+            uv_index,
+        ) = self._get_validated_sensor_data(sensor_data)
+
+        # Calculate derived meteorological values
+        dewpoint, temp_dewpoint_spread = self._calculate_derived_values(
+            current_temp, current_humidity
+        )
+
+        # Atmospheric stability analysis
+        stability_index = self.calculate_atmospheric_stability(
+            current_temp, current_humidity, current_wind, pressure_analysis
+        )
+
+        # Weather system classification
+        weather_system = self.classify_weather_system(
+            pressure_analysis, wind_analysis, temp_trends, stability_index
+        )
+
+        # Cloud cover and solar analysis
+        cloud_analysis = self._analyze_cloud_cover_comprehensive(
+            solar_radiation, solar_lux, uv_index, sensor_data, pressure_analysis
+        )
+
+        # Moisture transport analysis
+        moisture_analysis = self._analyze_moisture_transport(
+            current_humidity, humidity_trends, wind_analysis, temp_dewpoint_spread
+        )
+
+        # Wind pattern analysis
+        wind_pattern_analysis = self._analyze_wind_patterns(
+            current_wind, wind_trends, wind_analysis, pressure_analysis
+        )
+
+        return {
+            "pressure_analysis": pressure_analysis,
+            "wind_analysis": wind_analysis,
+            "temp_trends": temp_trends,
+            "humidity_trends": humidity_trends,
+            "wind_trends": wind_trends,
+            "current_conditions": {
+                KEY_TEMPERATURE: current_temp,
+                KEY_HUMIDITY: current_humidity,
+                KEY_PRESSURE: current_pressure,
+                KEY_WIND_SPEED: current_wind,
+                "dewpoint": dewpoint,
+                "temp_dewpoint_spread": temp_dewpoint_spread,
+            },
+            "atmospheric_stability": stability_index,
+            "weather_system": weather_system,
+            "cloud_analysis": cloud_analysis,
+            "moisture_analysis": moisture_analysis,
+            "wind_pattern_analysis": wind_pattern_analysis,
+        }
+
+    def _get_validated_trend_analyses(
+        self, altitude: Optional[float]
+    ) -> Tuple[
+        Dict[str, Any], Dict[str, Any], Dict[str, Any], Dict[str, Any], Dict[str, Any]
+    ]:
+        """Validate and retrieve all trend analyses with fallback handling.
+
+        Args:
+            altitude: Altitude for pressure analysis
+
+        Returns:
+            Tuple of (pressure_analysis, wind_analysis, temp_trends, humidity_trends, wind_trends)
         """
         # Get all available trend analyses with error handling for mock objects
         try:
@@ -188,7 +268,27 @@ class MeteorologicalAnalyzer:
         except (AttributeError, TypeError):
             wind_trends = {"trend": 0, "volatility": 2.0}
 
-        # Extract current sensor values with mock handling
+        return (
+            pressure_analysis,
+            wind_analysis,
+            temp_trends,
+            humidity_trends,
+            wind_trends,
+        )
+
+    def _get_validated_sensor_data(
+        self, sensor_data: Dict[str, Any]
+    ) -> Tuple[float, float, float, float, float, float, float]:
+        """Extract and validate current sensor data with mock handling.
+
+        Args:
+            sensor_data: Raw sensor data dictionary
+
+        Returns:
+            Tuple of (current_temp, current_humidity, current_pressure, current_wind,
+                     solar_radiation, solar_lux, uv_index)
+        """
+        # Temperature extraction with fallback
         current_temp = (
             sensor_data.get(KEY_TEMPERATURE)
             or sensor_data.get(KEY_OUTDOOR_TEMP)
@@ -199,12 +299,14 @@ class MeteorologicalAnalyzer:
         ):
             current_temp = DefaultSensorValues.TEMPERATURE_F
 
+        # Humidity extraction with fallback
         current_humidity = sensor_data.get(KEY_HUMIDITY, DefaultSensorValues.HUMIDITY)
         if hasattr(current_humidity, "_mock_name") or not isinstance(
             current_humidity, (int, float)
         ):
             current_humidity = DefaultSensorValues.HUMIDITY
 
+        # Pressure extraction with fallback
         current_pressure = sensor_data.get(
             KEY_PRESSURE, DefaultSensorValues.PRESSURE_INHG
         )
@@ -213,12 +315,14 @@ class MeteorologicalAnalyzer:
         ):
             current_pressure = DefaultSensorValues.PRESSURE_INHG
 
+        # Wind speed extraction with fallback
         current_wind = sensor_data.get(KEY_WIND_SPEED, DefaultSensorValues.WIND_SPEED)
         if hasattr(current_wind, "_mock_name") or not isinstance(
             current_wind, (int, float)
         ):
             current_wind = DefaultSensorValues.WIND_SPEED
 
+        # Solar data extraction with fallbacks
         solar_radiation = sensor_data.get(
             KEY_SOLAR_RADIATION, DefaultSensorValues.SOLAR_RADIATION
         )
@@ -237,6 +341,28 @@ class MeteorologicalAnalyzer:
         if hasattr(uv_index, "_mock_name") or not isinstance(uv_index, (int, float)):
             uv_index = 0.0
 
+        return (
+            current_temp,
+            current_humidity,
+            current_pressure,
+            current_wind,
+            solar_radiation,
+            solar_lux,
+            uv_index,
+        )
+
+    def _calculate_derived_values(
+        self, current_temp: float, current_humidity: float
+    ) -> Tuple[float, float]:
+        """Calculate derived meteorological values like dewpoint and temperature-dewpoint spread.
+
+        Args:
+            current_temp: Current temperature in °F
+            current_humidity: Current relative humidity in %
+
+        Returns:
+            Tuple of (dewpoint, temp_dewpoint_spread)
+        """
         # Calculate dewpoint with error handling
         try:
             dewpoint = self.core_analyzer.calculate_dewpoint(
@@ -264,6 +390,7 @@ class MeteorologicalAnalyzer:
         if dewpoint is None or not isinstance(dewpoint, (int, float)):
             dewpoint = current_temp - (100 - 50) / 5.0
 
+        # Temperature-dewpoint spread calculation
         try:
             temp_dewpoint_spread = current_temp - dewpoint
             if not isinstance(temp_dewpoint_spread, (int, float)):
@@ -271,51 +398,7 @@ class MeteorologicalAnalyzer:
         except (TypeError, ValueError):
             temp_dewpoint_spread = 5.0
 
-        # Atmospheric stability analysis
-        stability_index = self.calculate_atmospheric_stability(
-            current_temp, current_humidity, current_wind, pressure_analysis
-        )
-
-        # Weather system classification
-        weather_system = self.classify_weather_system(
-            pressure_analysis, wind_analysis, temp_trends, stability_index
-        )
-
-        # Cloud cover and solar analysis
-        cloud_analysis = self._analyze_cloud_cover_comprehensive(
-            solar_radiation, solar_lux, uv_index, sensor_data, pressure_analysis
-        )
-
-        # Moisture transport analysis
-        moisture_analysis = self._analyze_moisture_transport(
-            current_humidity, humidity_trends, wind_analysis, temp_dewpoint_spread
-        )
-
-        # Wind pattern analysis
-        wind_pattern_analysis = self._analyze_wind_patterns(
-            current_wind, wind_trends, wind_analysis, pressure_analysis
-        )
-
-        return {
-            "pressure_analysis": pressure_analysis,
-            "wind_analysis": wind_analysis,
-            "temp_trends": temp_trends,
-            "humidity_trends": humidity_trends,
-            "wind_trends": wind_trends,
-            "current_conditions": {
-                KEY_TEMPERATURE: current_temp,
-                KEY_HUMIDITY: current_humidity,
-                KEY_PRESSURE: current_pressure,
-                KEY_WIND_SPEED: current_wind,
-                "dewpoint": dewpoint,
-                "temp_dewpoint_spread": temp_dewpoint_spread,
-            },
-            "atmospheric_stability": stability_index,
-            "weather_system": weather_system,
-            "cloud_analysis": cloud_analysis,
-            "moisture_analysis": moisture_analysis,
-            "wind_pattern_analysis": wind_pattern_analysis,
-        }
+        return dewpoint, temp_dewpoint_spread
 
     def calculate_atmospheric_stability(
         self,

@@ -254,6 +254,51 @@ class DailyForecastGenerator:
         # Start with current condition as base
         forecast_condition = current_condition
 
+        # Apply evolution stage mapping for future days
+        forecast_condition = self._apply_evolution_stage_mapping(
+            forecast_condition, day_idx, system_evolution, current_condition
+        )
+
+        # Apply pressure system overrides for day 0
+        forecast_condition = self._apply_pressure_system_overrides(
+            forecast_condition, day_idx, meteorological_state, system_evolution
+        )
+
+        # Apply cloud cover analysis for future days
+        forecast_condition = self._apply_cloud_cover_analysis(
+            forecast_condition, day_idx, meteorological_state, system_evolution
+        )
+
+        # Apply moisture analysis for precipitation potential
+        forecast_condition = self._apply_moisture_precipitation_logic(
+            forecast_condition, meteorological_state
+        )
+
+        # Apply storm probability overrides (highest priority)
+        forecast_condition = self._apply_storm_probability_overrides(
+            forecast_condition, day_idx, meteorological_state
+        )
+
+        return forecast_condition
+
+    def _apply_evolution_stage_mapping(
+        self,
+        forecast_condition: str,
+        day_idx: int,
+        system_evolution: Dict[str, Any],
+        current_condition: str,
+    ) -> str:
+        """Apply evolution stage mapping for future days.
+
+        Args:
+            forecast_condition: Current forecast condition
+            day_idx: Day index (0-4)
+            system_evolution: System evolution model
+            current_condition: Current weather condition
+
+        Returns:
+            str: Updated forecast condition based on evolution stage
+        """
         # Get evolution stage for this day (skip for day 0)
         if day_idx > 0:
             evolution_path = system_evolution.get("evolution_path", [])
@@ -281,103 +326,153 @@ class DailyForecastGenerator:
                     evolution_stage, current_condition
                 )
 
-        # Apply pressure system influence
+        return forecast_condition
+
+    def _apply_pressure_system_overrides(
+        self,
+        forecast_condition: str,
+        day_idx: int,
+        meteorological_state: Dict[str, Any],
+        system_evolution: Dict[str, Any],
+    ) -> str:
+        """Apply pressure system overrides for day 0 forecasting.
+
+        Args:
+            forecast_condition: Current forecast condition
+            day_idx: Day index (0-4)
+            meteorological_state: Meteorological state analysis
+            system_evolution: System evolution model
+
+        Returns:
+            str: Updated forecast condition based on pressure systems
+        """
+        if day_idx != 0:
+            return forecast_condition
+
         pressure_system = meteorological_state["pressure_analysis"].get(
             "pressure_system", "normal"
         )
         storm_probability = meteorological_state["pressure_analysis"].get(
             "storm_probability", 0
         )
-
-        # Apply cloud analysis influence
         cloud_analysis = meteorological_state["cloud_analysis"]
         cloud_cover = cloud_analysis.get("cloud_cover", 50)
 
-        # Override condition based on cloud cover if confidence is high
+        # Get confidence value
         confidence = system_evolution.get("confidence_levels", [0.5])
-        if confidence and len(confidence) > min(day_idx, len(confidence) - 1):
-            confidence_value = confidence[min(day_idx, len(confidence) - 1)]
-        else:
-            confidence_value = 0.5
+        confidence_value = confidence[0] if confidence else 0.5
+        confidence_value = max(
+            confidence_value, ForecastConstants.DAY_ZERO_MIN_CONFIDENCE
+        )
 
-        # For day 0, use higher confidence for cloud cover analysis
-        if day_idx == 0:
-            confidence_value = max(
-                confidence_value, ForecastConstants.DAY_ZERO_MIN_CONFIDENCE
-            )
+        current_trend = meteorological_state["pressure_analysis"].get(
+            "current_trend", 0
+        )
 
-        # For day 0, be conservative but allow pressure-driven overrides
-        if day_idx == 0:
-            # Use pressure trends to determine if we should override current condition
-            pressure_system = meteorological_state["pressure_analysis"].get(
-                "pressure_system", "normal"
-            )
-            storm_probability = meteorological_state["pressure_analysis"].get(
-                "storm_probability", 0
-            )
-            current_trend = meteorological_state["pressure_analysis"].get(
-                "current_trend", 0
-            )
+        # High pressure systems improve conditions
+        if (
+            pressure_system == "high_pressure"
+            and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
+        ):
+            if cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:  # < 75%
+                forecast_condition = (
+                    ATTR_CONDITION_SUNNY
+                    if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY
+                    else ATTR_CONDITION_PARTLYCLOUDY
+                )
 
-            # High pressure systems improve conditions
+        # Low pressure systems worsen conditions
+        elif (
+            pressure_system == "low_pressure"
+            and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
+        ):
+            if cloud_cover > CloudCoverThresholds.THRESHOLD_SUNNY:  # > 20%
+                forecast_condition = ATTR_CONDITION_CLOUDY
+
+        # Normal pressure systems: use trend direction
+        elif (
+            pressure_system == "normal"
+            and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
+        ):
             if (
-                pressure_system == "high_pressure"
-                and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
-            ):
-                if cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:  # < 75%
+                current_trend < -ForecastConstants.PRESSURE_TREND_FALLING_THRESHOLD
+            ):  # Falling pressure in normal system
+                if cloud_cover > CloudCoverThresholds.THRESHOLD_SUNNY:
+                    forecast_condition = ATTR_CONDITION_CLOUDY
+            elif (
+                current_trend > ForecastConstants.PRESSURE_TREND_RISING_THRESHOLD
+            ):  # Rising pressure in normal system
+                if cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:
                     forecast_condition = (
                         ATTR_CONDITION_SUNNY
                         if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY
                         else ATTR_CONDITION_PARTLYCLOUDY
                     )
 
-            # Low pressure systems worsen conditions
-            elif (
-                pressure_system == "low_pressure"
-                and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
-            ):
-                if cloud_cover > CloudCoverThresholds.THRESHOLD_SUNNY:  # > 20%
-                    forecast_condition = ATTR_CONDITION_CLOUDY
+        # High storm probability always indicates precipitation
+        if storm_probability > ForecastConstants.STORM_PRECIPITATION_THRESHOLD:
+            forecast_condition = (
+                ATTR_CONDITION_LIGHTNING_RAINY
+                if storm_probability > ForecastConstants.STORM_THRESHOLD_SEVERE
+                else ATTR_CONDITION_RAINY
+            )
 
-            # Normal pressure systems: use trend direction
-            elif (
-                pressure_system == "normal"
-                and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
-            ):
-                if (
-                    current_trend < -ForecastConstants.PRESSURE_TREND_FALLING_THRESHOLD
-                ):  # Falling pressure in normal system
-                    if cloud_cover > CloudCoverThresholds.THRESHOLD_SUNNY:
-                        forecast_condition = ATTR_CONDITION_CLOUDY
-                elif (
-                    current_trend > ForecastConstants.PRESSURE_TREND_RISING_THRESHOLD
-                ):  # Rising pressure in normal system
-                    if cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:
-                        forecast_condition = (
-                            ATTR_CONDITION_SUNNY
-                            if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY
-                            else ATTR_CONDITION_PARTLYCLOUDY
-                        )
+        return forecast_condition
 
-            # High storm probability always indicates precipitation
-            if storm_probability > ForecastConstants.STORM_PRECIPITATION_THRESHOLD:
-                forecast_condition = (
-                    ATTR_CONDITION_LIGHTNING_RAINY
-                    if storm_probability > ForecastConstants.STORM_THRESHOLD_SEVERE
-                    else ATTR_CONDITION_RAINY
-                )
+    def _apply_cloud_cover_analysis(
+        self,
+        forecast_condition: str,
+        day_idx: int,
+        meteorological_state: Dict[str, Any],
+        system_evolution: Dict[str, Any],
+    ) -> str:
+        """Apply cloud cover analysis for future days.
 
+        Args:
+            forecast_condition: Current forecast condition
+            day_idx: Day index (0-4)
+            meteorological_state: Meteorological state analysis
+            system_evolution: System evolution model
+
+        Returns:
+            str: Updated forecast condition based on cloud cover
+        """
+        if day_idx == 0:
+            return forecast_condition
+
+        cloud_analysis = meteorological_state["cloud_analysis"]
+        cloud_cover = cloud_analysis.get("cloud_cover", 50)
+
+        # Get confidence value
+        confidence = system_evolution.get("confidence_levels", [0.5])
+        if confidence and len(confidence) > min(day_idx, len(confidence) - 1):
+            confidence_value = confidence[min(day_idx, len(confidence) - 1)]
         else:
-            # For future days, apply normal cloud cover logic
-            if confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH:
-                if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY:
-                    forecast_condition = ATTR_CONDITION_SUNNY
-                elif (
-                    cloud_cover > ForecastConstants.CLOUD_COVER_CLOUDY_THRESHOLD
-                ):  # Lower threshold for cloudy
-                    forecast_condition = ATTR_CONDITION_CLOUDY
+            confidence_value = 0.5
 
-        # Apply moisture analysis for precipitation potential
+        # For future days, apply normal cloud cover logic
+        if confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH:
+            if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY:
+                forecast_condition = ATTR_CONDITION_SUNNY
+            elif (
+                cloud_cover > ForecastConstants.CLOUD_COVER_CLOUDY_THRESHOLD
+            ):  # Lower threshold for cloudy
+                forecast_condition = ATTR_CONDITION_CLOUDY
+
+        return forecast_condition
+
+    def _apply_moisture_precipitation_logic(
+        self, forecast_condition: str, meteorological_state: Dict[str, Any]
+    ) -> str:
+        """Apply moisture analysis for precipitation potential.
+
+        Args:
+            forecast_condition: Current forecast condition
+            meteorological_state: Meteorological state analysis
+
+        Returns:
+            str: Updated forecast condition based on moisture analysis
+        """
         moisture_analysis = meteorological_state["moisture_analysis"]
         condensation_potential = moisture_analysis.get("condensation_potential", 0.3)
 
@@ -386,6 +481,31 @@ class DailyForecastGenerator:
             and forecast_condition == ATTR_CONDITION_CLOUDY
         ):
             forecast_condition = ATTR_CONDITION_RAINY
+
+        return forecast_condition
+
+    def _apply_storm_probability_overrides(
+        self,
+        forecast_condition: str,
+        day_idx: int,
+        meteorological_state: Dict[str, Any],
+    ) -> str:
+        """Apply storm probability overrides (highest priority).
+
+        Args:
+            forecast_condition: Current forecast condition
+            day_idx: Day index (0-4)
+            meteorological_state: Meteorological state analysis
+
+        Returns:
+            str: Updated forecast condition based on storm probability
+        """
+        storm_probability = meteorological_state["pressure_analysis"].get(
+            "storm_probability", 0
+        )
+        pressure_system = meteorological_state["pressure_analysis"].get(
+            "pressure_system", "normal"
+        )
 
         # Storm probability override (highest priority)
         if storm_probability >= ForecastConstants.STORM_THRESHOLD_SEVERE:
@@ -566,9 +686,54 @@ class DailyForecastGenerator:
         Returns:
             float: Forecasted precipitation in mm (or inches based on sensor units)
         """
-        base_precipitation = 0.0
+        # Get base precipitation by condition
+        precipitation = self._get_base_precipitation_by_condition(condition)
 
-        # Base precipitation by condition
+        # Apply storm probability enhancement
+        storm_probability = meteorological_state["pressure_analysis"].get(
+            "storm_probability", 0
+        )
+        precipitation = self._apply_storm_probability_enhancement(
+            precipitation, storm_probability
+        )
+
+        # Apply pressure trend adjustments
+        pressure_trend = meteorological_state["pressure_analysis"].get(
+            "current_trend", 0
+        )
+        precipitation = self._apply_pressure_trend_adjustment(
+            precipitation, pressure_trend
+        )
+
+        # Apply moisture factors
+        moisture_analysis = meteorological_state["moisture_analysis"]
+        precipitation = self._apply_moisture_factors(precipitation, moisture_analysis)
+
+        # Apply atmospheric stability
+        stability = meteorological_state["atmospheric_stability"]
+        precipitation = self._apply_atmospheric_stability(precipitation, stability)
+
+        # Apply historical patterns
+        precipitation = self._apply_historical_patterns(
+            precipitation, historical_patterns, day_idx
+        )
+
+        # Apply distance dampening and unit conversion
+        precipitation = self._apply_distance_dampening(
+            precipitation, day_idx, sensor_data
+        )
+
+        return precipitation
+
+    def _get_base_precipitation_by_condition(self, condition: str) -> float:
+        """Get base precipitation amount based on weather condition.
+
+        Args:
+            condition: Weather condition string
+
+        Returns:
+            float: Base precipitation amount in mm
+        """
         condition_precip = {
             ATTR_CONDITION_LIGHTNING_RAINY: PrecipitationConstants.LIGHTNING_RAINY,
             ATTR_CONDITION_POURING: PrecipitationConstants.POURING,
@@ -577,59 +742,114 @@ class DailyForecastGenerator:
             ATTR_CONDITION_CLOUDY: PrecipitationConstants.CLOUDY,
             ATTR_CONDITION_FOG: PrecipitationConstants.FOG,
         }
-        base_precipitation = condition_precip.get(condition, 0.0)
+        return condition_precip.get(condition, 0.0)
 
-        # Storm probability enhancement (pressure-based)
-        storm_probability = meteorological_state["pressure_analysis"].get(
-            "storm_probability", 0
-        )
+    def _apply_storm_probability_enhancement(
+        self, precipitation: float, storm_probability: float
+    ) -> float:
+        """Apply storm probability enhancement to precipitation.
+
+        Args:
+            precipitation: Current precipitation amount
+            storm_probability: Storm probability percentage
+
+        Returns:
+            float: Enhanced precipitation amount
+        """
         if storm_probability > ForecastConstants.STORM_THRESHOLD_HIGH:
-            base_precipitation *= ForecastConstants.PRECIP_MULT_STORM_HIGH
+            precipitation *= ForecastConstants.PRECIP_MULT_STORM_HIGH
         elif storm_probability > ForecastConstants.STORM_THRESHOLD_MODERATE:
-            base_precipitation *= ForecastConstants.PRECIP_MULT_STORM_MODERATE
+            precipitation *= ForecastConstants.PRECIP_MULT_STORM_MODERATE
+        return precipitation
 
-        # Pressure tendency: falling pressure = increased rain likelihood
-        # This correlates strongly with actual precipitation
-        pressure_trend = meteorological_state["pressure_analysis"].get(
-            "current_trend", 0
-        )
+    def _apply_pressure_trend_adjustment(
+        self, precipitation: float, pressure_trend: float
+    ) -> float:
+        """Apply pressure trend adjustments to precipitation.
+
+        Args:
+            precipitation: Current precipitation amount
+            pressure_trend: Pressure trend value
+
+        Returns:
+            float: Adjusted precipitation amount
+        """
         if pressure_trend < -abs(
             ForecastConstants.PRESSURE_RAPID_FALL
         ):  # Rapidly falling pressure
-            base_precipitation *= ForecastConstants.PRECIP_MULT_RAPID_FALL
+            precipitation *= ForecastConstants.PRECIP_MULT_RAPID_FALL
         elif pressure_trend < -abs(
             ForecastConstants.PRESSURE_SLOW_FALL
         ):  # Slowly falling pressure
-            base_precipitation *= ForecastConstants.PRECIP_MULT_SLOW_FALL
+            precipitation *= ForecastConstants.PRECIP_MULT_SLOW_FALL
         elif (
             pressure_trend > ForecastConstants.PRESSURE_MODERATE_RISE
         ):  # Rising pressure (clearing)
-            base_precipitation *= ForecastConstants.PRECIP_MULT_RISING
+            precipitation *= ForecastConstants.PRECIP_MULT_RISING
+        return precipitation
 
-        # Moisture transport and condensation potential (higher = more rain)
-        moisture_analysis = meteorological_state["moisture_analysis"]
+    def _apply_moisture_factors(
+        self, precipitation: float, moisture_analysis: Dict[str, Any]
+    ) -> float:
+        """Apply moisture transport and condensation factors to precipitation.
+
+        Args:
+            precipitation: Current precipitation amount
+            moisture_analysis: Moisture analysis dictionary
+
+        Returns:
+            float: Adjusted precipitation amount
+        """
         transport_potential = moisture_analysis.get("transport_potential", 5)
         condensation_potential = moisture_analysis.get("condensation_potential", 0.3)
 
         moisture_factor = (
             transport_potential / ForecastConstants.MOISTURE_TRANSPORT_DIVISOR
         ) * condensation_potential
-        base_precipitation *= 1.0 + moisture_factor
+        precipitation *= 1.0 + moisture_factor
+        return precipitation
 
-        # Atmospheric stability: unstable air enhances convective precipitation
-        stability = meteorological_state["atmospheric_stability"]
+    def _apply_atmospheric_stability(
+        self, precipitation: float, stability: float
+    ) -> float:
+        """Apply atmospheric stability adjustments to precipitation.
+
+        Args:
+            precipitation: Current precipitation amount
+            stability: Atmospheric stability index (0-1)
+
+        Returns:
+            float: Adjusted precipitation amount
+        """
         instability_factor = 1.0 + (
             (1.0 - stability) * ForecastConstants.INSTABILITY_PRECIP_MULT
         )
-        base_precipitation *= instability_factor
+        precipitation *= instability_factor
+        return precipitation
 
+    def _apply_historical_patterns(
+        self,
+        precipitation: float,
+        historical_patterns: Dict[str, Any],
+        day_idx: int,
+    ) -> float:
+        """Apply historical pattern influences to precipitation.
+
+        Args:
+            precipitation: Current precipitation amount
+            historical_patterns: Historical patterns dictionary
+            day_idx: Day index (0-4)
+
+        Returns:
+            float: Adjusted precipitation amount
+        """
         # Use historical rain_rate patterns if available
         if KEY_RAIN_RATE in historical_patterns:
             rain_history = historical_patterns[KEY_RAIN_RATE]
             avg_rain = rain_history.get("mean", 0)
             if avg_rain > 0:
                 # If there's a history of rain, increase forecast slightly
-                base_precipitation *= max(
+                precipitation *= max(
                     1.0, 1.0 + (avg_rain / ForecastConstants.RAIN_HISTORY_NORMALIZER)
                 )
 
@@ -637,14 +857,28 @@ class DailyForecastGenerator:
         pattern_influence = self._calculate_historical_pattern_influence(
             historical_patterns, day_idx, KEY_PRECIPITATION
         )
-        base_precipitation += pattern_influence
+        precipitation += pattern_influence
+        return precipitation
 
+    def _apply_distance_dampening(
+        self, precipitation: float, day_idx: int, sensor_data: Dict[str, Any]
+    ) -> float:
+        """Apply distance-based dampening and unit conversion to precipitation.
+
+        Args:
+            precipitation: Current precipitation amount
+            day_idx: Day index (0-4)
+            sensor_data: Sensor data dictionary
+
+        Returns:
+            float: Final precipitation amount
+        """
         # Distance-based reduction (forecast uncertainty increases with time)
         distance_factor = max(
             ForecastConstants.DAILY_DISTANCE_FACTOR_MIN,
             1.0 - (day_idx * ForecastConstants.DAILY_DISTANCE_DECAY),
         )
-        base_precipitation *= distance_factor
+        precipitation *= distance_factor
 
         # Convert to sensor units if needed
         rain_rate_unit = sensor_data.get("rain_rate_unit")
@@ -653,9 +887,9 @@ class DailyForecastGenerator:
             and isinstance(rain_rate_unit, str)
             and any(unit in rain_rate_unit.lower() for unit in ["in", "inch", "inches"])
         ):
-            base_precipitation /= PrecipitationConstants.MM_TO_INCHES
+            precipitation /= PrecipitationConstants.MM_TO_INCHES
 
-        return round(max(0.0, base_precipitation), 2)
+        return round(max(0.0, precipitation), 2)
 
     def _forecast_wind(
         self,
