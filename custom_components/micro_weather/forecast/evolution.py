@@ -9,6 +9,8 @@ This module handles modeling how weather systems evolve over time:
 import logging
 from typing import Any, Dict
 
+from ..meteorological_constants import DiurnalPatternConstants, EvolutionConstants
+
 _LOGGER = logging.getLogger(__name__)
 
 # Type alias
@@ -63,7 +65,7 @@ class EvolutionModeler:
                 "transitional",
                 "new_system",
             ]
-            confidence_levels = [0.9, 0.7, 0.5, 0.3]
+            confidence_levels = list(EvolutionConstants.STABLE_HIGH_CONFIDENCE)
         elif system_type == "active_low":
             # Low pressure systems evolve quickly
             evolution_path = [
@@ -72,7 +74,7 @@ class EvolutionModeler:
                 "post_frontal",
                 "stabilizing",
             ]
-            confidence_levels = [0.8, 0.6, 0.4, 0.3]
+            confidence_levels = list(EvolutionConstants.ACTIVE_LOW_CONFIDENCE)
         elif system_type == "frontal_system":
             # Fronts move through relatively predictably
             evolution_path = [
@@ -81,11 +83,11 @@ class EvolutionModeler:
                 "post_frontal",
                 "clearing",
             ]
-            confidence_levels = [0.7, 0.8, 0.6, 0.4]
+            confidence_levels = list(EvolutionConstants.FRONTAL_SYSTEM_CONFIDENCE)
         else:
             # Default transitional pattern for undefined system types
             evolution_path = ["current", "transitioning", "new_pattern", "stabilizing"]
-            confidence_levels = [0.8, 0.5, 0.3, 0.2]
+            confidence_levels = list(EvolutionConstants.TRANSITIONAL_CONFIDENCE)
 
         evolution_model["evolution_path"] = evolution_path
         evolution_model["confidence_levels"] = confidence_levels
@@ -95,7 +97,9 @@ class EvolutionModeler:
         evolution_model["transition_probabilities"] = {
             "persistence": stability,
             "gradual_change": 1.0 - stability,
-            "rapid_change": max(0, (1.0 - stability) - 0.5),
+            "rapid_change": max(
+                0, (1.0 - stability) - EvolutionConstants.RAPID_CHANGE_THRESHOLD
+            ),
         }
 
         return evolution_model
@@ -129,7 +133,9 @@ class EvolutionModeler:
         # In a full implementation, this would include detailed micro-pattern analysis
         for hour_idx in range(hours):
             # Confidence degrades slightly with each hour
-            hour_confidence = confidence * (0.98**hour_idx)
+            hour_confidence = confidence * (
+                EvolutionConstants.HOURLY_CONFIDENCE_DECAY**hour_idx
+            )
 
             hourly_changes.append(
                 {
@@ -165,10 +171,16 @@ class EvolutionModeler:
         import math
 
         # Temperature micro-pattern (small variations)
-        temp_adjustment = math.sin(hour_idx * math.pi / 12) * 0.5
+        temp_adjustment = (
+            math.sin(hour_idx * math.pi / DiurnalPatternConstants.TEMP_MICRO_PERIOD)
+            * DiurnalPatternConstants.TEMP_MICRO_AMPLITUDE
+        )
 
         # Cloud micro-pattern (small variations)
-        cloud_adjustment = math.cos(hour_idx * math.pi / 8) * 2.0
+        cloud_adjustment = (
+            math.cos(hour_idx * math.pi / DiurnalPatternConstants.CLOUD_MICRO_PERIOD)
+            * DiurnalPatternConstants.CLOUD_MICRO_AMPLITUDE
+        )
 
         return {
             "temperature_adjustment": temp_adjustment,

@@ -74,23 +74,32 @@ class TestSolarAnalyzer:
 
     def test_analyze_cloud_cover_low_solar_radiation_fallback(self, analyzer):
         """Test cloud cover analysis with improved low solar radiation logic."""
+        # Clear any existing history
+        analyzer._sensor_history["cloud_cover"] = []
+
         # Test very low solar values (heavy overcast)
         cloud_cover_heavy = analyzer.analyze_cloud_cover(20.0, 3000.0, 0.0, 15.0)
         assert cloud_cover_heavy == pytest.approx(
-            78.0, abs=0.5
-        )  # Astronomical calculation
+            74.1, abs=0.5
+        )  # Weighted calculation: solar(78.8)*0.8 + lux(73.5)*0.15
+
+        # Clear history for next test
+        analyzer._sensor_history["cloud_cover"] = []
 
         # Test moderately low solar values (mostly cloudy)
         cloud_cover_mostly = analyzer.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
         assert cloud_cover_mostly == pytest.approx(
-            48.0, abs=0.5
-        )  # Astronomical calculation (UV ignored due to inconsistency)
+            21.5, abs=0.5
+        )  # Weighted: solar(20.5)*0.8 + lux(33.8)*0.15
+
+        # Clear history for next test
+        analyzer._sensor_history["cloud_cover"] = []
 
         # Test borderline low solar values (partly cloudy fallback)
         cloud_cover_fallback = analyzer.analyze_cloud_cover(150.0, 15000.0, 0.8, 20.0)
         assert cloud_cover_fallback == pytest.approx(
-            18.0, abs=0.5
-        )  # Astronomical calculation (UV ignored due to inconsistency)
+            7.7, abs=0.5
+        )  # Weighted: solar(5.6)*0.8 + lux(21.3)*0.15
 
         # Test that higher values don't trigger fallback
         cloud_cover_normal = analyzer.analyze_cloud_cover(250.0, 25000.0, 2.0, 30.0)

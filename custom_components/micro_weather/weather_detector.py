@@ -1,24 +1,4 @@
-"""Weather condition detector using real sensor data.
-
-This module implements advanced meteorological analysis to determine
-accurate weather conditions based on real sensor readings. It analyzes:
-
-- Precipitation patterns (rain rate, state detection)
-- Atmospheric pressure systems and trends
-- Solar radiation for cloud cover assessment
-- Wind patterns for storm identification
-- Temperature and humidity for fog detection
-- Dewpoint analysis for precipitation potential
-
-The detector uses scientific weather analysis principles to provide more
-accurate local weather conditions than external weather services.
-
-Classes:
-    WeatherDetector: Main weather analysis engine
-
-Author: caplaz
-License: MIT
-"""
+"""Weather condition detector for Micro Weather Station."""
 
 from collections import deque
 from datetime import datetime

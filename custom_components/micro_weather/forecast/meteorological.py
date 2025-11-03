@@ -27,8 +27,12 @@ from ..const import (
 )
 from ..meteorological_constants import (
     CloudCoverThresholds,
-    PressureThresholds,
+    DefaultSensorValues,
+    MoistureAnalysisConstants,
+    PressureTrendConstants,
+    StabilityConstants,
     TemperatureThresholds,
+    WindShearConstants,
     WindThresholds,
 )
 
@@ -71,11 +75,29 @@ class MeteorologicalAnalyzer:
         - Weather system classification and evolution potential
 
         Args:
-            sensor_data: Current sensor data in imperial units
-            altitude: Altitude for pressure corrections
+            sensor_data: Current sensor data in imperial units. Expected keys include:
+                - temperature/outdoor_temp: Temperature in °F
+                - humidity: Relative humidity in %
+                - pressure: Barometric pressure in inHg
+                - wind_speed: Wind speed in mph
+                - solar_radiation: Solar radiation in W/m²
+                - solar_lux: Solar illuminance in lux
+                - uv_index: UV index value
+            altitude: Altitude above sea level in feet for pressure corrections
 
         Returns:
-            Dict[str, Any]: Comprehensive meteorological state analysis
+            Dict containing comprehensive meteorological analysis with keys:
+            - pressure_analysis: Pressure system type, trends, and storm probability
+            - wind_analysis: Wind direction stability and gust factors
+            - temp_trends: Temperature trend and volatility over 24 hours
+            - humidity_trends: Humidity trend and volatility over 24 hours
+            - wind_trends: Wind speed trend and volatility over 24 hours
+            - current_conditions: Processed sensor values and calculated dewpoint
+            - atmospheric_stability: Stability index (0.0-1.0, higher = more stable)
+            - weather_system: Weather system classification and evolution potential
+            - cloud_analysis: Cloud cover percentage, type, and solar efficiency
+            - moisture_analysis: Moisture transport and condensation potential
+            - wind_pattern_analysis: Wind shear intensity and gradient effects
         """
         # Get all available trend analyses with error handling for mock objects
         try:
@@ -168,40 +190,48 @@ class MeteorologicalAnalyzer:
 
         # Extract current sensor values with mock handling
         current_temp = (
-            sensor_data.get(KEY_TEMPERATURE) or sensor_data.get(KEY_OUTDOOR_TEMP) or 70
+            sensor_data.get(KEY_TEMPERATURE)
+            or sensor_data.get(KEY_OUTDOOR_TEMP)
+            or DefaultSensorValues.TEMPERATURE_F
         )
         if hasattr(current_temp, "_mock_name") or not isinstance(
             current_temp, (int, float)
         ):
-            current_temp = 70.0
+            current_temp = DefaultSensorValues.TEMPERATURE_F
 
-        current_humidity = sensor_data.get(KEY_HUMIDITY, 50)
+        current_humidity = sensor_data.get(KEY_HUMIDITY, DefaultSensorValues.HUMIDITY)
         if hasattr(current_humidity, "_mock_name") or not isinstance(
             current_humidity, (int, float)
         ):
-            current_humidity = 50.0
+            current_humidity = DefaultSensorValues.HUMIDITY
 
-        current_pressure = sensor_data.get(KEY_PRESSURE, 29.92)
+        current_pressure = sensor_data.get(
+            KEY_PRESSURE, DefaultSensorValues.PRESSURE_INHG
+        )
         if hasattr(current_pressure, "_mock_name") or not isinstance(
             current_pressure, (int, float)
         ):
-            current_pressure = 29.92
+            current_pressure = DefaultSensorValues.PRESSURE_INHG
 
-        current_wind = sensor_data.get(KEY_WIND_SPEED, 5)
+        current_wind = sensor_data.get(KEY_WIND_SPEED, DefaultSensorValues.WIND_SPEED)
         if hasattr(current_wind, "_mock_name") or not isinstance(
             current_wind, (int, float)
         ):
-            current_wind = 5.0
+            current_wind = DefaultSensorValues.WIND_SPEED
 
-        solar_radiation = sensor_data.get(KEY_SOLAR_RADIATION, 0)
+        solar_radiation = sensor_data.get(
+            KEY_SOLAR_RADIATION, DefaultSensorValues.SOLAR_RADIATION
+        )
         if hasattr(solar_radiation, "_mock_name") or not isinstance(
             solar_radiation, (int, float)
         ):
-            solar_radiation = 0.0
+            solar_radiation = DefaultSensorValues.SOLAR_RADIATION
 
-        solar_lux = sensor_data.get(KEY_SOLAR_LUX_INTERNAL, 0)
+        solar_lux = sensor_data.get(
+            KEY_SOLAR_LUX_INTERNAL, DefaultSensorValues.SOLAR_RADIATION
+        )
         if hasattr(solar_lux, "_mock_name") or not isinstance(solar_lux, (int, float)):
-            solar_lux = 0.0
+            solar_lux = DefaultSensorValues.SOLAR_RADIATION
 
         uv_index = sensor_data.get(KEY_UV_INDEX, 0)
         if hasattr(uv_index, "_mock_name") or not isinstance(uv_index, (int, float)):
@@ -296,7 +326,19 @@ class MeteorologicalAnalyzer:
     ) -> float:
         """Calculate atmospheric stability index (0-1, higher = more stable).
 
-        Stability affects weather persistence and forecast accuracy.
+        Stability affects weather persistence and forecast accuracy. Combines factors:
+        - Temperature trends (stable vs unstable lapse rates)
+        - Wind speed (calm = stable, strong wind = unstable)
+        - Humidity levels (high humidity = stable, low = unstable)
+
+        Args:
+            temp: Current temperature in °F
+            humidity: Current relative humidity in %
+            wind_speed: Current wind speed in mph
+            pressure_analysis: Pressure analysis dict with 'long_term_trend' key
+
+        Returns:
+            float: Stability index from 0.0 (highly unstable) to 1.0 (highly stable)
         """
         stability = 0.5  # Neutral baseline
 
@@ -304,26 +346,26 @@ class MeteorologicalAnalyzer:
         temp_trend = pressure_analysis.get("long_term_trend", 0)
         if not isinstance(temp_trend, (int, float)):
             temp_trend = 0.0
-        if abs(temp_trend) < 2:
-            stability += 0.2
-        elif abs(temp_trend) > 5:
-            stability -= 0.2
+        if abs(temp_trend) < StabilityConstants.TEMP_TREND_STABLE:
+            stability += StabilityConstants.TEMP_STABLE_ADJUSTMENT
+        elif abs(temp_trend) > StabilityConstants.TEMP_TREND_UNSTABLE:
+            stability += StabilityConstants.TEMP_UNSTABLE_ADJUSTMENT
 
         # Wind effect
         if not isinstance(wind_speed, (int, float)):
-            wind_speed = 5.0
+            wind_speed = DefaultSensorValues.WIND_SPEED
         if wind_speed < WindThresholds.LIGHT_BREEZE:
-            stability += 0.15
+            stability += StabilityConstants.WIND_STABLE_ADJUSTMENT
         elif wind_speed > WindThresholds.MODERATE_BREEZE:
-            stability -= 0.15
+            stability += StabilityConstants.WIND_UNSTABLE_ADJUSTMENT
 
         # Humidity effect
         if not isinstance(humidity, (int, float)):
-            humidity = 50.0
+            humidity = DefaultSensorValues.HUMIDITY
         if humidity > TemperatureThresholds.HUMIDITY_MODERATE_HIGH:
-            stability += 0.1
-        elif humidity < 30:
-            stability -= 0.1
+            stability += StabilityConstants.HUMIDITY_HIGH_ADJUSTMENT
+        elif humidity < StabilityConstants.HUMIDITY_LOW_THRESHOLD:
+            stability += StabilityConstants.HUMIDITY_LOW_ADJUSTMENT
 
         return max(0.0, min(1.0, stability))
 
@@ -334,7 +376,25 @@ class MeteorologicalAnalyzer:
         temp_trends: Dict[str, Any],
         stability: float,
     ) -> Dict[str, Any]:
-        """Classify current weather system type and evolution potential."""
+        """Classify current weather system type and evolution potential.
+
+        Analyzes multiple meteorological factors to determine the dominant weather
+        pattern and its likely evolution. System types include stable high pressure,
+        active low pressure, frontal systems, air mass changes, and transitional patterns.
+
+        Args:
+            pressure_analysis: Pressure analysis with 'pressure_system' and 'storm_probability'
+            wind_analysis: Wind analysis with 'direction_stability' key
+            temp_trends: Temperature trends dict with 'trend' key
+            stability: Atmospheric stability index (0-1)
+
+        Returns:
+            Dict with weather system classification:
+            - type: System type (stable_high, active_low, frontal_system, etc.)
+            - evolution_potential: Expected change pattern (gradual, rapid_change, etc.)
+            - persistence_factor: Weather persistence likelihood (0-1)
+            - change_probability: Probability of weather change (0-1)
+        """
         pressure_system = pressure_analysis.get("pressure_system", "normal")
         wind_stability = wind_analysis.get("direction_stability", 0.5)
         temp_trend = temp_trends.get("trend", 0) if temp_trends else 0
@@ -343,18 +403,29 @@ class MeteorologicalAnalyzer:
             temp_trend = 0.0
 
         # System classification
-        if pressure_system == "high_pressure" and stability > 0.7:
+        if (
+            pressure_system == "high_pressure"
+            and stability > StabilityConstants.AIR_MASS_MIN_STABILITY
+        ):
             system_type = "stable_high"
             evolution_potential = "gradual_improvement"
-        elif pressure_system == "low_pressure" and stability < 0.3:
+        elif (
+            pressure_system == "low_pressure"
+            and stability < StabilityConstants.FRONTAL_WIND_STABILITY
+        ):
             system_type = "active_low"
             evolution_potential = "rapid_change"
         elif (
-            wind_stability < 0.4 and pressure_analysis.get("storm_probability", 0) > 50
+            wind_stability < StabilityConstants.FRONTAL_WIND_STABILITY
+            and pressure_analysis.get("storm_probability", 0)
+            > StabilityConstants.FRONTAL_STORM_PROBABILITY
         ):
             system_type = "frontal_system"
             evolution_potential = "transitional"
-        elif abs(temp_trend) > 2 and stability > 0.6:
+        elif (
+            abs(temp_trend) > StabilityConstants.AIR_MASS_TEMP_CHANGE
+            and stability > StabilityConstants.AIR_MASS_MIN_STABILITY
+        ):
             system_type = "air_mass_change"
             evolution_potential = "gradual"
         else:
@@ -376,7 +447,25 @@ class MeteorologicalAnalyzer:
         sensor_data: Dict[str, Any],
         pressure_analysis: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Comprehensive cloud cover analysis using all solar data and pressure trends."""
+        """Comprehensive cloud cover analysis using all solar data and pressure trends.
+
+        Combines solar radiation, illuminance, and UV data with pressure trends to
+        estimate cloud cover percentage. Adjusts estimates based on falling/rising
+        pressure patterns that typically correlate with cloud changes.
+
+        Args:
+            solar_radiation: Solar radiation in W/m²
+            solar_lux: Solar illuminance in lux
+            uv_index: UV index value
+            sensor_data: Sensor data dict (expects 'solar_elevation' key)
+            pressure_analysis: Pressure analysis with 'current_trend' key
+
+        Returns:
+            Dict with cloud analysis:
+            - cloud_cover: Estimated cloud cover percentage (0-100)
+            - cloud_type: Descriptive cloud type (clear, few_clouds, scattered, overcast)
+            - solar_efficiency: Solar energy transmission efficiency (0-100)
+        """
         solar_elevation = sensor_data.get("solar_elevation", 45.0)
 
         try:
@@ -400,12 +489,21 @@ class MeteorologicalAnalyzer:
         pressure_trend = pressure_analysis.get("current_trend", 0)
         if not isinstance(pressure_trend, (int, float)):
             pressure_trend = 0.0
-        if pressure_trend < PressureThresholds.TREND_3H_RAPID_FALL:
-            cloud_cover = min(95.0, cloud_cover + 60.0)
-        elif pressure_trend < 0:
-            cloud_cover = min(95.0, cloud_cover + 40.0)
-        elif pressure_trend > PressureThresholds.TREND_3H_MODERATE_RISE:
-            cloud_cover = max(5.0, cloud_cover - 40.0)
+        if pressure_trend < PressureTrendConstants.DIRECTION_FALLING_MODERATE:
+            cloud_cover = min(
+                PressureTrendConstants.MAX_CLOUD_COVER,
+                cloud_cover + PressureTrendConstants.RAPID_FALL_CLOUD_INCREASE,
+            )
+        elif pressure_trend < PressureTrendConstants.DIRECTION_STABLE:
+            cloud_cover = min(
+                PressureTrendConstants.MAX_CLOUD_COVER,
+                cloud_cover + PressureTrendConstants.SLOW_FALL_CLOUD_INCREASE,
+            )
+        elif pressure_trend > PressureTrendConstants.DIRECTION_RISING_MODERATE:
+            cloud_cover = max(
+                PressureTrendConstants.MIN_CLOUD_COVER,
+                cloud_cover - PressureTrendConstants.RISING_CLOUD_DECREASE,
+            )
 
         # Cloud type classification
         if cloud_cover < CloudCoverThresholds.FEW:
@@ -430,30 +528,51 @@ class MeteorologicalAnalyzer:
         wind_analysis: Dict[str, Any],
         temp_dewpoint_spread: float,
     ) -> Dict[str, Any]:
-        """Analyze moisture transport and atmospheric moisture dynamics."""
+        """Analyze moisture transport and atmospheric moisture dynamics.
+
+        Evaluates moisture availability, transport potential, and condensation
+        likelihood based on humidity levels, trends, and atmospheric stability.
+
+        Args:
+            current_humidity: Current relative humidity in %
+            humidity_trends: Humidity trends dict with 'trend' key
+            wind_analysis: Wind analysis with 'direction_stability' key
+            temp_dewpoint_spread: Temperature minus dewpoint in °F
+
+        Returns:
+            Dict with moisture analysis:
+            - moisture_content: Current humidity percentage
+            - transport_potential: Wind-driven moisture transport capacity
+            - moisture_availability: Moisture availability level (low/moderate/high)
+            - condensation_potential: Likelihood of condensation (0.0-1.0)
+            - trend_direction: Humidity trend direction (stable/increasing/decreasing)
+        """
         moisture_content = current_humidity
-        transport_potential = wind_analysis.get("direction_stability", 0.5) * 10
+        transport_potential = (
+            wind_analysis.get("direction_stability", 0.5)
+            * MoistureAnalysisConstants.TRANSPORT_MULTIPLIER
+        )
 
         # Dewpoint spread indicates moisture availability
         if not isinstance(temp_dewpoint_spread, (int, float)):
             temp_dewpoint_spread = 5.0
-        if temp_dewpoint_spread < 5:
+        if temp_dewpoint_spread < MoistureAnalysisConstants.SPREAD_HIGH_MOISTURE:
             moisture_availability = "high"
-            condensation_potential = 0.8
-        elif temp_dewpoint_spread < 10:
+            condensation_potential = MoistureAnalysisConstants.CONDENSATION_HIGH
+        elif temp_dewpoint_spread < MoistureAnalysisConstants.SPREAD_MODERATE_MOISTURE:
             moisture_availability = "moderate"
-            condensation_potential = 0.5
+            condensation_potential = MoistureAnalysisConstants.CONDENSATION_MODERATE
         else:
             moisture_availability = "low"
-            condensation_potential = 0.2
+            condensation_potential = MoistureAnalysisConstants.CONDENSATION_LOW
 
         # Trend analysis
         humidity_trend = humidity_trends.get("trend", 0) if humidity_trends else 0
         if not isinstance(humidity_trend, (int, float)):
             humidity_trend = 0.0
-        if humidity_trend > 5:
+        if humidity_trend > MoistureAnalysisConstants.HUMIDITY_TREND_THRESHOLD:
             trend_direction = "increasing"
-        elif humidity_trend < -5:
+        elif humidity_trend < -MoistureAnalysisConstants.HUMIDITY_TREND_THRESHOLD:
             trend_direction = "decreasing"
         else:
             trend_direction = "stable"
@@ -473,7 +592,25 @@ class MeteorologicalAnalyzer:
         wind_analysis: Dict[str, Any],
         pressure_analysis: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Analyze wind patterns and boundary layer dynamics."""
+        """Analyze wind patterns and boundary layer dynamics.
+
+        Evaluates wind shear, gust factors, and pressure gradient effects on
+        wind patterns. Identifies turbulence potential and boundary layer stability.
+
+        Args:
+            current_wind: Current wind speed in mph
+            wind_trends: Wind trends dict with 'trend' key
+            wind_analysis: Wind analysis with 'direction_stability' and 'gust_factor' keys
+            pressure_analysis: Pressure analysis with 'current_trend' key
+
+        Returns:
+            Dict with wind pattern analysis:
+            - wind_speed: Current wind speed in mph
+            - direction_stability: Wind direction consistency (0-1)
+            - gust_factor: Wind gust intensity multiplier
+            - shear_intensity: Wind shear level (low/moderate/extreme)
+            - gradient_wind_effect: Pressure gradient wind acceleration
+        """
         wind_speed = current_wind
         direction_stability = wind_analysis.get("direction_stability", 0.5)
         gust_factor = (
@@ -486,9 +623,9 @@ class MeteorologicalAnalyzer:
         wind_trend = wind_trends.get("trend", 0) if wind_trends else 0
         if not isinstance(wind_trend, (int, float)):
             wind_trend = 0.0
-        if abs(wind_trend) > 5:
+        if abs(wind_trend) > WindShearConstants.EXTREME_THRESHOLD:
             shear_intensity = "extreme"
-        elif abs(wind_trend) > 2:
+        elif abs(wind_trend) > WindShearConstants.MODERATE_THRESHOLD:
             shear_intensity = "moderate"
         else:
             shear_intensity = "low"
@@ -497,7 +634,9 @@ class MeteorologicalAnalyzer:
         pressure_trend = pressure_analysis.get("current_trend", 0)
         if not isinstance(pressure_trend, (int, float)):
             pressure_trend = 0.0
-        gradient_wind_effect = abs(pressure_trend) * 2
+        gradient_wind_effect = (
+            abs(pressure_trend) * WindShearConstants.GRADIENT_WIND_MULTIPLIER
+        )
 
         return {
             KEY_WIND_SPEED: wind_speed,

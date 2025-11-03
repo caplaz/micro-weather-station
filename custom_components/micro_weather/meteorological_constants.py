@@ -299,58 +299,6 @@ class SolarAnalysisConstants:
 
 
 @dataclass(frozen=True)
-class TrendsAnalysisConstants:
-    """Constants for historical trends and pattern analysis.
-
-    These constants define time windows, thresholds, and factors used
-    in analyzing historical weather patterns and trends.
-    """
-
-    # Historical data time windows
-    DEFAULT_TREND_HOURS = 24  # Standard lookback period
-    EXTENDED_TREND_HOURS = 168  # One week lookback
-
-    # Seasonal temperature variation factors by month
-    # Higher values indicate more variable/extreme weather
-    SEASONAL_FACTOR_JANUARY = 0.9
-    SEASONAL_FACTOR_FEBRUARY = 0.7
-    SEASONAL_FACTOR_MARCH = 0.6
-    SEASONAL_FACTOR_APRIL = 0.5
-    SEASONAL_FACTOR_MAY = 0.4
-    SEASONAL_FACTOR_JUNE = 0.3
-    SEASONAL_FACTOR_JULY = 0.4
-    SEASONAL_FACTOR_AUGUST = 0.5
-    SEASONAL_FACTOR_SEPTEMBER = 0.6
-    SEASONAL_FACTOR_OCTOBER = 0.7
-    SEASONAL_FACTOR_NOVEMBER = 0.8
-    SEASONAL_FACTOR_DECEMBER = 0.8
-
-    # Pressure cycle thresholds
-    PRESSURE_VOLATILITY_ACTIVE = 1.0  # hPa - Active system changes
-    PRESSURE_VOLATILITY_MODERATE = 0.5  # hPa - Moderate system changes
-    CYCLE_FREQUENCY_MULTIPLIER = 2.0  # Cycle frequency scaling factor
-
-    # Wind direction analysis
-    WIND_DIRECTION_SIGNIFICANT_SHIFT = 45  # degrees - Major wind shift
-
-
-@dataclass(frozen=True)
-class ConversionConstants:
-    """Unit conversion constants for meteorological calculations.
-
-    Standard conversion factors between different unit systems used
-    throughout the weather analysis.
-    """
-
-    MPH_TO_KMH = 1.60934  # Miles per hour to kilometers per hour
-    INCHES_TO_MM = 25.4  # Inches to millimeters
-    FAHRENHEIT_TO_CELSIUS_SCALE = 5.0 / 9.0  # F to C scale factor
-    FAHRENHEIT_OFFSET = 32.0  # F to C offset
-    HPA_TO_INHG = 0.02953  # Hectopascals to inches of mercury
-    INHG_TO_HPA = 33.8639  # Inches of mercury to hectopascals
-
-
-@dataclass(frozen=True)
 class DefaultSensorValues:
     """Default values for missing or unavailable sensors.
 
@@ -560,12 +508,9 @@ class WindAdjustmentConstants:
     DIRECTION_STABLE_THRESHOLD: float = 0.8  # Threshold for stable direction
     DIRECTION_UNSTABLE_MULTIPLIER: float = 1.2  # Variable direction = stronger
     DIRECTION_STABLE_MULTIPLIER: float = 0.9  # Steady direction = lighter
-    UNSTABLE_DIRECTION_MULT: float = 1.2  # Variable direction = stronger (legacy)
-    STABLE_DIRECTION_MULT: float = 0.9  # Steady direction = lighter (legacy)
 
     # Gradient wind effect multiplier
     GRADIENT_WIND_MULTIPLIER: float = 2.0  # Pressure gradient influence
-    GRADIENT_EFFECT_MULT: float = 2.0  # Pressure gradient influence (legacy)
 
 
 @dataclass(frozen=True)
@@ -731,30 +676,6 @@ class PressureTrendConstants:
 
 
 @dataclass(frozen=True)
-class MoistureConstants:
-    """Moisture analysis and dewpoint spread thresholds.
-
-    Used to analyze atmospheric moisture content, transport,
-    and condensation potential for precipitation forecasting.
-    """
-
-    # Dewpoint spread thresholds (°F)
-    SPREAD_HIGH_MOISTURE: float = 5.0  # Tight spread = high moisture
-    SPREAD_MODERATE_MOISTURE: float = 10.0  # Moderate spread threshold
-
-    # Condensation potential by dewpoint spread
-    CONDENSATION_HIGH: float = 0.8  # High condensation potential
-    CONDENSATION_MODERATE: float = 0.5  # Moderate condensation potential
-    CONDENSATION_LOW: float = 0.2  # Low condensation potential
-
-    # Humidity trend classification threshold (% change/12h)
-    HUMIDITY_TREND_THRESHOLD: float = 5.0  # Significant humidity change
-
-    # Transport potential multiplier
-    TRANSPORT_MULTIPLIER: float = 10.0  # Wind stability to transport conversion
-
-
-@dataclass(frozen=True)
 class WindShearConstants:
     """Wind shear intensity classification thresholds.
 
@@ -769,3 +690,28 @@ class WindShearConstants:
 
     # Gradient wind calculation
     GRADIENT_WIND_MULTIPLIER: float = 2.0  # Pressure gradient to wind effect
+
+
+@dataclass(frozen=True)
+class MoistureAnalysisConstants:
+    """Moisture transport and condensation analysis.
+
+    Constants for analyzing atmospheric moisture content,
+    transport potential, and condensation likelihood.
+    """
+
+    # Transport calculation
+    TRANSPORT_MULTIPLIER: float = 10.0  # Wind stability to transport conversion
+
+    # Dewpoint spread thresholds (°F)
+    SPREAD_HIGH_MOISTURE: float = 5.0  # High moisture availability
+    SPREAD_MODERATE_MOISTURE: float = 10.0  # Moderate moisture availability
+    # Above SPREAD_MODERATE = low moisture
+
+    # Condensation potentials (0.0-1.0)
+    CONDENSATION_HIGH: float = 0.8  # High condensation likelihood
+    CONDENSATION_MODERATE: float = 0.5  # Moderate condensation likelihood
+    CONDENSATION_LOW: float = 0.2  # Low condensation likelihood
+
+    # Humidity trend threshold (% change)
+    HUMIDITY_TREND_THRESHOLD: float = 5.0  # Significant humidity change
