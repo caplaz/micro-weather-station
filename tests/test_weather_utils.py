@@ -208,3 +208,34 @@ class TestWeatherUtils:
             datetime(2024, 1, 1, 20, 0, 0, tzinfo=timezone.utc), sunrise, sunset
         )
         assert result is False, "Should be nighttime after sunset"
+
+    def test_is_forecast_hour_daytime_midday_scenario(self):
+        """Test is_forecast_hour_daytime when next sunrise is tomorrow and next sunset is today.
+
+        This simulates the scenario where the function is called in the middle of the day.
+        """
+        # Scenario:
+        # Current time (implied): Day 1, 13:40
+        # Next Sunrise: Day 2, 07:00
+        # Next Sunset: Day 1, 17:00
+
+        sunrise = datetime(2025, 12, 1, 7, 0, 0, tzinfo=timezone.utc)  # Tomorrow
+        sunset = datetime(2025, 11, 30, 17, 0, 0, tzinfo=timezone.utc)  # Today
+
+        # Test 1: Forecast 2 PM Today (Should be Day)
+        f1 = datetime(2025, 11, 30, 14, 0, 0, tzinfo=timezone.utc)
+        assert is_forecast_hour_daytime(f1, sunrise, sunset) is True
+
+        # Test 2: Forecast 8 PM Today (Should be Night)
+        f2 = datetime(2025, 11, 30, 20, 0, 0, tzinfo=timezone.utc)
+        assert is_forecast_hour_daytime(f2, sunrise, sunset) is False
+
+        # Test 3: Forecast 4 AM Tomorrow (Should be Night)
+        f3 = datetime(2025, 12, 1, 4, 0, 0, tzinfo=timezone.utc)
+        assert is_forecast_hour_daytime(f3, sunrise, sunset) is False
+
+        # Test 4: Forecast 8 AM Tomorrow (Should be Day)
+        # Note: This technically falls into the "next cycle" which might be tricky depending on how we define "daytime" relative to *these specific* sun times.
+        # But based on the logic `forecast_time >= sunrise_time`, it should be True.
+        f4 = datetime(2025, 12, 1, 8, 0, 0, tzinfo=timezone.utc)
+        assert is_forecast_hour_daytime(f4, sunrise, sunset) is True

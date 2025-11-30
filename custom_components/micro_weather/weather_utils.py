@@ -149,6 +149,11 @@ def is_forecast_hour_daytime(
             # Forecast is after the provided sunset date - use fallback
             return 6 <= forecast_time.hour < 18
 
+        # If sunrise is after sunset, it means we are currently in the day cycle
+        # where the next sunrise is tomorrow and next sunset is today.
+        if sunrise_time > sunset_time:
+            return forecast_time < sunset_time or forecast_time >= sunrise_time
+
         # If both are offset-naive or both are offset-aware, compare directly
         return sunrise_time <= forecast_time < sunset_time
     else:
