@@ -113,7 +113,7 @@ ELIF rain_state = "wet" AND rain_rate ≤ threshold:
 - **0.01 in/h** in weather_analysis.py (more sensitive)
 - **0.05 in/h** in weather_detector.py (more conservative to avoid false positives from dew)
 
-**Dew/Condensation Detection (Version 3.1.0):**
+**Dew/Condensation Detection (Version 4.0.0):**
 
 The system now includes intelligent dew detection to prevent false rain alerts on humid mornings:
 
@@ -210,7 +210,7 @@ ELSE:
     → No fog
 ```
 
-**Fog Pre-Validation (Version 3.1.0):**
+**Fog Pre-Validation (Version 4.0.0):**
 
 Before calculating fog scores, the system performs quick pre-validation checks to avoid unnecessary fog analysis:
 
@@ -259,7 +259,7 @@ ELSE:
     → "cloudy" (overcast)
 ```
 
-**Important Note:** Cloud cover thresholds were adjusted to be more conservative (version 3.1.0 improvement):
+**Important Note:** Cloud cover thresholds were adjusted to be more conservative (version 4.0.0 improvement):
 
 - Sunny threshold increased from 20% to 30% to avoid false sunny reports on partly cloudy days
 - Partly cloudy threshold increased from 50% to 60% for better gradation
@@ -284,7 +284,7 @@ ELSE:
 
 **Solar Elevation Enhancement:** When sun sensor is configured, cloud cover calculations are adjusted based on solar elevation angle, providing more accurate daytime weather detection throughout the day.
 
-**Solar Elevation Estimation (Version 3.1.0):**
+**Solar Elevation Estimation (Version 4.0.0):**
 
 When no sun sensor is configured, the system estimates solar elevation based on radiation intensity:
 
@@ -375,7 +375,7 @@ IF new_condition ≠ previous_condition:
         → Log: "Preventing condition oscillation: keeping X instead of Y"
 ```
 
-**Transition-Specific Thresholds (Version 3.1.0):**
+**Transition-Specific Thresholds (Version 4.0.0):**
 
 The hysteresis system now uses different thresholds based on the type of condition transition:
 

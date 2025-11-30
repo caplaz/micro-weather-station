@@ -234,7 +234,7 @@ stability_factor = atmospheric_stability
 micro_changes = calculate_micro_evolution_patterns(weather_system_type)
 ```
 
-**Trajectory-Based Evolution (Version 3.1.0):**
+**Trajectory-Based Evolution (Version 4.0.0):**
 
 The forecast now uses trajectory scoring based on pressure and humidity trends:
 

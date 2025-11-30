@@ -1,32 +1,37 @@
 # Changelog
 
-## 3.1.0 (2025-11-02)
+## 4.0.0 (2025-11-30)
 
 ### Forecast Logic Overhaul
 
 - **Trajectory-Based Condition Evolution**: Replaced static condition mapping with dynamic trajectory scoring
+
   - Conditions now evolve based on pressure trend direction and magnitude
   - Trajectory score (-100 to +100) determines condition ladder progression
   - Falling pressure moves conditions toward deterioration, rising toward improvement
   - Humidity trends influence precipitation/clearing transitions
 
 - **Trend-Integrated Temperature Forecasting**: Temperature forecasts now properly use trend data
-  - Temperature projected forward using trend * hours (not arbitrary multipliers)
+
+  - Temperature projected forward using trend \* hours (not arbitrary multipliers)
   - Pressure gradient effects applied to daily temperature swings
   - Distance dampening reduces confidence for distant forecasts
 
 - **Deterministic Precipitation Forecasting**: Removed all random.uniform() calls
+
   - Precipitation now based on condition, humidity trends, and storm probability
   - Condensation potential only affects current day (not distant forecasts)
   - Rising humidity increases precipitation by up to 50%
   - Falling pressure amplifies precipitation amounts
 
 - **Improved Humidity Convergence**: Faster, more realistic humidity evolution
+
   - Humidity now converges 30% per hour toward target (was 10%)
   - Target humidity based on forecasted condition
   - Eliminated arbitrary hour-based modulation
 
 - **Evolution Model Improvements**: Weather system evolution based on actual trends
+
   - Evolution paths dynamically generated from pressure trend magnitude
   - Confidence degrades based on trend volatility (disagreement between short/long term)
   - Hourly change rate determined by trend magnitude (rapid/moderate/gradual)
