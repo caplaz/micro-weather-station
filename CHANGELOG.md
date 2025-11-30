@@ -2,6 +2,49 @@
 
 ## 3.1.0 (2025-11-02)
 
+### Weather Detection Improvements
+
+- **Improved Cloud Cover Thresholds**: Adjusted thresholds to be more conservative and accurate
+
+  - Sunny threshold increased from 20% to 30% to avoid false sunny reports
+  - Partly cloudy threshold increased from 50% to 60% for better gradation
+  - Cloudy threshold increased from 75% to 85% for more accurate overcast detection
+  - Improved documentation of cloud cover to condition mapping logic
+
+- **Enhanced Dew/Condensation Detection**: Added intelligent dew detection to prevent false rain alerts
+
+  - System now uses consistent threshold matching `PrecipitationThresholds.SIGNIFICANT` (0.01 in/h)
+  - Prevents false "rainy" conditions on humid mornings when dew triggers rain sensors
+  - Clearer logic separation between dew/condensation and actual precipitation
+
+- **More Conservative Fog Detection**: Improved fog detection to reduce false positives
+
+  - Added pre-validation requiring minimum 88% humidity before fog analysis
+  - Added solar radiation check during daytime (fog should suppress radiation below expected minimum)
+  - Added stricter dewpoint spread requirement (≤2.0°F) for moderate fog scores (55-70 range)
+  - Added temperature trend consideration (cooling trend favorable for fog formation)
+  - Better prevents false fog detection on humid but clear mornings
+
+- **Improved Condition Hysteresis**: Enhanced stability to prevent rapid oscillation between conditions
+
+  - Adjacent condition transitions (sunny↔partlycloudy, partlycloudy↔cloudy) require 15% change
+  - Non-adjacent transitions (sunny↔cloudy) require 25% change to prevent unrealistic jumps
+  - Added trend-based threshold reduction for consistent patterns
+
+- **Solar Elevation Estimation**: Better cloud cover calculation when sun sensor is not configured
+
+  - Estimates solar elevation based on radiation intensity (800+ W/m² → 60°, 500+ → 45°, 200+ → 25°, else → 15°)
+  - Provides more accurate cloud cover percentages without explicit sun sensor data
+
+- **Storm Probability Threshold Consistency**: Fixed inconsistent threshold comparisons
+
+  - Unified storm threshold comparisons to use `>=` for `STORM_THRESHOLD_SEVERE` (70%)
+  - Ensures conditions exactly at thresholds are handled correctly
+
+- **Precipitation Threshold Documentation**: Clarified units in meteorological constants
+  - Added clear documentation that `PrecipitationThresholds` are in inches per hour (in/h)
+  - Added conversion reference table for mm/h equivalents
+
 ### Architecture Improvements
 
 - **Modular Architecture**: Reorganized codebase into specialized modules for improved maintainability and extensibility
@@ -43,7 +86,7 @@
 
 ### Testing
 
-- All 246 functional tests continue to pass
+- All 307 functional tests pass
 - Zero breaking changes for end users
 - Full backward compatibility maintained
 

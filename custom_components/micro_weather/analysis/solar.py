@@ -618,18 +618,37 @@ class SolarAnalyzer:
         }
 
     def map_cloud_cover_to_condition(self, cloud_cover: float) -> str:
-        """Map cloud cover percentage to weather condition."""
-        if cloud_cover <= CloudCoverThresholds.FEW:
+        """Map cloud cover percentage to weather condition.
+
+        Uses the CloudCoverThresholds constants for consistent mapping:
+        - < 30% = Sunny (clear skies with few clouds)
+        - 30-60% = Partly cloudy (mix of sun and clouds)
+        - 60-85% = Cloudy (mostly overcast)
+        - > 85% = Overcast (handled same as cloudy for current conditions)
+
+        Note: The THRESHOLD_CLOUDY constant (85%) represents the upper bound
+        of "cloudy" before it becomes "overcast". For the sunny->partly cloudy
+        and partly cloudy->cloudy transitions, we use the thresholds directly.
+        """
+        if cloud_cover <= CloudCoverThresholds.THRESHOLD_SUNNY:
             return ATTR_CONDITION_SUNNY
-        elif cloud_cover <= CloudCoverThresholds.SCATTERED:
+        elif cloud_cover <= CloudCoverThresholds.THRESHOLD_PARTLY_CLOUDY:
             return ATTR_CONDITION_PARTLYCLOUDY
         else:
+            # Everything above THRESHOLD_PARTLY_CLOUDY (60%) is cloudy
+            # THRESHOLD_CLOUDY (85%) represents "very cloudy/overcast" which
+            # still maps to CLOUDY condition (precipitation would override)
             return ATTR_CONDITION_CLOUDY
 
     def apply_condition_hysteresis(
         self, proposed_condition: str, current_cloud_cover: float
     ) -> str:
-        """Apply hysteresis to prevent rapid condition changes."""
+        """Apply hysteresis to prevent rapid condition changes.
+
+        This method ensures weather conditions are stable before reporting
+        a change. It requires a meaningful change in cloud cover before
+        allowing a condition transition.
+        """
         # Clean up old entries (keep last 24 hours)
         cutoff_time = datetime.now() - timedelta(hours=24)
         self._condition_history = deque(
@@ -675,16 +694,33 @@ class SolarAnalyzer:
         # Calculate cloud cover difference
         cloud_cover_change = abs(current_cloud_cover - last_cloud_cover)
 
-        # Define hysteresis thresholds
+        # Define hysteresis thresholds - require larger changes for stability
+        # These thresholds prevent oscillation between conditions
         hysteresis_thresholds = {
-            (ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY): 10.0,
-            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_SUNNY): 10.0,
-            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY): 10.0,
-            (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_PARTLYCLOUDY): 10.0,
+            # Transitioning from sunny to other conditions requires more confidence
+            (ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY): 15.0,
+            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_SUNNY): 12.0,
+            # Transitioning between partly cloudy and cloudy
+            (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY): 15.0,
+            (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_PARTLYCLOUDY): 12.0,
+            # Direct transitions between sunny and cloudy require significant change
+            (ATTR_CONDITION_SUNNY, ATTR_CONDITION_CLOUDY): 25.0,
+            (ATTR_CONDITION_CLOUDY, ATTR_CONDITION_SUNNY): 20.0,
         }
 
         transition_key = (last_condition, proposed_condition)
-        hysteresis_threshold = hysteresis_thresholds.get(transition_key, 5.0)
+        hysteresis_threshold = hysteresis_thresholds.get(transition_key, 10.0)
+
+        # Also check trend - if multiple recent readings support the change, allow it
+        # Count how many recent readings match the proposed condition
+        recent_matches = sum(
+            1
+            for entry in recent_history[-5:]
+            if entry["condition"] == proposed_condition
+        )
+        if recent_matches >= 2:
+            # The trend supports this change, use lower threshold
+            hysteresis_threshold = hysteresis_threshold * 0.7
 
         if cloud_cover_change >= hysteresis_threshold:
             _LOGGER.debug(

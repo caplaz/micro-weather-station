@@ -160,6 +160,10 @@ class AtmosphericAnalyzer:
         - Light winds (fog formation/persistence)
         - Reduced solar radiation (fog indicator)
 
+        Fog is a visibility-reducing phenomenon that requires very specific
+        conditions. We are conservative in detection to avoid false positives
+        from normal humid mornings or condensation.
+
         Args:
             temp: Temperature in Fahrenheit
             humidity: Relative humidity percentage
@@ -175,6 +179,7 @@ class AtmosphericAnalyzer:
         fog_score = 0
 
         # 1. Humidity factor (0-40 points)
+        # Fog requires very high humidity - near saturation
         if humidity >= FogThresholds.HUMIDITY_DENSE_FOG:
             fog_score += FogThresholds.SCORE_DENSE
         elif humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG:
@@ -185,6 +190,7 @@ class AtmosphericAnalyzer:
             fog_score += FogThresholds.SCORE_MARGINAL
 
         # 2. Temperature-dewpoint spread (0-30 points)
+        # Critical for fog - air must be near saturation
         if spread <= FogThresholds.SPREAD_SATURATED:
             fog_score += FogThresholds.SCORE_SPREAD_SATURATED
         elif spread <= FogThresholds.SPREAD_VERY_CLOSE:
@@ -195,6 +201,7 @@ class AtmosphericAnalyzer:
             fog_score += FogThresholds.SCORE_SPREAD_MARGINAL
 
         # 3. Wind factor (0-15 points)
+        # Fog requires calm to light winds - strong winds disperse fog
         if wind_speed <= FogThresholds.WIND_CALM:
             fog_score += FogThresholds.SCORE_WIND_CALM
         elif wind_speed <= FogThresholds.WIND_LIGHT:
@@ -202,9 +209,11 @@ class AtmosphericAnalyzer:
         elif wind_speed <= FogThresholds.WIND_MODERATE:
             fog_score += FogThresholds.SCORE_WIND_MODERATE
         else:
+            # Strong winds are a strong negative indicator for fog
             fog_score += FogThresholds.PENALTY_WIND_STRONG
 
         # 4. Solar radiation factor (0-15 points)
+        # During daytime, fog significantly reduces solar radiation
         if is_daytime:
             if solar_rad < FogThresholds.SOLAR_VERY_LOW:
                 fog_score += FogThresholds.SCORE_SOLAR_DENSE
@@ -212,6 +221,10 @@ class AtmosphericAnalyzer:
                 fog_score += FogThresholds.SCORE_SOLAR_MODERATE
             elif solar_rad < FogThresholds.SOLAR_REDUCED:
                 fog_score += FogThresholds.SCORE_SOLAR_LIGHT
+            else:
+                # If solar radiation is normal/high during daytime,
+                # this is a strong indicator against fog
+                fog_score -= 15
         else:
             if solar_rad <= FogThresholds.SOLAR_MINIMAL_NIGHT:
                 fog_score += FogThresholds.SCORE_SOLAR_NIGHT
@@ -223,6 +236,7 @@ class AtmosphericAnalyzer:
                 fog_score += FogThresholds.PENALTY_SOLAR_STRONG
 
         # 5. Temperature factor (bonus for evaporation fog)
+        # Warm temps with high humidity and tight spread = evaporation fog
         if (
             temp > FogThresholds.TEMP_WARM_THRESHOLD
             and humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG
@@ -243,16 +257,36 @@ class AtmosphericAnalyzer:
         )
 
         # Determine fog based on score
+        # Use conservative thresholds to avoid false positives
         if fog_score >= FogThresholds.THRESHOLD_DENSE_FOG:
             _LOGGER.debug("Dense fog detected (score: %.1f)", fog_score)
             return ATTR_CONDITION_FOG
         elif fog_score >= FogThresholds.THRESHOLD_MODERATE_FOG:
-            _LOGGER.debug("Moderate fog detected (score: %.1f)", fog_score)
-            return ATTR_CONDITION_FOG
+            # For moderate fog, also require tight dewpoint spread as confirmation
+            if spread <= FogThresholds.SPREAD_CLOSE:
+                _LOGGER.debug("Moderate fog detected (score: %.1f)", fog_score)
+                return ATTR_CONDITION_FOG
+            else:
+                _LOGGER.debug(
+                    "Moderate fog score but spread too large (%.1f > %.1f)",
+                    spread,
+                    FogThresholds.SPREAD_CLOSE,
+                )
         elif fog_score >= FogThresholds.THRESHOLD_LIGHT_FOG:
-            if humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG:
+            # For light fog, require both high humidity AND tight spread
+            if (
+                humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG
+                and spread <= FogThresholds.SPREAD_VERY_CLOSE
+            ):
                 _LOGGER.debug("Light fog detected (score: %.1f)", fog_score)
                 return ATTR_CONDITION_FOG
+            else:
+                _LOGGER.debug(
+                    "Light fog score but conditions not met "
+                    "(humidity=%.1f, spread=%.1f)",
+                    humidity,
+                    spread,
+                )
 
         _LOGGER.debug("No fog detected (score: %.1f)", fog_score)
         return None

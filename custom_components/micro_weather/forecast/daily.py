@@ -413,7 +413,7 @@ class DailyForecastGenerator:
         if storm_probability > ForecastConstants.STORM_PRECIPITATION_THRESHOLD:
             forecast_condition = (
                 ATTR_CONDITION_LIGHTNING_RAINY
-                if storm_probability > ForecastConstants.STORM_THRESHOLD_SEVERE
+                if storm_probability >= ForecastConstants.STORM_THRESHOLD_SEVERE
                 else ATTR_CONDITION_RAINY
             )
 

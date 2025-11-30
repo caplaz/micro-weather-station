@@ -168,21 +168,29 @@ class PressureThresholds:
 class PrecipitationThresholds:
     """Precipitation intensity classification thresholds.
 
-    Based on rain rate in inches per hour (in/h) or millimeters per hour (mm/h).
+    All values are in inches per hour (in/h), the standard US unit for rain rate.
+    These thresholds are based on NWS precipitation intensity classifications.
+
+    Conversion reference:
+        - 0.01 in/h ≈ 0.25 mm/h (trace)
+        - 0.10 in/h ≈ 2.5 mm/h (light)
+        - 0.25 in/h ≈ 6.4 mm/h (moderate)
+        - 0.50 in/h ≈ 12.7 mm/h (heavy)
+        - 1.00 in/h ≈ 25.4 mm/h (very heavy)
 
     References:
         - National Weather Service precipitation classification
         - NOAA rainfall intensity guidelines
     """
 
-    # Rain rate thresholds (in/h)
-    SIGNIFICANT = 0.01  # Minimum detectable precipitation
+    # Rain rate thresholds (in/h - inches per hour)
+    SIGNIFICANT = 0.01  # Minimum detectable precipitation (trace)
     LIGHT = 0.1  # Light rain threshold
     MODERATE = 0.25  # Moderate rain threshold
     HEAVY = 0.5  # Heavy rain threshold
     VERY_HEAVY = 1.0  # Very heavy rain/pouring
 
-    # Storm detection thresholds
+    # Storm detection thresholds (in/h)
     STORM_MIN_RATE = 0.05  # Minimum rate for severe weather with turbulence
     STORM_MODERATE_RATE = 0.1  # Moderate rate for storm classification
     STORM_HEAVY_RATE = 0.25  # Heavy rate for storm classification
@@ -237,10 +245,11 @@ class CloudCoverThresholds:
     OVERCAST = 100.0  # 8 okta (87.5-100%) - Overcast
 
     # Thresholds for condition mapping
-    THRESHOLD_SUNNY = 20.0  # < 20% = Sunny/Clear
-    THRESHOLD_PARTLY_CLOUDY = 50.0  # 20-50% = Partly cloudy
-    THRESHOLD_CLOUDY = 75.0  # 50-75% = Cloudy
-    # > 75% = Overcast (rainy if precipitation present)
+    # These are more relaxed to avoid over-reporting cloudy conditions
+    THRESHOLD_SUNNY = 30.0  # < 30% = Sunny/Clear (was 20%, too aggressive)
+    THRESHOLD_PARTLY_CLOUDY = 60.0  # 30-60% = Partly cloudy (was 50%)
+    THRESHOLD_CLOUDY = 85.0  # 60-85% = Cloudy (was 75%)
+    # > 85% = Overcast (rainy if precipitation present)
 
     # Neutral threshold for unreliable measurements
     NEUTRAL = 50.0  # Neutral point (neither clear nor cloudy)

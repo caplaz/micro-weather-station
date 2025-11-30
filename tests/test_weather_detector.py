@@ -207,30 +207,42 @@ class TestWeatherDetector:
     def test_detect_partly_cloudy_condition(
         self, mock_hass, mock_options, mock_sensor_data
     ):
-        """Test detection of cloudy conditions."""
-        # Set up mock states for cloudy conditions (moderate cloud cover)
+        """Test detection of partly cloudy conditions."""
+        # At 45° elevation, clear-sky max is ~496 W/m²
+        # For ~45% cloud cover (partly cloudy is 30-60%): need radiation at ~55% of max → ~273 W/m²
+        # With updated thresholds: <30% = sunny, 30-60% = partly cloudy, >60% = cloudy
         mock_states = {}
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "solar_radiation":
                 state = Mock()
-                state.state = "300.0"  # Moderate solar radiation for partly cloudy (75% of clear sky max)
+                state.state = (
+                    "270.0"  # ~55% of 496 W/m² clear-sky max → ~45% cloud cover
+                )
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "solar_lux":
                 state = Mock()
-                state.state = "30000.0"  # Moderate lux for partly cloudy
+                state.state = "25000.0"  # Moderate lux for partly cloudy
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "uv_index":
                 state = Mock()
-                state.state = "3.0"  # Moderate UV for partly cloudy
+                state.state = "3.5"  # Moderate UV for partly cloudy
                 mock_states[f"sensor.{sensor_key}"] = state
             else:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
 
+        # Add sun sensor with proper elevation for accurate cloud cover calculation
+        sun_state = Mock()
+        sun_state.state = "above_horizon"
+        sun_state.attributes = {"elevation": 45.0}
+        mock_states["sun.sun"] = sun_state
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
 
-        detector = WeatherDetector(mock_hass, mock_options)
+        # Add sun sensor to options using correct key
+        options_with_sun = {**mock_options, "sun_sensor": "sun.sun"}
+        detector = WeatherDetector(mock_hass, options_with_sun)
         result = detector.get_weather_data()
         assert result["condition"] == ATTR_CONDITION_PARTLYCLOUDY
 
@@ -366,7 +378,9 @@ class TestWeatherDetector:
 
     def test_weather_condition_boundaries(self, mock_hass, mock_options):
         """Test weather condition detection at boundary values."""
-        # Test boundary between sunny and partly cloudy
+        # Test sunny conditions with proper sun sensor elevation
+        # At 60° elevation, clear-sky max is ~651 W/m²
+        # 750 W/m² exceeds max → 0% cloud → sunny
         mock_states_sunny = {
             "sensor.outdoor_temperature": Mock(state="75.0"),
             "sensor.humidity": Mock(state="50.0"),
@@ -381,12 +395,21 @@ class TestWeatherDetector:
             "sensor.uv_index": Mock(state="7.5"),  # High UV
         }
 
+        # Add sun sensor
+        sun_state = Mock()
+        sun_state.state = "above_horizon"
+        sun_state.attributes = {"elevation": 60.0}
+        mock_states_sunny["sun.sun"] = sun_state
+
         mock_hass.states.get = lambda entity_id: mock_states_sunny.get(entity_id)
-        detector = WeatherDetector(mock_hass, mock_options)
+        options_with_sun = {**mock_options, "sun_sensor": "sun.sun"}
+        detector = WeatherDetector(mock_hass, options_with_sun)
         result = detector.get_weather_data()
         assert result["condition"] == ATTR_CONDITION_SUNNY
 
-        # Test boundary between partly cloudy and cloudy
+        # Test cloudy conditions - need very low radiation relative to clear-sky max
+        # At 45° elevation, clear-sky max is ~496 W/m²
+        # For ~70% cloud cover (>60% = cloudy): need radiation at ~30% of max → ~149 W/m²
         mock_states_cloudy = {
             "sensor.outdoor_temperature": Mock(state="70.0"),
             "sensor.humidity": Mock(state="60.0"),
@@ -396,13 +419,21 @@ class TestWeatherDetector:
             "sensor.wind_gust": Mock(state="7.0"),
             "sensor.rain_rate": Mock(state="0.0"),
             "sensor.rain_state": Mock(state="Dry"),
-            "sensor.solar_radiation": Mock(state="100.0"),  # Low radiation
-            "sensor.solar_lux": Mock(state="8000.0"),  # Low lux
+            "sensor.solar_radiation": Mock(
+                state="140.0"
+            ),  # ~28% of clear-sky → ~72% cloud
+            "sensor.solar_lux": Mock(state="12000.0"),  # Low lux
             "sensor.uv_index": Mock(state="1.5"),  # Low UV
         }
 
+        # Add sun sensor with 45° elevation for cloudy test
+        sun_state_cloudy = Mock()
+        sun_state_cloudy.state = "above_horizon"
+        sun_state_cloudy.attributes = {"elevation": 45.0}
+        mock_states_cloudy["sun.sun"] = sun_state_cloudy
+
         mock_hass.states.get = lambda entity_id: mock_states_cloudy.get(entity_id)
-        detector2 = WeatherDetector(mock_hass, mock_options)
+        detector2 = WeatherDetector(mock_hass, options_with_sun)
         result2 = detector2.get_weather_data()
         assert result2["condition"] == ATTR_CONDITION_CLOUDY
 

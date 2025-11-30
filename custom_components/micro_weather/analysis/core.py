@@ -123,17 +123,35 @@ class WeatherConditionAnalyzer:
         Returns:
             Dictionary with normalized sensor values (never None)
         """
+        # Safely extract rain rate - ensure it's a valid number
+        rain_rate = sensor_data.get(KEY_RAIN_RATE)
+        if rain_rate is None or (isinstance(rain_rate, float) and rain_rate < 0):
+            rain_rate = 0.0
+        else:
+            rain_rate = float(rain_rate) if rain_rate else 0.0
+
+        # Safely extract rain state - normalize to lowercase
+        rain_state = sensor_data.get("rain_state", "dry")
+        if rain_state is None:
+            rain_state = "dry"
+        rain_state = str(rain_state).lower().strip()
+        # Normalize common rain state variations
+        if rain_state in ["raining", "rain", "precipitation", "1", "true", "on"]:
+            rain_state = "wet"
+        elif rain_state in ["not raining", "no rain", "0", "false", "off"]:
+            rain_state = "dry"
+
         return {
-            "rain_rate": sensor_data.get(KEY_RAIN_RATE, 0.0),
-            "rain_state": sensor_data.get("rain_state", "dry").lower(),
-            "wind_speed": sensor_data.get(KEY_WIND_SPEED, 0.0),
-            "wind_gust": sensor_data.get(KEY_WIND_GUST, 0.0),
-            "solar_radiation": sensor_data.get(KEY_SOLAR_RADIATION, 0.0),
-            "solar_lux": sensor_data.get(KEY_SOLAR_LUX_INTERNAL, 0.0),
-            "uv_index": sensor_data.get(KEY_UV_INDEX, 0.0),
-            "outdoor_temp": sensor_data.get(KEY_OUTDOOR_TEMP, 70.0),
-            "humidity": sensor_data.get(KEY_HUMIDITY, 50.0),
-            "pressure": sensor_data.get(KEY_PRESSURE, 29.92),
+            "rain_rate": rain_rate,
+            "rain_state": rain_state,
+            "wind_speed": float(sensor_data.get(KEY_WIND_SPEED) or 0.0),
+            "wind_gust": float(sensor_data.get(KEY_WIND_GUST) or 0.0),
+            "solar_radiation": float(sensor_data.get(KEY_SOLAR_RADIATION) or 0.0),
+            "solar_lux": float(sensor_data.get(KEY_SOLAR_LUX_INTERNAL) or 0.0),
+            "uv_index": float(sensor_data.get(KEY_UV_INDEX) or 0.0),
+            "outdoor_temp": float(sensor_data.get(KEY_OUTDOOR_TEMP) or 70.0),
+            "humidity": float(sensor_data.get(KEY_HUMIDITY) or 50.0),
+            "pressure": float(sensor_data.get(KEY_PRESSURE) or 29.92),
             "dewpoint_raw": sensor_data.get(KEY_DEWPOINT),
             "solar_elevation": sensor_data.get("solar_elevation"),
         }
@@ -194,6 +212,12 @@ class WeatherConditionAnalyzer:
         (rain, snow, thunderstorm) and intensity based on temperature,
         rain rate, and atmospheric conditions.
 
+        Priority logic:
+        1. Rain rate sensor is the primary indicator when available and > threshold
+        2. Rain state (wet/dry) is used as confirmation or when rate is unavailable
+        3. We explicitly avoid false positives from dew/condensation by requiring
+           either a meaningful rain rate OR wet state with supporting conditions
+
         Args:
             sensors: Dictionary of sensor values
             params: Dictionary of calculated parameters
@@ -202,9 +226,51 @@ class WeatherConditionAnalyzer:
             Weather condition string if precipitation detected, None otherwise
             Possible returns: rainy, pouring, snowy, lightning-rainy
         """
-        significant_rain = sensors["rain_rate"] > PrecipitationThresholds.SIGNIFICANT
+        rain_rate = sensors["rain_rate"]
+        rain_state = sensors["rain_state"]
+        humidity = sensors["humidity"]
+        wind_speed = sensors["wind_speed"]
 
-        if not (significant_rain or sensors["rain_state"] == "wet"):
+        # Primary check: Significant rain rate (most reliable indicator)
+        has_significant_rain_rate = rain_rate > PrecipitationThresholds.SIGNIFICANT
+
+        # Secondary check: Rain state sensor reports wet
+        is_wet = rain_state == "wet"
+
+        # Determine if we have actual precipitation vs just moisture/dew
+        # If rain_rate is measurable, trust it
+        # If only wet sensor with no rate, check if conditions support precipitation
+        if not has_significant_rain_rate and is_wet:
+            # Check if this might be dew/condensation rather than rain:
+            # - Very calm conditions (wind < 2 mph) favor dew formation
+            # - Very high humidity without other precipitation indicators
+            # - Tight dewpoint spread in calm conditions = likely dew
+            # - Low rain rate (below significant threshold) with other dew indicators
+            is_likely_dew = (
+                wind_speed < 2.0
+                and humidity >= 95
+                and params["temp_dewpoint_spread"] < 2.0
+                and rain_rate < PrecipitationThresholds.SIGNIFICANT
+            )
+            if is_likely_dew:
+                # This is probably dew/condensation, not rain - check fog instead
+                _LOGGER.debug(
+                    "Wet sensor detected but likely dew/condensation "
+                    "(wind=%.1f, humidity=%.1f%%, spread=%.1f°F, rate=%.3f)",
+                    wind_speed,
+                    humidity,
+                    params["temp_dewpoint_spread"],
+                    rain_rate,
+                )
+                return None
+
+        # Now determine if we have confirmed precipitation
+        has_precipitation = has_significant_rain_rate or (
+            is_wet and rain_rate >= PrecipitationThresholds.SIGNIFICANT / 2
+        )
+
+        if not has_precipitation:
+            # No precipitation detected
             return None
 
         # Determine precipitation type based on temperature
@@ -215,15 +281,15 @@ class WeatherConditionAnalyzer:
         if self._is_thunderstorm(sensors, params):
             return ATTR_CONDITION_LIGHTNING_RAINY
 
-        # Classify rain intensity
-        intensity = self.classify_precipitation_intensity(sensors["rain_rate"])
-
-        if (
-            intensity == "heavy"
-            or sensors["rain_rate"] > PrecipitationThresholds.MODERATE
-        ):
+        # Classify rain intensity based on rate
+        if rain_rate >= PrecipitationThresholds.HEAVY:
             return ATTR_CONDITION_POURING
+        elif rain_rate >= PrecipitationThresholds.MODERATE:
+            return ATTR_CONDITION_POURING
+        elif rain_rate >= PrecipitationThresholds.LIGHT:
+            return ATTR_CONDITION_RAINY
         else:
+            # Light rain or wet sensor with minimal rate
             return ATTR_CONDITION_RAINY
 
     def _is_thunderstorm(
@@ -289,6 +355,10 @@ class WeatherConditionAnalyzer:
         comprehensive scoring system based on humidity, dewpoint spread,
         wind speed, and solar radiation.
 
+        Important: We apply additional validation to prevent false fog
+        detection during normal humid mornings. True fog significantly
+        reduces visibility and solar radiation.
+
         Args:
             sensors: Dictionary of sensor values
             params: Dictionary of calculated parameters including dewpoint
@@ -296,7 +366,42 @@ class WeatherConditionAnalyzer:
         Returns:
             ATTR_CONDITION_FOG if fog detected, None otherwise
         """
-        return self.atmospheric.analyze_fog_conditions(
+        # Quick pre-check: fog requires very high humidity
+        # Skip fog analysis if humidity is below 88%
+        if sensors["humidity"] < 88:
+            return None
+
+        # Additional pre-check: during daytime, fog should significantly
+        # reduce solar radiation. If solar radiation is high, it's not fog.
+        if params["is_daytime"]:
+            solar_elevation = sensors.get("solar_elevation", 45.0)
+            if solar_elevation and solar_elevation > 10:
+                # During daytime with reasonable sun angle,
+                # fog would significantly reduce radiation
+                expected_min_radiation = min(200.0, solar_elevation * 8)
+                if sensors["solar_radiation"] > expected_min_radiation:
+                    # Solar radiation is too high for fog
+                    _LOGGER.debug(
+                        "Skipping fog check: solar radiation %.1f W/m² too high "
+                        "for fog (expected < %.1f at elevation %.1f°)",
+                        sensors["solar_radiation"],
+                        expected_min_radiation,
+                        solar_elevation,
+                    )
+                    return None
+
+        # Check temperature trend - fog often forms when temperature is falling
+        # toward dewpoint (evening/night radiational cooling)
+        # This is a bonus factor, not a requirement
+        temp_trend = self.trends.get_historical_trends("outdoor_temp", hours=3)
+        is_cooling = False
+        if temp_trend and "trend" in temp_trend:
+            trend_value = temp_trend.get("trend", 0)
+            if isinstance(trend_value, (int, float)):
+                # Negative trend = temperature falling (favorable for fog)
+                is_cooling = trend_value < -0.5  # Dropping more than 0.5°F/hour
+
+        fog_result = self.atmospheric.analyze_fog_conditions(
             sensors["outdoor_temp"],
             sensors["humidity"],
             params["dewpoint"],
@@ -305,6 +410,19 @@ class WeatherConditionAnalyzer:
             sensors["solar_radiation"],
             params["is_daytime"],
         )
+
+        # If atmospheric analysis says fog and conditions are favorable, return fog
+        # If temperature is rising (not cooling), require stricter fog conditions
+        if fog_result == ATTR_CONDITION_FOG:
+            # Log temperature trend influence
+            if is_cooling:
+                _LOGGER.debug(
+                    "Fog confirmed with favorable cooling trend (temp trend: %.2f°F/hr)",
+                    temp_trend.get("trend", 0) if temp_trend else 0,
+                )
+            return fog_result
+
+        return None
 
     def _check_severe_weather(
         self, sensors: Dict[str, float], params: Dict[str, Any]
@@ -378,7 +496,16 @@ class WeatherConditionAnalyzer:
 
         if solar_elevation is None:
             if has_solar_data:
-                solar_elevation = 45.0  # Reasonable default
+                # Estimate solar elevation based on radiation intensity
+                # Higher radiation = higher sun typically
+                if sensors["solar_radiation"] > 600:
+                    solar_elevation = 60.0  # High sun
+                elif sensors["solar_radiation"] > 300:
+                    solar_elevation = 45.0  # Mid-day
+                elif sensors["solar_radiation"] > 100:
+                    solar_elevation = 25.0  # Morning/afternoon
+                else:
+                    solar_elevation = 15.0  # Early morning/late afternoon
             else:
                 # Fallback to atmospheric analysis
                 return self._atmospheric_fallback_condition(sensors, params)
@@ -397,11 +524,23 @@ class WeatherConditionAnalyzer:
             pressure_trends,
         )
 
+        # Log the cloud cover analysis for debugging
+        _LOGGER.debug(
+            "Cloud cover analysis: %.1f%% (radiation=%.1f W/m², lux=%.0f, "
+            "uv=%.1f, elevation=%.1f°)",
+            cloud_cover,
+            sensors["solar_radiation"],
+            sensors["solar_lux"],
+            sensors["uv_index"],
+            solar_elevation,
+        )
+
         # Map cloud cover to condition with hysteresis
         proposed = self.solar.map_cloud_cover_to_condition(cloud_cover)
         final = self.solar.apply_condition_hysteresis(proposed, cloud_cover)
 
         # Override with windy if conditions are right
+        # Windy only applies on sunny days - cloudy + wind = cloudy
         wind_strong = (
             WindThresholds.FRESH_BREEZE
             <= sensors["wind_speed"]

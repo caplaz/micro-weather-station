@@ -113,6 +113,18 @@ ELIF rain_state = "wet" AND rain_rate ≤ threshold:
 - **0.01 in/h** in weather_analysis.py (more sensitive)
 - **0.05 in/h** in weather_detector.py (more conservative to avoid false positives from dew)
 
+**Dew/Condensation Detection (Version 3.1.0):**
+
+The system now includes intelligent dew detection to prevent false rain alerts on humid mornings:
+
+```
+IF rain_rate < 0.02 in/h AND humidity > 90% AND dewpoint_spread < 3°F AND wind_speed < 3 mph:
+    → Likely dew/condensation, not precipitation
+    → Skip precipitation detection, continue to other conditions
+```
+
+This prevents the common false positive where morning dew on a rain sensor triggers incorrect "rainy" conditions.
+
 **Precipitation Classification:**
 
 ```
@@ -190,13 +202,28 @@ The system uses a sophisticated scoring algorithm to detect fog conditions, repl
 ```
 IF fog_score ≥70:
     → Dense fog (very high confidence)
-ELIF fog_score ≥55:
-    → Moderate fog (high confidence)
+ELIF fog_score ≥55 AND dewpoint_spread ≤2.0°F:
+    → Moderate fog (high confidence, requires tight spread confirmation)
 ELIF fog_score ≥45 AND humidity ≥95%:
     → Light fog/mist (marginal conditions with very high humidity required)
 ELSE:
     → No fog
 ```
+
+**Fog Pre-Validation (Version 3.1.0):**
+
+Before calculating fog scores, the system performs quick pre-validation checks to avoid unnecessary fog analysis:
+
+```
+IF humidity < 88%:
+    → Skip fog analysis (humidity too low for fog formation)
+
+IF is_daytime AND solar_radiation > expected_min_radiation:
+    → Skip fog analysis (solar radiation too high - fog would suppress it)
+    → expected_min_radiation = min(200 W/m², solar_elevation × 8)
+```
+
+This prevents false fog detection on humid but clear mornings where solar radiation indicates clear skies.
 
 **Fog Types Detected:**
 
@@ -222,7 +249,7 @@ This unified scoring system naturally handles all fog types without separate ove
 **Cloud Cover Analysis:**
 
 ```
-IF cloud_cover ≤20%:
+IF cloud_cover ≤30%:
     → "sunny"
 ELIF cloud_cover ≤60%:
     → "partly_cloudy"
@@ -232,7 +259,11 @@ ELSE:
     → "cloudy" (overcast)
 ```
 
-**Important Note:** Cloud cover thresholds were adjusted from 25% to 20% for sunny conditions to better reflect actual weather conditions (version 3.0.0 improvement).
+**Important Note:** Cloud cover thresholds were adjusted to be more conservative (version 3.1.0 improvement):
+
+- Sunny threshold increased from 20% to 30% to avoid false sunny reports on partly cloudy days
+- Partly cloudy threshold increased from 50% to 60% for better gradation
+- Cloudy threshold increased from 75% to 85% for more accurate overcast detection
 
 #### Priority 5: Windy Conditions (Only on Sunny Days)
 
@@ -252,6 +283,23 @@ ELSE:
 - **Prevents Confusion**: Avoids scenarios like "windy" when it's actually overcast and stormy
 
 **Solar Elevation Enhancement:** When sun sensor is configured, cloud cover calculations are adjusted based on solar elevation angle, providing more accurate daytime weather detection throughout the day.
+
+**Solar Elevation Estimation (Version 3.1.0):**
+
+When no sun sensor is configured, the system estimates solar elevation based on radiation intensity:
+
+```
+IF solar_radiation ≥ 800 W/m²:
+    → Estimated elevation: 60° (high sun)
+ELIF solar_radiation ≥ 500 W/m²:
+    → Estimated elevation: 45° (mid-day sun)
+ELIF solar_radiation ≥ 200 W/m²:
+    → Estimated elevation: 25° (morning/afternoon sun)
+ELSE:
+    → Estimated elevation: 15° (early morning/late afternoon)
+```
+
+This provides more accurate cloud cover calculations even without explicit sun sensor data.
 
 **Sensor Validation and Safety Checks (Version 3.0.0):**
 
@@ -326,6 +374,24 @@ IF new_condition ≠ previous_condition:
         → Keep previous_condition (prevent oscillation)
         → Log: "Preventing condition oscillation: keeping X instead of Y"
 ```
+
+**Transition-Specific Thresholds (Version 3.1.0):**
+
+The hysteresis system now uses different thresholds based on the type of condition transition:
+
+```
+Adjacent condition transitions (e.g., sunny ↔ partlycloudy, partlycloudy ↔ cloudy):
+    → Threshold: 15% cloud cover change required
+
+Non-adjacent condition transitions (e.g., sunny ↔ cloudy):
+    → Threshold: 25% cloud cover change required
+
+Trend-based threshold reduction:
+    IF cloud cover trend is consistent (moving in same direction):
+        → Reduce threshold by 3-5% for smoother transitions
+```
+
+This prevents rapid oscillation between conditions while still allowing responsive updates when weather genuinely changes.
 
 ### Major Changes (Immediate Transitions)
 

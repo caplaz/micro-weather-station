@@ -559,7 +559,7 @@ class HourlyForecastGenerator:
         """Determine condition based on pressure trends and storm probability."""
         current_trend = pressure_analysis.get("current_trend", 0)
 
-        if storm_probability > ForecastConstants.STORM_THRESHOLD_SEVERE:
+        if storm_probability >= ForecastConstants.STORM_THRESHOLD_SEVERE:
             if cloud_cover > ForecastConstants.STORM_PRECIPITATION_THRESHOLD:
                 return ATTR_CONDITION_LIGHTNING_RAINY
             else:

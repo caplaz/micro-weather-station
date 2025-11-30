@@ -76,10 +76,11 @@ class TestAtmosphericAnalyzer:
         )
         assert result_moderate == ATTR_CONDITION_FOG
 
-        # Test light fog (high humidity required)
-        # Very high humidity (95% = 30pts) + larger spread (2.5°F = 5pts) + light winds (4mph = 10pts) + no solar (10pts) = 55pts
+        # Test light fog (high humidity required, stricter spread requirement)
+        # Very high humidity (95% = 30pts) + tighter spread (1.5°F = 15pts) + light winds (4mph = 10pts) + no solar (10pts) = 65pts
+        # With updated fog detection requiring spread <= 2.0°F for moderate fog scores
         result_light = analyzer.analyze_fog_conditions(
-            70.0, 95.0, 67.5, 2.5, 4.0, 0.0, False
+            70.0, 95.0, 68.5, 1.5, 4.0, 0.0, False
         )
         assert result_light == ATTR_CONDITION_FOG
 
