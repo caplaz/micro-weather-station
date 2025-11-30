@@ -1,17 +1,21 @@
 """Hourly forecast generation module.
 
 This module provides comprehensive 24-hour hourly forecast generation using:
-- Astronomical diurnal cycles
-- Pressure trend modulation
-- Wind pattern analysis
-- Moisture transport modeling
-- Weather system micro-evolution
+- Astronomical diurnal cycles for temperature/humidity patterns
+- Pressure trend trajectory for condition evolution
+- Wind pattern analysis with trend extrapolation
+- Deterministic condition transitions (no randomness)
+
+Key improvements over previous version:
+- NO random() calls - forecasts are deterministic and repeatable
+- Trend-based evolution instead of arbitrary hour intervals
+- Smooth condition transitions following pressure trajectory
+- Proper humidity convergence toward targets
 """
 
 from datetime import datetime, timedelta
 import logging
 import math
-import random
 from typing import Any, Dict, List, Optional
 
 from homeassistant.components.weather import (
@@ -275,19 +279,36 @@ class HourlyForecastGenerator:
         hourly_patterns: Dict[str, Any],
         micro_evolution: Dict[str, Any],
     ) -> float:
-        """Forecast temperature for a specific hour with comprehensive modulation."""
-        # Ensure current_temp is not None
+        """Forecast temperature using diurnal pattern and trend extrapolation.
+
+        Temperature forecasting combines:
+        1. Diurnal (daily) temperature cycle based on time of day
+        2. Trend extrapolation from historical data
+        3. Pressure system influence (highs warm, lows cool)
+
+        Args:
+            hour_idx: Hour index (0-23)
+            current_temp: Current temperature in the forecast units
+            astronomical_context: Day/night and solar position info
+            meteorological_state: Meteorological state
+            hourly_patterns: Hourly patterns with diurnal info
+            micro_evolution: Micro-evolution model
+
+        Returns:
+            float: Forecasted temperature
+        """
         if current_temp is None:
             current_temp = ForecastConstants.DEFAULT_TEMPERATURE
+
         forecast_temp = current_temp
 
-        # Astronomical diurnal variation (inlined from AstronomicalCalculator)
+        # Get diurnal patterns
         hour = astronomical_context["hour_of_day"]
         diurnal_patterns = hourly_patterns.get("diurnal_patterns", {}).get(
             KEY_TEMPERATURE, {}
         )
 
-        # Default diurnal patterns
+        # Default diurnal patterns (temperature adjustment from daily mean)
         default_patterns = {
             "dawn": DiurnalPatternConstants.TEMP_DAWN,
             "morning": DiurnalPatternConstants.TEMP_MORNING,
@@ -298,7 +319,6 @@ class HourlyForecastGenerator:
             "midnight": DiurnalPatternConstants.TEMP_MIDNIGHT,
         }
 
-        # Merge provided patterns with defaults
         patterns = {**default_patterns, **diurnal_patterns}
 
         # Map hour to diurnal period
@@ -317,36 +337,29 @@ class HourlyForecastGenerator:
         else:  # 2-5 AM
             diurnal_variation = patterns["midnight"]
 
-        # Apply distance-based dampening to diurnal variation for distant forecasts
-        diurnal_dampening = max(
-            ForecastConstants.HOURLY_MIN_DAMPENING,
-            1.0 - (hour_idx * ForecastConstants.HOURLY_DAMPENING_RATE),
-        )
+        # Dampen diurnal variation for distant hours
+        diurnal_dampening = max(0.5, 1.0 - (hour_idx * 0.015))
         diurnal_variation *= diurnal_dampening
         forecast_temp += diurnal_variation
 
-        # Pressure trend modulation
-        pressure_modulation = self._calculate_hourly_pressure_modulation(
-            meteorological_state, hour_idx
-        )
-        forecast_temp += pressure_modulation
+        # Pressure trend modulation - more significant than before
+        pressure_analysis = meteorological_state.get("pressure_analysis", {})
+        current_trend = pressure_analysis.get("current_trend", 0)
+        if isinstance(current_trend, (int, float)):
+            # Falling pressure often means cooling (cold front approach)
+            # Rising pressure after fall means post-frontal clearing
+            pressure_effect = current_trend * 0.5 * (hour_idx / 24.0)
+            forecast_temp += pressure_effect
 
-        # Micro-evolution influence
-        evolution_influence = self._calculate_hourly_evolution_influence(
-            micro_evolution, hour_idx
+        # Micro-evolution influence (small adjustments for system evolution)
+        evolution_rate = micro_evolution.get("evolution_rate", 0.3)
+        max_change = micro_evolution.get("micro_changes", {}).get(
+            "max_change_per_hour", 0.5
         )
-        forecast_temp += evolution_influence
-
-        # Natural variation
-        natural_variation = (
-            hour_idx % ForecastConstants.NATURAL_VARIATION_PERIOD - 1
-        ) * ForecastConstants.NATURAL_VARIATION_AMPLITUDE
-        distance_dampening = max(
-            ForecastConstants.HOURLY_NATURAL_VARIATION_DAMPENING,
-            1.0 - (hour_idx * ForecastConstants.HOURLY_VARIATION_DECAY),
-        )
-        natural_variation *= distance_dampening
-        forecast_temp += natural_variation
+        # Deterministic small variation based on hour
+        evolution_effect = evolution_rate * max_change * math.sin(hour_idx * 0.26)
+        evolution_effect *= max(0.3, 1.0 - (hour_idx * 0.03))
+        forecast_temp += evolution_effect
 
         return forecast_temp
 
@@ -359,74 +372,193 @@ class HourlyForecastGenerator:
         hourly_patterns: Dict[str, Any],
         micro_evolution: Dict[str, Any],
     ) -> str:
-        """Forecast condition for a specific hour with micro-evolution."""
+        """Forecast condition using pressure trend trajectory.
+
+        Condition evolution is driven by:
+        1. Pressure trend trajectory (falling = deteriorating, rising = improving)
+        2. Day/night transitions (sunny ↔ clear-night)
+        3. Cloud cover analysis for current state
+
+        Evolution happens gradually - conditions step up/down the severity ladder
+        based on the cumulative trajectory score.
+
+        Args:
+            hour_idx: Hour index (0-23)
+            current_condition: Current/previous hour's condition
+            astronomical_context: Day/night info
+            meteorological_state: Meteorological state
+            hourly_patterns: Hourly patterns
+            micro_evolution: Micro-evolution model
+
+        Returns:
+            str: Forecasted condition
+        """
         if current_condition is None:
             current_condition = ATTR_CONDITION_CLOUDY
-        forecast_condition = current_condition
 
-        cloud_analysis = meteorological_state.get("cloud_analysis", {})
-        cloud_cover = cloud_analysis.get("cloud_cover", 50)
         is_daytime = astronomical_context["is_daytime"]
 
-        # Apply time-of-day conversion
+        # Calculate cumulative trajectory score for this hour
+        trajectory_score = self._calculate_hourly_trajectory(
+            hour_idx, meteorological_state
+        )
+
+        # Evolve condition based on trajectory
+        forecast_condition = self._evolve_hourly_condition(
+            current_condition, trajectory_score, hour_idx
+        )
+
+        # Apply day/night conversion
+        forecast_condition = self._apply_day_night_conversion(
+            forecast_condition, is_daytime, meteorological_state
+        )
+
+        return forecast_condition
+
+    def _calculate_hourly_trajectory(
+        self, hour_idx: int, meteorological_state: Dict[str, Any]
+    ) -> float:
+        """Calculate cumulative trajectory score for hourly evolution.
+
+        Trajectory accumulates over hours based on pressure trends.
+        Rapid changes = faster evolution, stable = slow/no evolution.
+
+        Args:
+            hour_idx: Hour index (0-23)
+            meteorological_state: Meteorological state
+
+        Returns:
+            float: Trajectory score (-100 to +100)
+        """
+        pressure_analysis = meteorological_state.get("pressure_analysis", {})
+        current_trend = pressure_analysis.get("current_trend", 0)
+        storm_prob = pressure_analysis.get("storm_probability", 0)
+
+        if not isinstance(current_trend, (int, float)):
+            current_trend = 0.0
+        if not isinstance(storm_prob, (int, float)):
+            storm_prob = 0.0
+
+        # Base score from pressure trend
+        # -1.0 inHg/3h trend = -30 score per hour
+        hourly_contribution = current_trend * 30.0
+
+        # Storm probability adds negative (deteriorating) score
+        if storm_prob > 50:
+            hourly_contribution -= (storm_prob - 50) * 0.5
+
+        # Accumulate over hours (with diminishing weight for distant hours)
+        cumulative_factor = min(hour_idx, 6)  # Cap at 6 hours of accumulation
+        trajectory_score = hourly_contribution * cumulative_factor
+
+        # Cloud cover influence
+        cloud_analysis = meteorological_state.get("cloud_analysis", {})
+        cloud_cover = cloud_analysis.get("cloud_cover", 50)
+        if isinstance(cloud_cover, (int, float)):
+            # High cloud cover = negative bias
+            cloud_bias = (cloud_cover - 50) * 0.3
+            trajectory_score -= cloud_bias
+
+        return max(-100, min(100, trajectory_score))
+
+    def _evolve_hourly_condition(
+        self, current_condition: str, trajectory_score: float, hour_idx: int
+    ) -> str:
+        """Evolve condition based on hourly trajectory.
+
+        Similar to daily evolution but with smaller steps (max 1 per 3 hours).
+
+        Args:
+            current_condition: Starting condition
+            trajectory_score: Cumulative trajectory (-100 to +100)
+            hour_idx: Hour index for step limiting
+
+        Returns:
+            str: Evolved condition
+        """
+        condition_ladder = [
+            ATTR_CONDITION_POURING,
+            ATTR_CONDITION_LIGHTNING_RAINY,
+            ATTR_CONDITION_RAINY,
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_SUNNY,
+        ]
+
+        # Handle special conditions
+        if current_condition == ATTR_CONDITION_FOG:
+            if trajectory_score > 30:
+                return ATTR_CONDITION_SUNNY
+            elif trajectory_score > 0:
+                return ATTR_CONDITION_PARTLYCLOUDY
+            else:
+                return ATTR_CONDITION_CLOUDY
+
+        if current_condition == ATTR_CONDITION_SNOWY:
+            return ATTR_CONDITION_SNOWY
+
+        if current_condition == ATTR_CONDITION_CLEAR_NIGHT:
+            current_condition = ATTR_CONDITION_SUNNY
+
+        # Find current position
+        try:
+            current_idx = condition_ladder.index(current_condition)
+        except ValueError:
+            current_idx = 3  # Default to cloudy
+
+        # Calculate steps (max 1 step per 3 hours)
+        max_steps = max(1, hour_idx // 3)
+        steps = int(trajectory_score / 40)  # ±40 = 1 step
+        steps = max(-max_steps, min(max_steps, steps))
+
+        new_idx = max(0, min(len(condition_ladder) - 1, current_idx + steps))
+        return condition_ladder[new_idx]
+
+    def _apply_day_night_conversion(
+        self,
+        condition: str,
+        is_daytime: bool,
+        meteorological_state: Dict[str, Any],
+    ) -> str:
+        """Apply day/night condition conversions.
+
+        Args:
+            condition: Current condition
+            is_daytime: Whether it's daytime
+            meteorological_state: For cloud/storm checks
+
+        Returns:
+            str: Day/night appropriate condition
+        """
         if is_daytime:
-            if forecast_condition == ATTR_CONDITION_CLEAR_NIGHT:
-                forecast_condition = ATTR_CONDITION_SUNNY
-            elif (
-                forecast_condition == ATTR_CONDITION_CLOUDY
-                and cloud_cover <= ForecastConstants.CLOUD_COVER_CLOUDY_THRESHOLD + 10
-            ):
-                forecast_condition = ATTR_CONDITION_PARTLYCLOUDY
+            if condition == ATTR_CONDITION_CLEAR_NIGHT:
+                return ATTR_CONDITION_SUNNY
         else:
-            if forecast_condition == ATTR_CONDITION_SUNNY:
-                forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
-            elif forecast_condition == ATTR_CONDITION_PARTLYCLOUDY:
+            if condition == ATTR_CONDITION_SUNNY:
+                return ATTR_CONDITION_CLEAR_NIGHT
+            elif condition == ATTR_CONDITION_PARTLYCLOUDY:
+                # At night, check if conditions are deteriorating
                 pressure_analysis = meteorological_state.get("pressure_analysis", {})
-                pressure_trend = pressure_analysis.get("current_trend", 0)
                 storm_prob = pressure_analysis.get("storm_probability", 0)
+                pressure_trend = pressure_analysis.get("current_trend", 0)
 
                 if not isinstance(pressure_trend, (int, float)):
                     pressure_trend = 0.0
                 if not isinstance(storm_prob, (int, float)):
                     storm_prob = 0.0
 
+                cloud_analysis = meteorological_state.get("cloud_analysis", {})
+                cloud_cover = cloud_analysis.get("cloud_cover", 50)
+
                 if (
-                    pressure_trend < -abs(ForecastConstants.PRESSURE_SLOW_FALL)
-                    or storm_prob > ForecastConstants.STORM_THRESHOLD_MODERATE
-                    or cloud_cover > 70
+                    pressure_trend < -0.3
+                    or storm_prob > 40
+                    or (isinstance(cloud_cover, (int, float)) and cloud_cover > 70)
                 ):
-                    forecast_condition = ATTR_CONDITION_CLOUDY
-                else:
-                    forecast_condition = ATTR_CONDITION_CLEAR_NIGHT
+                    return ATTR_CONDITION_CLOUDY
+                return ATTR_CONDITION_CLEAR_NIGHT
 
-        # Pressure-aware micro-evolution
-        pressure_analysis = meteorological_state.get("pressure_analysis", {})
-        storm_probability = pressure_analysis.get("storm_probability", 0)
-
-        should_evolve = self._calculate_pressure_aware_evolution_frequency(
-            pressure_analysis, hour_idx
-        )
-
-        if should_evolve:
-            current_trend = pressure_analysis.get("current_trend", 0)
-            long_term_trend = pressure_analysis.get("long_term_trend", 0)
-            if not isinstance(current_trend, (int, float)):
-                current_trend = 0.0
-            if not isinstance(long_term_trend, (int, float)):
-                long_term_trend = 0.0
-
-            pressure_driven_condition = self._determine_pressure_driven_condition(
-                pressure_analysis,
-                storm_probability,
-                cloud_cover,
-                is_daytime,
-                forecast_condition,
-            )
-
-            if pressure_driven_condition:
-                forecast_condition = pressure_driven_condition
-
-        return forecast_condition
+        return condition
 
     def _calculate_astronomical_context(
         self,
@@ -595,36 +727,73 @@ class HourlyForecastGenerator:
         hourly_patterns: Dict[str, Any],
         sensor_data: Dict[str, Any],
     ) -> float:
-        """Comprehensive hourly precipitation forecasting."""
+        """Hourly precipitation forecasting using condition and trends.
+
+        Precipitation is primarily driven by condition type, with modulation
+        from pressure trends. No randomness - precipitation follows a
+        deterministic pattern based on meteorological state.
+
+        Args:
+            hour_idx: Hour index (0-23)
+            condition: Forecasted weather condition
+            meteorological_state: Meteorological state analysis
+            hourly_patterns: Hourly patterns
+            sensor_data: Sensor data
+
+        Returns:
+            float: Hourly precipitation amount
+        """
+        # Get current precipitation as baseline
         current_precipitation = sensor_data.get(KEY_PRECIPITATION, 0.0)
         if hasattr(current_precipitation, "_mock_name") or not isinstance(
             current_precipitation, (int, float)
         ):
             current_precipitation = 0.0
 
-        precipitation = current_precipitation
-        condition_variation = {
-            ATTR_CONDITION_LIGHTNING_RAINY: 1.5,
-            ATTR_CONDITION_POURING: 1.3,
-            ATTR_CONDITION_RAINY: 1.1,
-            ATTR_CONDITION_SNOWY: 0.8,
-            ATTR_CONDITION_CLOUDY: 0.5,
-            ATTR_CONDITION_FOG: 0.3,
+        # Base precipitation by condition (hourly rate, not daily)
+        condition_precip_hourly = {
+            ATTR_CONDITION_LIGHTNING_RAINY: 2.5,  # mm/hour during storms
+            ATTR_CONDITION_POURING: 3.0,  # mm/hour heavy rain
+            ATTR_CONDITION_RAINY: 1.0,  # mm/hour moderate rain
+            ATTR_CONDITION_SNOWY: 0.5,  # mm/hour snow
+            ATTR_CONDITION_CLOUDY: 0.0,  # No precip unless rainy
+            ATTR_CONDITION_FOG: 0.05,  # Trace from fog drip
         }
 
-        variation_factor = condition_variation.get(condition, 1.0)
-        precipitation *= variation_factor
-        variation = random.uniform(0.8, 1.2)  # nosec B311
-        precipitation *= variation
+        base_precip = condition_precip_hourly.get(condition, 0.0)
 
-        if condition in [
-            ATTR_CONDITION_LIGHTNING_RAINY,
-            ATTR_CONDITION_POURING,
-            ATTR_CONDITION_RAINY,
-        ]:
-            precipitation = max(precipitation, 0.1)
+        # If currently raining, use blend of current and expected
+        if current_precipitation > 0:
+            base_precip = (base_precip + current_precipitation) / 2
 
-        return round(max(0.0, precipitation), 2)
+        # Pressure trend modulation
+        # Falling pressure intensifies, rising pressure diminishes
+        pressure_analysis = meteorological_state.get("pressure_analysis", {})
+        pressure_trend = pressure_analysis.get("current_trend", 0)
+        if isinstance(pressure_trend, (int, float)):
+            if pressure_trend < -0.3:
+                base_precip *= 1.3  # Intensifying
+            elif pressure_trend > 0.2:
+                base_precip *= 0.7  # Diminishing
+
+        # Storm probability boost
+        storm_prob = pressure_analysis.get("storm_probability", 0)
+        if isinstance(storm_prob, (int, float)) and storm_prob > 60:
+            base_precip *= 1.0 + (storm_prob - 60) / 100  # Up to 40% boost
+
+        # Temporal pattern: precipitation often peaks a few hours into a system
+        # Use deterministic wave pattern instead of random
+        if base_precip > 0:
+            # Sinusoidal variation ±20% based on hour, peaks at hours 4, 12, 20
+            hour_phase = (hour_idx % 8) / 8.0 * math.pi * 2
+            temporal_factor = 1.0 + 0.2 * math.sin(hour_phase)
+            base_precip *= temporal_factor
+
+        # Distance dampening
+        confidence = max(0.3, 1.0 - (hour_idx * 0.02))
+        base_precip *= confidence
+
+        return round(max(0.0, base_precip), 2)
 
     def _forecast_wind(
         self,
@@ -686,11 +855,27 @@ class HourlyForecastGenerator:
         hourly_patterns: Dict[str, Any],
         condition: str,
     ) -> float:
-        """Comprehensive hourly humidity forecasting."""
+        """Hourly humidity forecasting with proper convergence.
+
+        Humidity evolves by:
+        1. Diurnal pattern (lower midday, higher at night)
+        2. Convergence toward condition-appropriate target (faster than before)
+        3. Moisture trend from analysis
+
+        Args:
+            hour_idx: Hour index (0-23)
+            current_humidity: Current humidity
+            meteorological_state: Meteorological state
+            hourly_patterns: Hourly patterns
+            condition: Forecasted condition
+
+        Returns:
+            float: Forecasted humidity
+        """
         if current_humidity is None:
             current_humidity = ForecastConstants.DEFAULT_HUMIDITY
-        humidity = current_humidity
 
+        # Get diurnal pattern
         hour = (dt_util.now() + timedelta(hours=hour_idx + 1)).hour
         diurnal_patterns = hourly_patterns.get("diurnal_patterns", {}).get(
             KEY_HUMIDITY, {}
@@ -706,23 +891,22 @@ class HourlyForecastGenerator:
             "midnight": DiurnalPatternConstants.HUMIDITY_MIDNIGHT,
         }
 
-        diurnal_patterns = {**default_humidity_patterns, **diurnal_patterns}
+        patterns = {**default_humidity_patterns, **diurnal_patterns}
 
         if 5 <= hour < 7:
-            diurnal_change = diurnal_patterns["dawn"]
+            diurnal_change = patterns["dawn"]
         elif 7 <= hour < 12:
-            diurnal_change = diurnal_patterns["morning"]
+            diurnal_change = patterns["morning"]
         elif 12 <= hour < 15:
-            diurnal_change = diurnal_patterns["noon"]
+            diurnal_change = patterns["noon"]
         elif 15 <= hour < 19:
-            diurnal_change = diurnal_patterns["afternoon"]
+            diurnal_change = patterns["afternoon"]
         elif 19 <= hour < 22:
-            diurnal_change = diurnal_patterns["evening"]
+            diurnal_change = patterns["evening"]
         else:
-            diurnal_change = diurnal_patterns["night"]
+            diurnal_change = patterns["night"]
 
-        humidity += diurnal_change
-
+        # Target humidity by condition
         condition_humidity = {
             ATTR_CONDITION_LIGHTNING_RAINY: HumidityTargetConstants.LIGHTNING_RAINY,
             ATTR_CONDITION_POURING: HumidityTargetConstants.POURING,
@@ -735,10 +919,26 @@ class HourlyForecastGenerator:
         }
 
         target_humidity = condition_humidity.get(condition, current_humidity)
-        humidity = current_humidity + (target_humidity - current_humidity) * 0.1
+
+        # Convergence: move 15% toward target per hour (reaches ~95% in 20 hours)
+        convergence_rate = 0.15
+        humidity_delta = (target_humidity - current_humidity) * convergence_rate
+
+        # Apply diurnal and convergence
+        forecast_humidity = current_humidity + humidity_delta + diurnal_change * 0.3
+
+        # Moisture trend influence
+        moisture_analysis = meteorological_state.get("moisture_analysis", {})
+        trend_direction = moisture_analysis.get("trend_direction", "stable")
+
+        if trend_direction == "increasing":
+            forecast_humidity += 2
+        elif trend_direction == "decreasing":
+            forecast_humidity -= 2
+
         return int(
             max(
                 ForecastConstants.MIN_HUMIDITY,
-                min(ForecastConstants.MAX_HUMIDITY, humidity),
+                min(ForecastConstants.MAX_HUMIDITY, forecast_humidity),
             )
         )

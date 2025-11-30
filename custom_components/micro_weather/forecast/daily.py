@@ -1,15 +1,20 @@
 """Daily forecast generation module.
 
 This module provides comprehensive 5-day daily forecast generation using:
-- Multi-factor meteorological analysis
-- Historical pattern recognition
-- Weather system evolution modeling
-- Advanced precipitation forecasting
+- Multi-factor meteorological analysis with trend extrapolation
+- Pressure trend acceleration for weather system evolution
+- Temperature/humidity/wind trend integration
+- Storm probability with trend-based adjustments
+
+Key improvements:
+- Trends are extrapolated forward, not just used as multipliers
+- Pressure trend acceleration predicts system arrival/departure
+- Historical volatility affects confidence, not random variation
+- Condition evolution follows pressure/moisture trajectory
 """
 
 from datetime import timedelta
 import logging
-import math
 from typing import Any, Dict, List
 
 from homeassistant.components.weather import (
@@ -30,12 +35,10 @@ from ..const import (
     KEY_HUMIDITY,
     KEY_OUTDOOR_TEMP,
     KEY_PRECIPITATION,
-    KEY_RAIN_RATE,
     KEY_TEMPERATURE,
     KEY_WIND_SPEED,
 )
 from ..meteorological_constants import (
-    CloudCoverThresholds,
     ForecastConstants,
     HumidityTargetConstants,
     PrecipitationConstants,
@@ -172,64 +175,81 @@ class DailyForecastGenerator:
         historical_patterns: Dict[str, Any],
         system_evolution: Dict[str, Any],
     ) -> float:
-        """Forecast temperature for a specific day using multi-factor analysis.
+        """Forecast temperature for a specific day using trend extrapolation.
+
+        Uses linear trend extrapolation as the primary method, with pressure
+        system influences as secondary adjustments. The key insight is that
+        temperature trends from the last 24h are often good predictors of
+        the next 1-2 days, with decreasing confidence thereafter.
 
         Args:
             day_idx: Day index (0-4)
-            current_temp: Current temperature
+            current_temp: Current temperature in °F
             meteorological_state: Meteorological state analysis
-            historical_patterns: Historical patterns
+            historical_patterns: Historical patterns with trend data
             system_evolution: System evolution model
 
         Returns:
-            float: Forecasted temperature
+            float: Forecasted temperature in °F
         """
-        forecast_temp = current_temp
+        # Get temperature trend from historical data (°F per hour)
+        temp_pattern = historical_patterns.get(KEY_TEMPERATURE, {})
+        temp_trend_per_hour = temp_pattern.get("trend", 0)
+        if not isinstance(temp_trend_per_hour, (int, float)):
+            temp_trend_per_hour = 0.0
 
-        # Base astronomical seasonal adjustment
-        seasonal_adjustment = self._calculate_seasonal_temperature_adjustment(day_idx)
-        forecast_temp += seasonal_adjustment
+        # Extrapolate trend forward (24 hours per day)
+        # But dampen the extrapolation for distant days
+        hours_forward = (day_idx + 1) * 24
+        trend_confidence = self._calculate_trend_confidence(day_idx, temp_pattern)
 
-        # Pressure system influence
+        # Linear extrapolation with confidence dampening
+        trend_extrapolation = temp_trend_per_hour * hours_forward * trend_confidence
+        forecast_temp = current_temp + trend_extrapolation
+
+        # Pressure system influence (modifies the trend direction)
         pressure_influence = self._calculate_pressure_temperature_influence(
             meteorological_state, day_idx
         )
         forecast_temp += pressure_influence
 
-        # Historical pattern influence
-        pattern_influence = self._calculate_historical_pattern_influence(
-            historical_patterns, day_idx, KEY_TEMPERATURE
-        )
-        forecast_temp += pattern_influence
-
-        # Weather system evolution influence
-        evolution_influence = self._calculate_system_evolution_influence(
-            system_evolution, day_idx, KEY_TEMPERATURE
-        )
-        forecast_temp += evolution_influence
-
-        # Atmospheric stability dampening
-        stability = meteorological_state["atmospheric_stability"]
-        stability_dampening = (
-            1.0 - stability * ForecastConstants.STABILITY_DAMPENING_FACTOR
-        )  # Stable systems have less variation
-        forecast_temp = (
-            current_temp + (forecast_temp - current_temp) * stability_dampening
-        )
-
-        # Distance-based uncertainty using exponential decay (more realistic than linear)
-        # Day 1 = 95% confidence, Day 2 = 85%, Day 3 = 70%, Day 4 = 55%, Day 5 = 35%
-        # This reflects that forecast skill degrades exponentially with time
-        uncertainty_factor = (
-            math.exp(-ForecastConstants.UNCERTAINTY_DECAY_RATE * day_idx)
-            * ForecastConstants.MAX_FORECAST_CONFIDENCE
-            + ForecastConstants.MIN_FORECAST_CONFIDENCE
-        )
-        forecast_temp = (
-            current_temp + (forecast_temp - current_temp) * uncertainty_factor
+        # Clamp unreasonable extrapolations
+        # Max reasonable change: ±30°F over 5 days in extreme conditions
+        max_change = 6.0 * (day_idx + 1)  # ±6°F per day maximum
+        forecast_temp = max(
+            current_temp - max_change, min(current_temp + max_change, forecast_temp)
         )
 
         return forecast_temp
+
+    def _calculate_trend_confidence(
+        self, day_idx: int, pattern_data: Dict[str, Any]
+    ) -> float:
+        """Calculate confidence in trend extrapolation.
+
+        Confidence decreases with:
+        - Distance from current time
+        - High volatility in historical data
+        - Low sample count
+
+        Args:
+            day_idx: Day index (0-4)
+            pattern_data: Historical pattern data with volatility info
+
+        Returns:
+            float: Confidence factor 0.0-1.0
+        """
+        volatility = pattern_data.get("volatility", 5.0)
+        if not isinstance(volatility, (int, float)):
+            volatility = 5.0
+
+        # Base confidence decay: Day 0=0.9, Day 1=0.7, Day 2=0.5, Day 3=0.3, Day 4=0.15
+        base_confidence = max(0.15, 0.9 - (day_idx * 0.2))
+
+        # High volatility reduces confidence (volatility of 10+ halves confidence)
+        volatility_factor = max(0.3, 1.0 - (volatility / 20.0))
+
+        return base_confidence * volatility_factor
 
     def forecast_condition(
         self,
@@ -239,39 +259,33 @@ class DailyForecastGenerator:
         historical_patterns: Dict[str, Any],
         system_evolution: Dict[str, Any],
     ) -> str:
-        """Forecast condition for a specific day using all meteorological factors.
+        """Forecast condition using pressure/humidity trend trajectory.
+
+        The key insight is that weather conditions follow predictable
+        trajectories based on pressure and humidity trends:
+        - Falling pressure + rising humidity → deteriorating conditions
+        - Rising pressure + falling humidity → improving conditions
+        - The rate of change predicts timing of system arrival
 
         Args:
             day_idx: Day index (0-4)
             current_condition: Current weather condition
             meteorological_state: Meteorological state analysis
-            historical_patterns: Historical patterns
+            historical_patterns: Historical patterns with trends
             system_evolution: System evolution model
 
         Returns:
             str: Forecasted weather condition
         """
-        # Start with current condition as base
-        forecast_condition = current_condition
-
-        # Apply evolution stage mapping for future days
-        forecast_condition = self._apply_evolution_stage_mapping(
-            forecast_condition, day_idx, system_evolution, current_condition
+        # Calculate trend-based trajectory score
+        # Negative = deteriorating, Positive = improving
+        trajectory_score = self._calculate_condition_trajectory(
+            meteorological_state, historical_patterns, day_idx
         )
 
-        # Apply pressure system overrides for day 0
-        forecast_condition = self._apply_pressure_system_overrides(
-            forecast_condition, day_idx, meteorological_state, system_evolution
-        )
-
-        # Apply cloud cover analysis for future days
-        forecast_condition = self._apply_cloud_cover_analysis(
-            forecast_condition, day_idx, meteorological_state, system_evolution
-        )
-
-        # Apply moisture analysis for precipitation potential
-        forecast_condition = self._apply_moisture_precipitation_logic(
-            forecast_condition, meteorological_state, day_idx
+        # Start with current condition, then evolve based on trajectory
+        forecast_condition = self._evolve_condition_by_trajectory(
+            current_condition, trajectory_score, day_idx
         )
 
         # Apply storm probability overrides (highest priority)
@@ -281,220 +295,129 @@ class DailyForecastGenerator:
 
         return forecast_condition
 
-    def _apply_evolution_stage_mapping(
+    def _calculate_condition_trajectory(
         self,
-        forecast_condition: str,
-        day_idx: int,
-        system_evolution: Dict[str, Any],
-        current_condition: str,
-    ) -> str:
-        """Apply evolution stage mapping for future days.
-
-        Args:
-            forecast_condition: Current forecast condition
-            day_idx: Day index (0-4)
-            system_evolution: System evolution model
-            current_condition: Current weather condition
-
-        Returns:
-            str: Updated forecast condition based on evolution stage
-        """
-        # Get evolution stage for this day (skip for day 0)
-        if day_idx > 0:
-            evolution_path = system_evolution.get("evolution_path", [])
-            if day_idx < len(evolution_path):
-                evolution_stage = evolution_path[day_idx]
-
-                # Map evolution stages to conditions
-                evolution_condition_map = {
-                    "stable_high": ATTR_CONDITION_SUNNY,
-                    "weakening_high": ATTR_CONDITION_PARTLYCLOUDY,
-                    "active_low": ATTR_CONDITION_CLOUDY,
-                    "frontal_passage": ATTR_CONDITION_RAINY,
-                    "frontal_approach": ATTR_CONDITION_CLOUDY,
-                    "post_frontal": ATTR_CONDITION_PARTLYCLOUDY,
-                    "clearing": ATTR_CONDITION_SUNNY,
-                    "transitional": ATTR_CONDITION_PARTLYCLOUDY,
-                    "new_system": ATTR_CONDITION_CLOUDY,
-                    "current": current_condition,
-                    "transitioning": ATTR_CONDITION_PARTLYCLOUDY,
-                    "new_pattern": ATTR_CONDITION_CLOUDY,
-                    "stabilizing": ATTR_CONDITION_SUNNY,
-                }
-
-                forecast_condition = evolution_condition_map.get(
-                    evolution_stage, current_condition
-                )
-
-        return forecast_condition
-
-    def _apply_pressure_system_overrides(
-        self,
-        forecast_condition: str,
-        day_idx: int,
         meteorological_state: Dict[str, Any],
-        system_evolution: Dict[str, Any],
-    ) -> str:
-        """Apply pressure system overrides for day 0 forecasting.
-
-        Args:
-            forecast_condition: Current forecast condition
-            day_idx: Day index (0-4)
-            meteorological_state: Meteorological state analysis
-            system_evolution: System evolution model
-
-        Returns:
-            str: Updated forecast condition based on pressure systems
-        """
-        if day_idx != 0:
-            return forecast_condition
-
-        pressure_system = meteorological_state["pressure_analysis"].get(
-            "pressure_system", "normal"
-        )
-        storm_probability = meteorological_state["pressure_analysis"].get(
-            "storm_probability", 0
-        )
-        cloud_analysis = meteorological_state["cloud_analysis"]
-        cloud_cover = cloud_analysis.get("cloud_cover", 50)
-
-        # Get confidence value
-        confidence = system_evolution.get("confidence_levels", [0.5])
-        confidence_value = confidence[0] if confidence else 0.5
-        confidence_value = max(
-            confidence_value, ForecastConstants.DAY_ZERO_MIN_CONFIDENCE
-        )
-
-        current_trend = meteorological_state["pressure_analysis"].get(
-            "current_trend", 0
-        )
-
-        # High pressure systems improve conditions
-        if (
-            pressure_system == "high_pressure"
-            and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
-        ):
-            if cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:  # < 75%
-                forecast_condition = (
-                    ATTR_CONDITION_SUNNY
-                    if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY
-                    else ATTR_CONDITION_PARTLYCLOUDY
-                )
-
-        # Low pressure systems worsen conditions
-        elif (
-            pressure_system == "low_pressure"
-            and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
-        ):
-            if cloud_cover > CloudCoverThresholds.THRESHOLD_SUNNY:  # > 20%
-                forecast_condition = ATTR_CONDITION_CLOUDY
-
-        # Normal pressure systems: use trend direction
-        elif (
-            pressure_system == "normal"
-            and confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH
-        ):
-            if (
-                current_trend < -ForecastConstants.PRESSURE_TREND_FALLING_THRESHOLD
-            ):  # Falling pressure in normal system
-                if cloud_cover > CloudCoverThresholds.THRESHOLD_SUNNY:
-                    forecast_condition = ATTR_CONDITION_CLOUDY
-            elif (
-                current_trend > ForecastConstants.PRESSURE_TREND_RISING_THRESHOLD
-            ):  # Rising pressure in normal system
-                if cloud_cover < CloudCoverThresholds.THRESHOLD_CLOUDY:
-                    forecast_condition = (
-                        ATTR_CONDITION_SUNNY
-                        if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY
-                        else ATTR_CONDITION_PARTLYCLOUDY
-                    )
-
-        # High storm probability always indicates precipitation
-        if storm_probability > ForecastConstants.STORM_PRECIPITATION_THRESHOLD:
-            forecast_condition = (
-                ATTR_CONDITION_LIGHTNING_RAINY
-                if storm_probability >= ForecastConstants.STORM_THRESHOLD_SEVERE
-                else ATTR_CONDITION_RAINY
-            )
-
-        return forecast_condition
-
-    def _apply_cloud_cover_analysis(
-        self,
-        forecast_condition: str,
+        historical_patterns: Dict[str, Any],
         day_idx: int,
-        meteorological_state: Dict[str, Any],
-        system_evolution: Dict[str, Any],
-    ) -> str:
-        """Apply cloud cover analysis for future days.
+    ) -> float:
+        """Calculate weather trajectory score from trends.
+
+        Combines pressure and humidity trends to predict condition evolution.
+        Score ranges from -100 (severe deterioration) to +100 (major improvement).
+
+        Key factors:
+        - Pressure trend: Falling = -20 to -50 per inHg/3h, Rising = +20 to +50
+        - Humidity trend: Rising = -10 to -30, Falling = +10 to +30
+        - Storm probability: Adds -20 to -60 for high probabilities
 
         Args:
-            forecast_condition: Current forecast condition
-            day_idx: Day index (0-4)
             meteorological_state: Meteorological state analysis
-            system_evolution: System evolution model
+            historical_patterns: Historical patterns
+            day_idx: Day index for dampening
 
         Returns:
-            str: Updated forecast condition based on cloud cover
+            float: Trajectory score (-100 to +100)
         """
-        if day_idx == 0:
-            return forecast_condition
+        pressure_analysis = meteorological_state.get("pressure_analysis", {})
+        current_trend = pressure_analysis.get("current_trend", 0)
+        long_term_trend = pressure_analysis.get("long_term_trend", 0)
+        storm_probability = pressure_analysis.get("storm_probability", 0)
 
-        cloud_analysis = meteorological_state["cloud_analysis"]
-        cloud_cover = cloud_analysis.get("cloud_cover", 50)
+        # Ensure numeric values
+        if not isinstance(current_trend, (int, float)):
+            current_trend = 0.0
+        if not isinstance(long_term_trend, (int, float)):
+            long_term_trend = 0.0
+        if not isinstance(storm_probability, (int, float)):
+            storm_probability = 0.0
 
-        # Get confidence value
-        confidence = system_evolution.get("confidence_levels", [0.5])
-        if confidence and len(confidence) > min(day_idx, len(confidence) - 1):
-            confidence_value = confidence[min(day_idx, len(confidence) - 1)]
-        else:
-            confidence_value = 0.5
+        # Pressure contribution: -1.0 inHg/3h trend = -40 score
+        pressure_score = current_trend * 40.0
 
-        # For future days, apply normal cloud cover logic
-        if confidence_value > ForecastConstants.CONFIDENCE_THRESHOLD_HIGH:
-            if cloud_cover < CloudCoverThresholds.THRESHOLD_SUNNY:
-                forecast_condition = ATTR_CONDITION_SUNNY
-            elif (
-                cloud_cover > ForecastConstants.CLOUD_COVER_CLOUDY_THRESHOLD
-            ):  # Lower threshold for cloudy
-                forecast_condition = ATTR_CONDITION_CLOUDY
+        # Long-term trend reinforcement (smaller weight)
+        pressure_score += long_term_trend * 20.0
 
-        return forecast_condition
+        # Get humidity trend from patterns
+        humidity_pattern = historical_patterns.get(KEY_HUMIDITY, {})
+        humidity_trend = humidity_pattern.get("trend", 0)
+        if not isinstance(humidity_trend, (int, float)):
+            humidity_trend = 0.0
 
-    def _apply_moisture_precipitation_logic(
-        self,
-        forecast_condition: str,
-        meteorological_state: Dict[str, Any],
-        day_idx: int,
+        # Humidity contribution: Rising humidity = deteriorating
+        humidity_score = -humidity_trend * 5.0  # °%/hour * 5
+
+        # Storm probability penalty
+        storm_penalty = 0.0
+        if storm_probability > 60:
+            storm_penalty = -(storm_probability - 40)  # -20 to -60
+
+        # Combine scores
+        total_score = pressure_score + humidity_score + storm_penalty
+
+        # Dampen for future days (less certain)
+        confidence = max(0.3, 1.0 - (day_idx * 0.15))
+        total_score *= confidence
+
+        return max(-100, min(100, total_score))
+
+    def _evolve_condition_by_trajectory(
+        self, current_condition: str, trajectory_score: float, day_idx: int
     ) -> str:
-        """Apply moisture analysis for precipitation potential.
+        """Evolve condition based on trajectory score.
 
-        Only applies to current day (day_idx == 0) to avoid false rain predictions
-        for future days based on current moisture conditions.
+        Condition ladder (worst to best):
+        pouring → lightning-rainy → rainy → cloudy → partly-cloudy → sunny
 
         Args:
-            forecast_condition: Current forecast condition
-            meteorological_state: Meteorological state analysis
-            day_idx: Day index (0-4)
+            current_condition: Starting condition
+            trajectory_score: -100 (deteriorating) to +100 (improving)
+            day_idx: Day index for step calculation
 
         Returns:
-            str: Updated forecast condition based on moisture analysis
+            str: Evolved condition
         """
-        # Only apply moisture precipitation logic to the current day
-        # Future days should rely on pressure systems and evolution patterns
-        if day_idx != 0:
-            return forecast_condition
+        # Define condition ladder
+        condition_ladder = [
+            ATTR_CONDITION_POURING,
+            ATTR_CONDITION_LIGHTNING_RAINY,
+            ATTR_CONDITION_RAINY,
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_SUNNY,
+        ]
 
-        moisture_analysis = meteorological_state["moisture_analysis"]
-        condensation_potential = moisture_analysis.get("condensation_potential", 0.3)
+        # Handle special conditions
+        if current_condition == ATTR_CONDITION_FOG:
+            # Fog typically clears, evolve toward sunny
+            if trajectory_score > 20:
+                return ATTR_CONDITION_SUNNY
+            elif trajectory_score > 0:
+                return ATTR_CONDITION_PARTLYCLOUDY
+            else:
+                return ATTR_CONDITION_CLOUDY
 
-        if (
-            condensation_potential > ForecastConstants.CONDENSATION_RAIN_THRESHOLD
-            and forecast_condition == ATTR_CONDITION_CLOUDY
-        ):
-            forecast_condition = ATTR_CONDITION_RAINY
+        if current_condition == ATTR_CONDITION_SNOWY:
+            # Keep snowy if cold, otherwise treat like rainy
+            return ATTR_CONDITION_SNOWY
 
-        return forecast_condition
+        # Find current position on ladder
+        try:
+            current_idx = condition_ladder.index(current_condition)
+        except ValueError:
+            current_idx = 3  # Default to cloudy if unknown
+
+        # Calculate steps to move (max 2 steps per day for realism)
+        # Score of ±50 = 1 step, ±100 = 2 steps
+        steps = int(trajectory_score / 50)
+        steps = max(-2, min(2, steps))  # Clamp to ±2
+
+        # Apply steps with day dampening (smaller steps for distant days)
+        if day_idx > 2:
+            steps = max(-1, min(1, steps))
+
+        new_idx = max(0, min(len(condition_ladder) - 1, current_idx + steps))
+        return condition_ladder[new_idx]
 
     def _apply_storm_probability_overrides(
         self,
@@ -541,117 +464,136 @@ class DailyForecastGenerator:
     def _calculate_seasonal_temperature_adjustment(self, day_index: int) -> float:
         """Calculate seasonal temperature adjustment for forecast days.
 
-        Returns small adjustments (±2°C) based on seasonal patterns.
+        Uses actual date to determine seasonal trend direction.
+        Spring/early summer: warming trend (+0.5°F/day)
+        Late summer/fall: cooling trend (-0.5°F/day)
 
         Args:
             day_index: Day index (0-4)
 
         Returns:
-            float: Temperature adjustment in degrees
+            float: Temperature adjustment in degrees F
         """
-        # Simple seasonal pattern - slightly cooler in early days, warmer later
-        base_adjustment = (
-            day_index - ForecastConstants.SEASONAL_ADJUSTMENT_CENTER
-        ) * ForecastConstants.SEASONAL_ADJUSTMENT_BASE_RATE
-        seasonal_variation = ForecastConstants.SEASONAL_ADJUSTMENT_VARIATION * (
-            (day_index % ForecastConstants.SEASONAL_ADJUSTMENT_CYCLE)
-            - ForecastConstants.SEASONAL_ADJUSTMENT_CYCLE_OFFSET
-        )
+        now = dt_util.now()
+        day_of_year = now.timetuple().tm_yday
 
-        adjustment = base_adjustment + seasonal_variation
-        return max(
-            -ForecastConstants.SEASONAL_ADJUSTMENT_MAX_RANGE,
-            min(ForecastConstants.SEASONAL_ADJUSTMENT_MAX_RANGE, adjustment),
-        )
+        # Determine seasonal trend based on day of year
+        # Days 1-172 (Jan 1 - Jun 21): Warming trend
+        # Days 173-355 (Jun 22 - Dec 21): Cooling trend
+        if day_of_year < 172:
+            # Spring: warming at ~0.3°F per day
+            seasonal_rate = 0.3
+        elif day_of_year < 265:
+            # Summer: relatively stable
+            seasonal_rate = 0.1
+        elif day_of_year < 355:
+            # Fall: cooling at ~0.3°F per day
+            seasonal_rate = -0.3
+        else:
+            # Winter: relatively stable (already cold)
+            seasonal_rate = -0.1
+
+        # Apply rate for the forecast day
+        adjustment = seasonal_rate * day_index
+
+        return max(-2.0, min(2.0, adjustment))
 
     def _calculate_pressure_temperature_influence(
         self, meteorological_state: Dict[str, Any], day_idx: int
     ) -> float:
-        """Calculate temperature influence from pressure systems.
+        """Calculate temperature influence from pressure trends.
+
+        Pressure trends indicate air mass changes:
+        - Rapid pressure fall often precedes cooler air (cold front approach)
+        - Rapid pressure rise often follows cooler air (cold front passage)
+        - Slow pressure rise typically means warming (high pressure building)
 
         Args:
             meteorological_state: Meteorological state analysis
             day_idx: Day index (0-4)
 
         Returns:
-            float: Temperature influence in degrees
+            float: Temperature influence in degrees F
         """
-        pressure_analysis = meteorological_state["pressure_analysis"]
+        pressure_analysis = meteorological_state.get("pressure_analysis", {})
         pressure_system = pressure_analysis.get("pressure_system", "normal")
-
-        # Base influence by pressure system
-        if pressure_system == "high_pressure":
-            base_influence = (
-                ForecastConstants.HIGH_PRESSURE_TEMP_INFLUENCE
-            )  # High pressure = warmer
-        elif pressure_system == "low_pressure":
-            base_influence = (
-                ForecastConstants.LOW_PRESSURE_TEMP_INFLUENCE
-            )  # Low pressure = cooler
-        else:
-            base_influence = 0.0
-
-        # Trend influence
         current_trend = pressure_analysis.get("current_trend", 0)
-        long_trend = pressure_analysis.get("long_term_trend", 0)
+        long_term_trend = pressure_analysis.get("long_term_trend", 0)
 
-        trend_influence = (current_trend * ForecastConstants.CURRENT_TREND_WEIGHT) + (
-            long_trend * ForecastConstants.LONG_TERM_TREND_WEIGHT
-        )
+        # Ensure numeric values
+        if not isinstance(current_trend, (int, float)):
+            current_trend = 0.0
+        if not isinstance(long_term_trend, (int, float)):
+            long_term_trend = 0.0
 
-        # Dampen for forecast distance
-        distance_dampening = max(
-            ForecastConstants.DAILY_MIN_DAMPENING,
-            1.0 - (day_idx * ForecastConstants.DAILY_DAMPENING_RATE),
-        )
-        total_influence = (base_influence + trend_influence) * distance_dampening
+        influence = 0.0
 
-        # Use absolute value of LOW_PRESSURE influence as max
-        max_influence = abs(ForecastConstants.LOW_PRESSURE_TEMP_INFLUENCE) + abs(
-            ForecastConstants.HIGH_PRESSURE_TEMP_INFLUENCE
-        )
-        return max(-max_influence, min(max_influence, total_influence))
+        # Rapid pressure fall (< -0.5 inHg/3h) often means approaching cold front
+        if current_trend < -0.5:
+            # Expect cooling after the front passes
+            influence = -3.0 * (day_idx + 1)  # More cooling for distant days
+        elif current_trend < -0.2:
+            influence = -1.0 * (day_idx + 1)
+        # Rising pressure after a fall often means post-frontal clearing
+        elif current_trend > 0.3:
+            influence = 1.5 * max(0, 2 - day_idx)  # Warming on first days only
+
+        # Pressure system base effect
+        if pressure_system == "high_pressure":
+            influence += 2.0  # High pressure = warmer (clear skies, solar heating)
+        elif pressure_system == "low_pressure":
+            influence -= 2.0  # Low pressure = cooler (clouds block sun)
+
+        # Dampen for distant days
+        distance_dampening = max(0.3, 1.0 - (day_idx * 0.15))
+        influence *= distance_dampening
+
+        return max(-8.0, min(8.0, influence))
 
     def _calculate_historical_pattern_influence(
         self, historical_patterns: Dict[str, Any], day_idx: int, variable: str
     ) -> float:
-        """Calculate influence from historical patterns.
+        """Calculate influence from historical trend patterns.
+
+        Uses actual trend data to extrapolate forward, not random variation.
+        The trend from historical data is applied with decreasing confidence.
 
         Args:
-            historical_patterns: Historical weather patterns
+            historical_patterns: Historical weather patterns with trend data
             day_idx: Day index (0-4)
             variable: Variable name (e.g., KEY_TEMPERATURE)
 
         Returns:
-            float: Pattern influence value
+            float: Pattern influence value (trend-based extrapolation)
         """
         if variable not in historical_patterns:
             return 0.0
 
         pattern_data = historical_patterns[variable]
-        volatility = pattern_data.get("volatility", 1.0)
+        trend = pattern_data.get("trend", 0)
 
-        # Use volatility to estimate likely variation
-        # Higher volatility = more potential for change
-        max_influence = volatility * ForecastConstants.PATTERN_VOLATILITY_MULTIPLIER
+        if not isinstance(trend, (int, float)):
+            return 0.0
 
-        # Dampen based on forecast distance and pattern strength
-        distance_factor = max(
-            ForecastConstants.MIN_PATTERN_INFLUENCE,
-            1.0 - (day_idx * ForecastConstants.PATTERN_DISTANCE_DECAY),
-        )
-        influence = max_influence * distance_factor
+        # Extrapolate trend forward with dampening
+        # Trend is in units per hour, extrapolate for (day_idx+1)*24 hours
+        hours_forward = (day_idx + 1) * 24
+        confidence = self._calculate_trend_confidence(day_idx, pattern_data)
 
-        # Random component based on historical patterns (±influence)
-        # In a real implementation, this would use actual pattern recognition
-        return influence * (
-            ForecastConstants.PATTERN_ALTERNATION_BASELINE - (day_idx % 2)
-        )  # Simplified alternating pattern
+        # Apply trend with dampening
+        influence = (
+            trend * hours_forward * confidence * 0.5
+        )  # 50% weight vs temperature
+
+        return max(-5.0, min(5.0, influence))
 
     def _calculate_system_evolution_influence(
         self, system_evolution: Dict[str, Any], day_idx: int, variable: str
     ) -> float:
         """Calculate influence from weather system evolution.
+
+        Uses evolution confidence to modulate forecast uncertainty.
+        Low confidence means we should stay closer to current values.
 
         Args:
             system_evolution: System evolution model
@@ -659,24 +601,22 @@ class DailyForecastGenerator:
             variable: Variable name (e.g., KEY_TEMPERATURE)
 
         Returns:
-            float: Evolution influence value
+            float: Evolution influence value (small adjustment for uncertainty)
         """
-        evolution_path = system_evolution.get("evolution_path", [])
         confidence_levels = system_evolution.get("confidence_levels", [])
 
-        if day_idx >= len(evolution_path):
+        if day_idx >= len(confidence_levels):
             return 0.0
 
-        # Get confidence for this day's evolution stage
+        # Get confidence for this day
         confidence = confidence_levels[min(day_idx, len(confidence_levels) - 1)]
 
-        # Evolution influence based on system type
-        # This is a simplified model - real implementation would be more sophisticated
-        evolution_influence = (
-            confidence * ForecastConstants.EVOLUTION_BASE_INFLUENCE
-        )  # Base influence
+        # Low confidence = small random-like variation to express uncertainty
+        # This is the only place where we add uncertainty variation
+        uncertainty = 1.0 - confidence
+        variation = uncertainty * 2.0 * ((day_idx % 2) - 0.5)  # ±1°F for low confidence
 
-        return evolution_influence
+        return variation
 
     def _forecast_precipitation(
         self,
@@ -686,7 +626,12 @@ class DailyForecastGenerator:
         historical_patterns: Dict[str, Any],
         sensor_data: Dict[str, Any],
     ) -> float:
-        """Comprehensive precipitation forecasting using atmospheric analysis and rain history.
+        """Forecast precipitation using condition and trend trajectory.
+
+        Precipitation forecast is primarily driven by:
+        1. The forecasted condition (rainy, etc.)
+        2. Humidity and pressure trends (are we trending wetter?)
+        3. Storm probability from pressure analysis
 
         Args:
             day_idx: Day index (0-4)
@@ -701,41 +646,54 @@ class DailyForecastGenerator:
         # Get base precipitation by condition
         precipitation = self._get_base_precipitation_by_condition(condition)
 
-        # Apply storm probability enhancement
-        storm_probability = meteorological_state["pressure_analysis"].get(
-            "storm_probability", 0
-        )
-        precipitation = self._apply_storm_probability_enhancement(
-            precipitation, storm_probability
-        )
+        # Get humidity trend - rising humidity increases precipitation chance
+        humidity_pattern = historical_patterns.get(KEY_HUMIDITY, {})
+        humidity_trend = humidity_pattern.get("trend", 0)
+        if isinstance(humidity_trend, (int, float)) and humidity_trend > 0.5:
+            # Rising humidity increases precipitation by up to 50%
+            precipitation *= 1.0 + min(0.5, humidity_trend / 5.0)
 
         # Apply pressure trend adjustments
-        pressure_trend = meteorological_state["pressure_analysis"].get(
-            "current_trend", 0
-        )
-        precipitation = self._apply_pressure_trend_adjustment(
-            precipitation, pressure_trend
-        )
+        pressure_analysis = meteorological_state.get("pressure_analysis", {})
+        pressure_trend = pressure_analysis.get("current_trend", 0)
 
-        # Apply moisture factors
-        moisture_analysis = meteorological_state["moisture_analysis"]
-        precipitation = self._apply_moisture_factors(precipitation, moisture_analysis)
+        if isinstance(pressure_trend, (int, float)):
+            if pressure_trend < -0.5:  # Rapidly falling pressure
+                precipitation *= 1.5
+            elif pressure_trend < -0.2:  # Slowly falling pressure
+                precipitation *= 1.25
+            elif pressure_trend > 0.3:  # Rising pressure (clearing)
+                precipitation *= 0.5
 
-        # Apply atmospheric stability
-        stability = meteorological_state["atmospheric_stability"]
-        precipitation = self._apply_atmospheric_stability(precipitation, stability)
+        # Storm probability enhancement
+        storm_probability = pressure_analysis.get("storm_probability", 0)
+        if isinstance(storm_probability, (int, float)):
+            if storm_probability > 70:
+                precipitation *= 1.8
+            elif storm_probability > 40:
+                precipitation *= 1.4
 
-        # Apply historical patterns
-        precipitation = self._apply_historical_patterns(
-            precipitation, historical_patterns, day_idx
-        )
+        # Condensation potential for today only
+        if day_idx == 0:
+            moisture_analysis = meteorological_state.get("moisture_analysis", {})
+            condensation_potential = moisture_analysis.get("condensation_potential", 0)
+            if isinstance(condensation_potential, (int, float)):
+                precipitation *= 1.0 + condensation_potential * 0.5
 
-        # Apply distance dampening and unit conversion
-        precipitation = self._apply_distance_dampening(
-            precipitation, day_idx, sensor_data
-        )
+        # Distance dampening - less confident about distant precipitation
+        distance_factor = max(0.3, 1.0 - (day_idx * 0.15))
+        precipitation *= distance_factor
 
-        return precipitation
+        # Convert to sensor units if needed
+        rain_rate_unit = sensor_data.get("rain_rate_unit")
+        if (
+            rain_rate_unit
+            and isinstance(rain_rate_unit, str)
+            and any(unit in rain_rate_unit.lower() for unit in ["in", "inch", "inches"])
+        ):
+            precipitation /= PrecipitationConstants.MM_TO_INCHES
+
+        return round(max(0.0, precipitation), 2)
 
     def _get_base_precipitation_by_condition(self, condition: str) -> float:
         """Get base precipitation amount based on weather condition.
@@ -756,153 +714,6 @@ class DailyForecastGenerator:
         }
         return condition_precip.get(condition, 0.0)
 
-    def _apply_storm_probability_enhancement(
-        self, precipitation: float, storm_probability: float
-    ) -> float:
-        """Apply storm probability enhancement to precipitation.
-
-        Args:
-            precipitation: Current precipitation amount
-            storm_probability: Storm probability percentage
-
-        Returns:
-            float: Enhanced precipitation amount
-        """
-        if storm_probability > ForecastConstants.STORM_THRESHOLD_HIGH:
-            precipitation *= ForecastConstants.PRECIP_MULT_STORM_HIGH
-        elif storm_probability > ForecastConstants.STORM_THRESHOLD_MODERATE:
-            precipitation *= ForecastConstants.PRECIP_MULT_STORM_MODERATE
-        return precipitation
-
-    def _apply_pressure_trend_adjustment(
-        self, precipitation: float, pressure_trend: float
-    ) -> float:
-        """Apply pressure trend adjustments to precipitation.
-
-        Args:
-            precipitation: Current precipitation amount
-            pressure_trend: Pressure trend value
-
-        Returns:
-            float: Adjusted precipitation amount
-        """
-        if pressure_trend < -abs(
-            ForecastConstants.PRESSURE_RAPID_FALL
-        ):  # Rapidly falling pressure
-            precipitation *= ForecastConstants.PRECIP_MULT_RAPID_FALL
-        elif pressure_trend < -abs(
-            ForecastConstants.PRESSURE_SLOW_FALL
-        ):  # Slowly falling pressure
-            precipitation *= ForecastConstants.PRECIP_MULT_SLOW_FALL
-        elif (
-            pressure_trend > ForecastConstants.PRESSURE_MODERATE_RISE
-        ):  # Rising pressure (clearing)
-            precipitation *= ForecastConstants.PRECIP_MULT_RISING
-        return precipitation
-
-    def _apply_moisture_factors(
-        self, precipitation: float, moisture_analysis: Dict[str, Any]
-    ) -> float:
-        """Apply moisture transport and condensation factors to precipitation.
-
-        Args:
-            precipitation: Current precipitation amount
-            moisture_analysis: Moisture analysis dictionary
-
-        Returns:
-            float: Adjusted precipitation amount
-        """
-        transport_potential = moisture_analysis.get("transport_potential", 5)
-        condensation_potential = moisture_analysis.get("condensation_potential", 0.3)
-
-        moisture_factor = (
-            transport_potential / ForecastConstants.MOISTURE_TRANSPORT_DIVISOR
-        ) * condensation_potential
-        precipitation *= 1.0 + moisture_factor
-        return precipitation
-
-    def _apply_atmospheric_stability(
-        self, precipitation: float, stability: float
-    ) -> float:
-        """Apply atmospheric stability adjustments to precipitation.
-
-        Args:
-            precipitation: Current precipitation amount
-            stability: Atmospheric stability index (0-1)
-
-        Returns:
-            float: Adjusted precipitation amount
-        """
-        instability_factor = 1.0 + (
-            (1.0 - stability) * ForecastConstants.INSTABILITY_PRECIP_MULT
-        )
-        precipitation *= instability_factor
-        return precipitation
-
-    def _apply_historical_patterns(
-        self,
-        precipitation: float,
-        historical_patterns: Dict[str, Any],
-        day_idx: int,
-    ) -> float:
-        """Apply historical pattern influences to precipitation.
-
-        Args:
-            precipitation: Current precipitation amount
-            historical_patterns: Historical patterns dictionary
-            day_idx: Day index (0-4)
-
-        Returns:
-            float: Adjusted precipitation amount
-        """
-        # Use historical rain_rate patterns if available
-        if KEY_RAIN_RATE in historical_patterns:
-            rain_history = historical_patterns[KEY_RAIN_RATE]
-            avg_rain = rain_history.get("mean", 0)
-            if avg_rain > 0:
-                # If there's a history of rain, increase forecast slightly
-                precipitation *= max(
-                    1.0, 1.0 + (avg_rain / ForecastConstants.RAIN_HISTORY_NORMALIZER)
-                )
-
-        # Historical pattern influence for precipitation variability
-        pattern_influence = self._calculate_historical_pattern_influence(
-            historical_patterns, day_idx, KEY_PRECIPITATION
-        )
-        precipitation += pattern_influence
-        return precipitation
-
-    def _apply_distance_dampening(
-        self, precipitation: float, day_idx: int, sensor_data: Dict[str, Any]
-    ) -> float:
-        """Apply distance-based dampening and unit conversion to precipitation.
-
-        Args:
-            precipitation: Current precipitation amount
-            day_idx: Day index (0-4)
-            sensor_data: Sensor data dictionary
-
-        Returns:
-            float: Final precipitation amount
-        """
-        # Distance-based reduction (forecast uncertainty increases with time)
-        distance_factor = max(
-            ForecastConstants.DAILY_DISTANCE_FACTOR_MIN,
-            1.0 - (day_idx * ForecastConstants.DAILY_DISTANCE_DECAY),
-        )
-        precipitation *= distance_factor
-
-        # Convert to sensor units if needed
-        rain_rate_unit = sensor_data.get("rain_rate_unit")
-        if (
-            rain_rate_unit
-            and isinstance(rain_rate_unit, str)
-            and any(unit in rain_rate_unit.lower() for unit in ["in", "inch", "inches"])
-        ):
-            precipitation /= PrecipitationConstants.MM_TO_INCHES
-
-        return round(max(0.0, precipitation), 2)
-
     def _forecast_wind(
         self,
         day_idx: int,
@@ -911,11 +722,17 @@ class DailyForecastGenerator:
         meteorological_state: Dict[str, Any],
         historical_patterns: Dict[str, Any],
     ) -> float:
-        """Comprehensive wind forecasting using pressure gradients and patterns.
+        """Forecast wind using trend extrapolation and condition modifiers.
+
+        Wind forecasting uses:
+        1. Current wind as baseline
+        2. Wind trend extrapolation
+        3. Condition-based modifiers (storms increase wind)
+        4. Pressure gradient effects
 
         Args:
             day_idx: Day index (0-4)
-            current_wind: Current wind speed
+            current_wind: Current wind speed in mph
             condition: Forecasted weather condition
             meteorological_state: Meteorological state analysis
             historical_patterns: Historical patterns
@@ -927,68 +744,49 @@ class DailyForecastGenerator:
         current_wind_kmh = convert_to_kmh(current_wind) or convert_to_kmh(
             ForecastConstants.DEFAULT_WIND_SPEED
         )
-        assert current_wind_kmh is not None  # Should never be None with fallback
+        assert current_wind_kmh is not None
 
-        forecast_wind = current_wind_kmh
+        # Get wind trend from historical data
+        wind_pattern = historical_patterns.get("wind", {})
+        wind_trend = wind_pattern.get("trend", 0)
+        if not isinstance(wind_trend, (int, float)):
+            wind_trend = 0.0
+
+        # Extrapolate wind trend (trend is in units/hour)
+        hours_forward = (day_idx + 1) * 24
+        trend_confidence = self._calculate_trend_confidence(day_idx, wind_pattern)
+        trend_adjustment = wind_trend * hours_forward * trend_confidence * 0.3
+
+        forecast_wind = current_wind_kmh + trend_adjustment
 
         # Condition-based adjustments
-        condition_wind_adjustment = {
+        condition_wind_multiplier = {
             ATTR_CONDITION_LIGHTNING_RAINY: WindAdjustmentConstants.LIGHTNING_RAINY,
             ATTR_CONDITION_POURING: WindAdjustmentConstants.POURING,
             ATTR_CONDITION_RAINY: WindAdjustmentConstants.RAINY,
-            "windy": WindAdjustmentConstants.WINDY,
             ATTR_CONDITION_CLOUDY: WindAdjustmentConstants.CLOUDY,
             ATTR_CONDITION_PARTLYCLOUDY: WindAdjustmentConstants.PARTLYCLOUDY,
             ATTR_CONDITION_SUNNY: WindAdjustmentConstants.SUNNY,
             ATTR_CONDITION_FOG: WindAdjustmentConstants.FOG,
             ATTR_CONDITION_SNOWY: WindAdjustmentConstants.SNOWY,
         }
-        adjustment = condition_wind_adjustment.get(condition, 1.0)
-        forecast_wind *= adjustment
+        multiplier = condition_wind_multiplier.get(condition, 1.0)
+        forecast_wind *= multiplier
 
-        # Pressure system influence on wind
-        pressure_system = meteorological_state["pressure_analysis"].get(
-            "pressure_system", "normal"
-        )
+        # Pressure system influence
+        pressure_analysis = meteorological_state.get("pressure_analysis", {})
+        pressure_system = pressure_analysis.get("pressure_system", "normal")
+
         if pressure_system == "low_pressure":
-            forecast_wind *= (
-                WindAdjustmentConstants.LOW_PRESSURE_MULT
-            )  # Low pressure = stronger winds
+            forecast_wind *= WindAdjustmentConstants.LOW_PRESSURE_MULT
         elif pressure_system == "high_pressure":
-            forecast_wind *= (
-                WindAdjustmentConstants.HIGH_PRESSURE_MULT
-            )  # High pressure = lighter winds
+            forecast_wind *= WindAdjustmentConstants.HIGH_PRESSURE_MULT
 
-        # Pressure gradient influence
-        wind_pattern_analysis = meteorological_state["wind_pattern_analysis"]
+        # Pressure gradient effect from wind pattern analysis
+        wind_pattern_analysis = meteorological_state.get("wind_pattern_analysis", {})
         gradient_effect = wind_pattern_analysis.get("gradient_wind_effect", 0)
-        forecast_wind += (
-            gradient_effect * WindAdjustmentConstants.GRADIENT_WIND_MULTIPLIER
-        )  # Pressure gradients drive wind
-
-        # Wind pattern stability influence
-        direction_stability = wind_pattern_analysis.get("direction_stability", 0.5)
-        if (
-            direction_stability < WindAdjustmentConstants.DIRECTION_UNSTABLE_THRESHOLD
-        ):  # Unstable wind direction = variable winds
-            forecast_wind *= WindAdjustmentConstants.DIRECTION_UNSTABLE_MULTIPLIER
-        elif (
-            direction_stability > WindAdjustmentConstants.DIRECTION_STABLE_THRESHOLD
-        ):  # Stable direction = consistent winds
-            forecast_wind *= WindAdjustmentConstants.DIRECTION_STABLE_MULTIPLIER
-
-        # Historical pattern influence
-        pattern_influence = self._calculate_historical_pattern_influence(
-            historical_patterns, day_idx, "wind"
-        )
-        forecast_wind += pattern_influence
-
-        # Distance dampening
-        distance_factor = max(
-            ForecastConstants.WIND_DISTANCE_FACTOR_MIN,
-            1.0 - (day_idx * ForecastConstants.WIND_DISTANCE_DECAY),
-        )
-        forecast_wind *= distance_factor
+        if isinstance(gradient_effect, (int, float)):
+            forecast_wind += gradient_effect * 0.5
 
         return round(max(ForecastConstants.MIN_WIND_SPEED, forecast_wind), 1)
 
@@ -1000,7 +798,12 @@ class DailyForecastGenerator:
         historical_patterns: Dict[str, Any],
         condition: str,
     ) -> int:
-        """Comprehensive humidity forecasting using moisture dynamics.
+        """Forecast humidity using trend extrapolation toward condition target.
+
+        Humidity forecasting combines:
+        1. Current humidity trending toward condition-appropriate target
+        2. Humidity trend from historical data
+        3. Pressure system moisture effects
 
         Args:
             day_idx: Day index (0-4)
@@ -1012,9 +815,18 @@ class DailyForecastGenerator:
         Returns:
             int: Forecasted humidity percentage (10-100)
         """
-        forecast_humidity = current_humidity
+        # Get humidity trend
+        humidity_pattern = historical_patterns.get(KEY_HUMIDITY, {})
+        humidity_trend = humidity_pattern.get("trend", 0)
+        if not isinstance(humidity_trend, (int, float)):
+            humidity_trend = 0.0
 
-        # Base humidity by condition
+        # Extrapolate trend
+        hours_forward = (day_idx + 1) * 24
+        trend_confidence = self._calculate_trend_confidence(day_idx, humidity_pattern)
+        trend_change = humidity_trend * hours_forward * trend_confidence * 0.3
+
+        # Target humidity by condition
         condition_humidity = {
             ATTR_CONDITION_LIGHTNING_RAINY: HumidityTargetConstants.LIGHTNING_RAINY,
             ATTR_CONDITION_POURING: HumidityTargetConstants.POURING,
@@ -1023,42 +835,31 @@ class DailyForecastGenerator:
             ATTR_CONDITION_CLOUDY: HumidityTargetConstants.CLOUDY,
             ATTR_CONDITION_PARTLYCLOUDY: HumidityTargetConstants.PARTLYCLOUDY,
             ATTR_CONDITION_SUNNY: HumidityTargetConstants.SUNNY,
-            "windy": HumidityTargetConstants.WINDY,
             ATTR_CONDITION_FOG: HumidityTargetConstants.FOG,
         }
         target_humidity = condition_humidity.get(condition, current_humidity)
 
-        # Gradually move toward target
-        humidity_change = (target_humidity - current_humidity) * (
-            1 - day_idx * ForecastConstants.DAILY_DAMPENING_RATE
-        )
-        forecast_humidity += humidity_change
+        # Blend current + trend toward target
+        # Weight: 50% trend-extrapolated, 50% move toward target
+        trend_extrapolated = current_humidity + trend_change
 
-        # Moisture analysis influence
-        moisture_analysis = meteorological_state["moisture_analysis"]
+        # Convergence rate: 30% per day toward target
+        convergence_rate = min(0.9, 0.3 * (day_idx + 1))
+        target_pull = target_humidity * convergence_rate + current_humidity * (
+            1 - convergence_rate
+        )
+
+        # Blend the two approaches
+        forecast_humidity = (trend_extrapolated + target_pull) / 2
+
+        # Moisture trend direction from analysis
+        moisture_analysis = meteorological_state.get("moisture_analysis", {})
         trend_direction = moisture_analysis.get("trend_direction", "stable")
 
         if trend_direction == "increasing":
-            forecast_humidity += HumidityTargetConstants.MOISTURE_TREND_ADJUSTMENT
+            forecast_humidity += 3
         elif trend_direction == "decreasing":
-            forecast_humidity -= HumidityTargetConstants.MOISTURE_TREND_ADJUSTMENT
-
-        # Atmospheric stability influence
-        stability = meteorological_state["atmospheric_stability"]
-        if (
-            stability > HumidityTargetConstants.STABILITY_HIGH_THRESHOLD
-        ):  # Stable air holds moisture better
-            forecast_humidity += HumidityTargetConstants.STABILITY_HUMIDITY_ADJUSTMENT
-        elif (
-            stability < HumidityTargetConstants.STABILITY_LOW_THRESHOLD
-        ):  # Unstable air mixes and can reduce humidity
-            forecast_humidity -= HumidityTargetConstants.STABILITY_HUMIDITY_ADJUSTMENT
-
-        # Historical pattern influence
-        pattern_influence = self._calculate_historical_pattern_influence(
-            historical_patterns, day_idx, KEY_HUMIDITY
-        )
-        forecast_humidity += pattern_influence
+            forecast_humidity -= 3
 
         return int(
             max(

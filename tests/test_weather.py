@@ -347,10 +347,9 @@ class TestMicroWeatherEntity:
             f for f in result if f["condition"] == ATTR_CONDITION_LIGHTNING_RAINY
         ]
         if lightning_forecasts:
-            # Should vary around the current precipitation rate (0.1 in/h)
+            # Lightning-rainy base precipitation is 15mm ≈ 0.59in, with modifiers can range widely
             precip = lightning_forecasts[0]["native_precipitation"]
-            assert 0.05 <= precip <= 0.2
-            # Should be close to 0.1 in/h with variation
+            assert 0.1 <= precip <= 3.0  # Reasonable range for thunderstorms in inches
 
     async def test_async_forecast_hourly_nighttime_conditions(
         self, weather_entity, coordinator
