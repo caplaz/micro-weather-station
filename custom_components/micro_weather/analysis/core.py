@@ -110,7 +110,7 @@ class WeatherConditionAnalyzer:
         else:
             return self._determine_nighttime_condition(sensors, params)
 
-    def _extract_sensors(self, sensor_data: Dict[str, Any]) -> Dict[str, float]:
+    def _extract_sensors(self, sensor_data: Dict[str, Any]) -> Dict[str, Any]:
         """Extract and validate sensor values with defaults.
 
         Extracts all relevant sensor readings from the sensor data dictionary

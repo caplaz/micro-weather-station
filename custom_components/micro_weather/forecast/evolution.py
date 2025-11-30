@@ -93,7 +93,7 @@ class EvolutionModeler:
         long_term_trend: float,
         storm_probability: float,
         stability: float,
-    ) -> list:
+    ) -> list[str]:
         """Generate evolution path based on pressure trends.
 
         Trend-based evolution:
@@ -161,7 +161,7 @@ class EvolutionModeler:
 
     def _calculate_trend_confidence_levels(
         self, current_trend: float, long_term_trend: float, stability: float
-    ) -> list:
+    ) -> list[float]:
         """Calculate confidence levels based on trend agreement.
 
         Confidence is higher when:
