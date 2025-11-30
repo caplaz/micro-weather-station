@@ -234,29 +234,27 @@ stability_factor = atmospheric_stability
 micro_changes = calculate_micro_evolution_patterns(weather_system_type)
 ```
 
-**Pressure-Aware Evolution Frequency (Version 3.0.0 Enhancement):**
+**Trajectory-Based Evolution (Version 3.1.0):**
+
+The forecast now uses trajectory scoring based on pressure and humidity trends:
 
 ```python
-def _calculate_pressure_aware_evolution_frequency(pressure_analysis, hour_idx):
-    """Calculate when conditions should evolve based on pressure trends."""
-    current_trend = pressure_analysis.get("current_trend", 0)
-    storm_probability = pressure_analysis.get("storm_probability", 0)
+def _calculate_hourly_trajectory(meteorological_state, hour_idx):
+    """Calculate trajectory score for condition evolution."""
+    pressure_trend = pressure_analysis.get("current_trend", 0)
+    humidity_trend = humidity_trends.get("trend", 0)
 
-    # Base evolution every 6 hours
-    base_evolution = (hour_idx % 6) == 0
+    # Trajectory score: negative = deteriorating, positive = improving
+    # Pressure trend projected forward by 6 hours
+    trajectory = pressure_trend * 6 + humidity_trend * 2
 
-    # Pressure-driven evolution adjustments
-    if abs(current_trend) > 1.0:  # Significant pressure change
-        evolution_frequency = 3  # More frequent evolution
-    elif storm_probability > 30:  # Storm approaching
-        evolution_frequency = 4  # Moderately more frequent
-    else:
-        evolution_frequency = 6  # Standard frequency
-
-    return (hour_idx % evolution_frequency) == 0
+    return trajectory  # Range: roughly -100 to +100
 ```
 
-This provides dynamic evolution timing based on meteorological conditions rather than fixed intervals.
+Conditions evolve along a ladder based on trajectory:
+
+- Trajectory < -30: Move toward deterioration (sunny → partlycloudy → cloudy → rainy)
+- Trajectory > 30: Move toward improvement (rainy → cloudy → partlycloudy → sunny)
 
 #### Hourly Temperature Forecasting
 

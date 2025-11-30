@@ -662,63 +662,6 @@ class HourlyForecastGenerator:
             "confidence": confidence,
         }
 
-    def _calculate_pressure_aware_evolution_frequency(
-        self, pressure_analysis: Dict[str, Any], hour_idx: int
-    ) -> bool:
-        """Determine if conditions should evolve at this hour based on pressure trends."""
-        current_trend = pressure_analysis.get("current_trend", 0)
-        long_term_trend = pressure_analysis.get("long_term_trend", 0)
-        trend_analysis = self._analyze_pressure_trend_severity(
-            current_trend, long_term_trend
-        )
-        severity = trend_analysis["severity"]
-
-        if severity == "rapid":
-            return hour_idx > 0 and hour_idx % 2 == 0
-        elif severity == "moderate":
-            return hour_idx > 0 and hour_idx % 3 == 0
-        else:
-            return hour_idx > 0 and hour_idx % 6 == 0
-
-    def _determine_pressure_driven_condition(
-        self,
-        pressure_analysis: Dict[str, Any],
-        storm_probability: float,
-        cloud_cover: float,
-        is_daytime: bool,
-        current_condition: str,
-    ) -> Optional[str]:
-        """Determine condition based on pressure trends and storm probability."""
-        current_trend = pressure_analysis.get("current_trend", 0)
-
-        if storm_probability >= ForecastConstants.STORM_THRESHOLD_SEVERE:
-            if cloud_cover > ForecastConstants.STORM_PRECIPITATION_THRESHOLD:
-                return ATTR_CONDITION_LIGHTNING_RAINY
-            else:
-                return ATTR_CONDITION_RAINY
-        elif storm_probability > ForecastConstants.STORM_THRESHOLD_MODERATE:
-            if current_trend < -abs(ForecastConstants.PRESSURE_SLOW_FALL) or (
-                cloud_cover > 70
-            ):
-                return ATTR_CONDITION_RAINY
-
-        if abs(current_trend) > PressureTrendConstants.MODERATE_THRESHOLD:
-            if current_trend < -PressureTrendConstants.MODERATE_THRESHOLD:
-                if current_condition == ATTR_CONDITION_SUNNY:
-                    return ATTR_CONDITION_PARTLYCLOUDY
-                elif current_condition == ATTR_CONDITION_PARTLYCLOUDY:
-                    return ATTR_CONDITION_CLOUDY
-            elif current_trend > PressureTrendConstants.MODERATE_THRESHOLD:
-                if current_condition == ATTR_CONDITION_CLOUDY:
-                    return ATTR_CONDITION_PARTLYCLOUDY
-                elif current_condition == ATTR_CONDITION_PARTLYCLOUDY:
-                    return (
-                        ATTR_CONDITION_SUNNY
-                        if is_daytime
-                        else ATTR_CONDITION_CLEAR_NIGHT
-                    )
-        return None
-
     def _forecast_precipitation(
         self,
         hour_idx: int,
