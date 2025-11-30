@@ -744,7 +744,9 @@ class DailyForecastGenerator:
         current_wind_kmh = convert_to_kmh(current_wind) or convert_to_kmh(
             ForecastConstants.DEFAULT_WIND_SPEED
         )
-        assert current_wind_kmh is not None
+        if current_wind_kmh is None:
+            # Final fallback if conversion still fails
+            current_wind_kmh = convert_to_kmh(5.0)  # 5 mph in km/h
 
         # Get wind trend from historical data
         wind_pattern = historical_patterns.get("wind", {})
