@@ -468,42 +468,51 @@ class TestDewpointFallback:
     def test_dewpoint_with_celsius_sensor_input(
         self, mock_hass, mock_options_with_dewpoint_sensor
     ):
-        """Test dewpoint handling when sensor provides Celsius values."""
+        """Test dewpoint handling when sensor provides Celsius values (issue #18).
+
+        This test reproduces the bug where Ecowitt sensors reporting dewpoint in
+        Celsius were being incorrectly converted. Example: 1.8°C was displayed
+        as -16.7°C because the code assumed all dewpoint values were Fahrenheit
+        and converted them again.
+
+        The fix uses the sensor's native unit_of_measurement to determine if
+        conversion is needed.
+        """
         mock_states = {
             "sensor.outdoor_temperature": Mock(
-                state="21.1", attributes={"unit_of_measurement": "°C"}
-            ),  # 70°F
+                state="2.8", attributes={"unit_of_measurement": "°C"}
+            ),  # User's actual temperature
             "sensor.humidity": Mock(
-                state="60.0", attributes={"unit_of_measurement": "%"}
-            ),
+                state="94.0", attributes={"unit_of_measurement": "%"}
+            ),  # User's actual humidity
             "sensor.pressure": Mock(
-                state="1013.25", attributes={"unit_of_measurement": "hPa"}
-            ),
+                state="1025.1", attributes={"unit_of_measurement": "hPa"}
+            ),  # User's actual pressure
             "sensor.wind_speed": Mock(
-                state="9.0", attributes={"unit_of_measurement": "km/h"}
+                state="0.0", attributes={"unit_of_measurement": "km/h"}
             ),
             "sensor.wind_direction": Mock(
-                state="180.0", attributes={"unit_of_measurement": "°"}
+                state="332.0", attributes={"unit_of_measurement": "°"}
             ),
             "sensor.wind_gust": Mock(
-                state="13.0", attributes={"unit_of_measurement": "km/h"}
+                state="0.0", attributes={"unit_of_measurement": "km/h"}
             ),
             "sensor.rain_rate": Mock(
                 state="0.0", attributes={"unit_of_measurement": "mm/h"}
             ),
             "sensor.rain_state": Mock(state="Dry", attributes={}),
             "sensor.solar_radiation": Mock(
-                state="250.0", attributes={"unit_of_measurement": "W/m²"}
+                state="0.0", attributes={"unit_of_measurement": "W/m²"}
             ),
             "sensor.solar_lux": Mock(
-                state="25000.0", attributes={"unit_of_measurement": "lx"}
+                state="0.0", attributes={"unit_of_measurement": "lx"}
             ),
             "sensor.uv_index": Mock(
-                state="3.0", attributes={"unit_of_measurement": "UV index"}
+                state="0.0", attributes={"unit_of_measurement": "UV index"}
             ),
             "sensor.dewpoint": Mock(
-                state="11.1", attributes={"unit_of_measurement": "°C"}
-            ),  # 52°F
+                state="1.8", attributes={"unit_of_measurement": "°C"}
+            ),  # Ecowitt dewpoint in Celsius
         }
 
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
@@ -511,12 +520,16 @@ class TestDewpointFallback:
         detector = WeatherDetector(mock_hass, mock_options_with_dewpoint_sensor)
         result = detector.get_weather_data()
 
-        # Celsius input is treated as Fahrenheit (this is a known behavior)
-        # 11.1°C read as °F gets converted: (11.1-32)*5/9 = -11.6°C
+        # Celsius dewpoint should be passed through without conversion
+        # 1.8°C should remain 1.8°C (NOT become -16.7°C from double conversion)
         assert KEY_DEWPOINT in result
         assert result[KEY_DEWPOINT] is not None
-        # Accept the conversion behavior
-        assert isinstance(result[KEY_DEWPOINT], (int, float))
+        # The dewpoint should be close to 1.8°C (allow small rounding tolerance)
+        assert abs(result[KEY_DEWPOINT] - 1.8) < 0.2, (
+            f"Dewpoint {result[KEY_DEWPOINT]}°C is incorrect. "
+            f"Expected ~1.8°C. If you see ~-16.7°C, the Celsius value was "
+            f"incorrectly converted as if it were Fahrenheit (issue #18)."
+        )
 
     def test_dewpoint_calculation_accuracy_magnus_formula(
         self, mock_hass, mock_options_without_dewpoint_sensor

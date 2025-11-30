@@ -2,6 +2,14 @@
 
 ## 4.0.0 (2025-11-30)
 
+### Bug Fixes
+
+- **Dewpoint Unit Conversion**: Fixed incorrect dewpoint display when using external dewpoint sensors (#18)
+  - Dewpoint sensor values are now properly converted using the sensor's native unit
+  - Previously, all dewpoint values were assumed to be Fahrenheit, causing Celsius values to be incorrectly converted
+  - Example: Ecowitt sensor reporting 1.8°C was displayed as -16.7°C due to double conversion
+  - Calculated dewpoints (from temp/humidity) still correctly use Fahrenheit internally
+
 ### Forecast Logic Overhaul
 
 - **Trajectory-Based Condition Evolution**: Replaced static condition mapping with dynamic trajectory scoring

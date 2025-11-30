@@ -244,6 +244,7 @@ class WeatherDetector:
 
         # Get or calculate dewpoint
         dewpoint_value = sensor_data.get(KEY_DEWPOINT)
+        dewpoint_unit = sensor_data.get("dewpoint_unit")  # Get sensor's native unit
         if not dewpoint_value:
             # Calculate dewpoint as fallback using temperature and humidity
             temp_f = sensor_data.get(KEY_OUTDOOR_TEMP) or sensor_data.get(
@@ -252,9 +253,10 @@ class WeatherDetector:
             humidity = sensor_data.get("humidity")
             if temp_f is not None and humidity is not None:
                 dewpoint_value = self.analysis.calculate_dewpoint(temp_f, humidity)
-                _LOGGER.debug(
-                    "Dewpoint calculated: %.1f°F", dewpoint_value
-                )  # Convert units and prepare data
+                dewpoint_unit = "F"  # Calculated dewpoint is in Fahrenheit
+                _LOGGER.debug("Dewpoint calculated: %.1f°F", dewpoint_value)
+
+        # Convert units and prepare data
         weather_data = {
             KEY_TEMPERATURE: self._convert_temperature(
                 sensor_data.get(KEY_OUTDOOR_TEMP), sensor_data.get(KEY_TEMPERATURE_UNIT)
@@ -272,8 +274,8 @@ class WeatherDetector:
             ),
             KEY_PRECIPITATION: sensor_data.get(KEY_RAIN_RATE),
             KEY_DEWPOINT: self._convert_temperature(
-                dewpoint_value, "F"
-            ),  # Convert dewpoint from Fahrenheit to Celsius per HA standards
+                dewpoint_value, dewpoint_unit
+            ),  # Use sensor's unit or "F" for calculated values
             KEY_CONDITION: condition,
             KEY_FORECAST: forecast_data,
             KEY_LAST_UPDATED: datetime.now().isoformat(),
