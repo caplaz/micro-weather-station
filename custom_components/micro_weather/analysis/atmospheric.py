@@ -15,7 +15,11 @@ from typing import Any, Dict, List, Optional
 
 from homeassistant.components.weather import ATTR_CONDITION_FOG
 
-from ..meteorological_constants import FogThresholds
+from ..meteorological_constants import (
+    FogThresholds,
+    PhysicsConstants,
+    PressureThresholds,
+)
 from .trends import TrendsAnalyzer
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,14 +67,14 @@ class AtmosphericAnalyzer:
             return pressure_inhg
 
         # Convert to hPa for calculation
-        pressure_hpa = pressure_inhg * 33.8639
+        pressure_hpa = pressure_inhg * PhysicsConstants.INHG_TO_HPA
 
         # Barometric formula constants
-        L = 0.0065  # Temperature lapse rate (K/m)
-        T0 = 288.15  # Standard temperature at sea level (K)
-        g = 9.80665  # Gravitational acceleration (m/s²)
-        M = 0.0289644  # Molar mass of air (kg/mol)
-        R = 8.31432  # Universal gas constant (J/(mol·K))
+        L = PhysicsConstants.LAPSE_RATE
+        T0 = PhysicsConstants.STD_TEMP_SEA_LEVEL
+        g = PhysicsConstants.G
+        M = PhysicsConstants.M_AIR
+        R = PhysicsConstants.R
 
         # Calculate exponent
         exponent = (g * M) / (R * L)
@@ -84,7 +88,7 @@ class AtmosphericAnalyzer:
             sea_level_pressure_hpa = pressure_hpa
 
         # Convert back to inHg
-        return sea_level_pressure_hpa / 33.8639
+        return sea_level_pressure_hpa / PhysicsConstants.INHG_TO_HPA
 
     def get_altitude_adjusted_pressure_thresholds(
         self, altitude_m: Optional[float]
@@ -101,13 +105,13 @@ class AtmosphericAnalyzer:
 
         # Base thresholds at sea level
         base_thresholds = {
-            "very_high": 30.20,
-            "high": 30.00,
-            "normal_high": 30.20,
-            "normal_low": 29.80,
-            "low": 29.80,
-            "very_low": 29.50,
-            "extremely_low": 29.20,
+            "very_high": PressureThresholds.VERY_HIGH,
+            "high": PressureThresholds.HIGH,
+            "normal_high": PressureThresholds.NORMAL_HIGH,
+            "normal_low": PressureThresholds.NORMAL_LOW,
+            "low": PressureThresholds.LOW,
+            "very_low": PressureThresholds.VERY_LOW,
+            "extremely_low": PressureThresholds.EXTREMELY_LOW,
         }
 
         if altitude_m == 0:
@@ -115,7 +119,9 @@ class AtmosphericAnalyzer:
 
         # Adjust for altitude (~1 hPa per 8 meters)
         altitude_adjustment_hpa = altitude_m / 8.0
-        altitude_adjustment_inhg = altitude_adjustment_hpa / 33.8639
+        altitude_adjustment_inhg = (
+            altitude_adjustment_hpa / PhysicsConstants.INHG_TO_HPA
+        )
 
         # Apply adjustment
         adjusted_thresholds = {}
@@ -139,7 +145,7 @@ class AtmosphericAnalyzer:
         inhg_thresholds = self.get_altitude_adjusted_pressure_thresholds(altitude_m)
         hpa_thresholds = {}
         for key, value_inhg in inhg_thresholds.items():
-            hpa_thresholds[key] = value_inhg * 33.8639
+            hpa_thresholds[key] = value_inhg * PhysicsConstants.INHG_TO_HPA
         return hpa_thresholds
 
     def analyze_fog_conditions(

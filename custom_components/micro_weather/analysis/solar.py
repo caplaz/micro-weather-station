@@ -25,6 +25,7 @@ from ..meteorological_constants import (
     CloudCoverThresholds,
     PressureThresholds,
     SolarAnalysisConstants,
+    SolarPhysicsConstants,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -224,9 +225,13 @@ class SolarAnalyzer:
         )
 
         # Calculate lux and UV maximums
-        max_solar_lux = max_solar_radiation * 120
+        max_solar_lux = max_solar_radiation * SolarPhysicsConstants.MAX_LUX_MULTIPLIER
         air_mass = self._calculate_air_mass(solar_elevation)
-        max_uv_index = max(0.5, 12 * math.exp(-0.05 * air_mass))
+        max_uv_index = max(
+            0.5,
+            SolarPhysicsConstants.UV_MAX_BASE
+            * math.exp(SolarPhysicsConstants.UV_ATTENUATION * air_mass),
+        )
 
         lux_cloud_cover = max(
             SolarAnalysisConstants.MIN_CLOUD_COVER,
@@ -275,7 +280,8 @@ class SolarAnalyzer:
                 )
         elif solar_lux > 100:
             cloud_cover = (
-                lux_cloud_cover * 0.9 + uv_cloud_cover * 0.1
+                lux_cloud_cover * SolarPhysicsConstants.LUX_WEIGHT_SECONDARY
+                + uv_cloud_cover * SolarPhysicsConstants.UV_WEIGHT_SECONDARY
                 if uv_index > 0
                 else lux_cloud_cover
             )
@@ -306,18 +312,26 @@ class SolarAnalyzer:
         day_of_year = now.timetuple().tm_yday
 
         # Solar constant variation (±3.3% due to elliptical orbit)
-        solar_constant_variation = 1 + 0.033 * math.cos(
-            2 * math.pi * (day_of_year - 4) / 365.25
+        solar_constant_variation = (
+            1
+            + SolarPhysicsConstants.SOLAR_CONSTANT_VARIATION
+            * math.cos(2 * math.pi * (day_of_year - 4) / 365.25)
         )
 
         # Calculate air mass and atmospheric transmission
         air_mass = self._calculate_air_mass(solar_elevation)
 
         # Atmospheric extinction components
-        rayleigh_extinction = math.exp(-0.1 * air_mass)
-        ozone_extinction = math.exp(-0.02 * air_mass)
-        water_vapor_extinction = math.exp(-0.05 * air_mass)
-        aerosol_extinction = math.exp(-0.1 * air_mass)
+        rayleigh_extinction = math.exp(
+            SolarPhysicsConstants.EXTINCTION_RAYLEIGH * air_mass
+        )
+        ozone_extinction = math.exp(SolarPhysicsConstants.EXTINCTION_OZONE * air_mass)
+        water_vapor_extinction = math.exp(
+            SolarPhysicsConstants.EXTINCTION_WATER * air_mass
+        )
+        aerosol_extinction = math.exp(
+            SolarPhysicsConstants.EXTINCTION_AEROSOL * air_mass
+        )
 
         atmospheric_transmission = (
             rayleigh_extinction
@@ -486,8 +500,8 @@ class SolarAnalyzer:
 
         # Combine adjustments
         total_adjustment = (
-            short_term_adjustment * 0.3
-            + long_term_adjustment * 0.4
+            short_term_adjustment * SolarPhysicsConstants.PRESSURE_SHORT_TERM_WEIGHT
+            + long_term_adjustment * SolarPhysicsConstants.PRESSURE_LONG_TERM_WEIGHT
             + system_adjustment * PressureThresholds.SYSTEM_WEIGHT
         )
 

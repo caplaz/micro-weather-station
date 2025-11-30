@@ -236,22 +236,10 @@ class TrendsAnalyzer:
         Returns:
             Seasonal factor (0-1, higher = more variable)
         """
+        from ..meteorological_constants import TrendConstants
+
         month = datetime.now().month
-        seasonal_factors = {
-            12: 0.8,
-            1: 0.9,
-            2: 0.7,  # Winter
-            3: 0.6,
-            4: 0.5,
-            5: 0.4,  # Spring
-            6: 0.3,
-            7: 0.4,
-            8: 0.5,  # Summer
-            9: 0.6,
-            10: 0.7,
-            11: 0.8,  # Fall
-        }
-        return seasonal_factors.get(month, 0.5)
+        return TrendConstants.SEASONAL_FACTORS.get(month, 0.5)
 
     def detect_pressure_cycles(
         self, pressure_history: Dict[str, Any]
@@ -264,11 +252,13 @@ class TrendsAnalyzer:
         Returns:
             Dictionary with cycle analysis
         """
+        from ..meteorological_constants import TrendConstants
+
         volatility = pressure_history.get("volatility", 0.5)
 
-        if volatility > 1.0:
+        if volatility > TrendConstants.VOLATILITY_ACTIVE:
             cycle_type = "active"  # Frequent system changes
-        elif volatility > 0.5:
+        elif volatility > TrendConstants.VOLATILITY_MODERATE:
             cycle_type = "moderate"  # Normal system changes
         else:
             cycle_type = "stable"  # Persistent systems

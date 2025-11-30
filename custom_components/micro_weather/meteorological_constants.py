@@ -5,7 +5,8 @@ throughout the weather analysis system. Values are based on meteorological
 research and observational standards.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -724,3 +725,82 @@ class MoistureAnalysisConstants:
 
     # Humidity trend threshold (% change)
     HUMIDITY_TREND_THRESHOLD: float = 5.0  # Significant humidity change
+
+
+@dataclass(frozen=True)
+class PhysicsConstants:
+    """Fundamental physical constants for meteorological calculations.
+
+    Standard values for Earth's atmosphere and gravity.
+    """
+
+    G: float = 9.80665  # Gravitational acceleration (m/s²)
+    R: float = 8.31432  # Universal gas constant (J/(mol·K))
+    M_AIR: float = 0.0289644  # Molar mass of dry air (kg/mol)
+    LAPSE_RATE: float = 0.0065  # Standard temperature lapse rate (K/m)
+    STD_TEMP_SEA_LEVEL: float = 288.15  # Standard temperature at sea level (K)
+    STD_PRESS_SEA_LEVEL_HPA: float = 1013.25  # Standard pressure at sea level (hPa)
+    INHG_TO_HPA: float = 33.8639  # Conversion factor inHg to hPa
+
+
+@dataclass(frozen=True)
+class SolarPhysicsConstants:
+    """Constants for solar radiation physics and atmospheric extinction.
+
+    Used in clear-sky radiation models and cloud cover estimation.
+    """
+
+    # Orbital parameters
+    SOLAR_CONSTANT_VARIATION: float = 0.033  # Variation due to elliptical orbit
+
+    # Atmospheric extinction coefficients (Beer-Lambert law exponents)
+    EXTINCTION_RAYLEIGH: float = -0.1  # Rayleigh scattering
+    EXTINCTION_OZONE: float = -0.02  # Ozone absorption
+    EXTINCTION_WATER: float = -0.05  # Water vapor absorption
+    EXTINCTION_AEROSOL: float = -0.1  # Aerosol scattering
+
+    # Conversion factors
+    MAX_LUX_MULTIPLIER: float = 120.0  # W/m² to Lux conversion factor for clear sky
+
+    # UV Index calculation
+    UV_MAX_BASE: float = 12.0  # Base max UV index
+    UV_ATTENUATION: float = -0.05  # UV attenuation coefficient
+
+    # Cloud cover estimation weights
+    LUX_WEIGHT_SECONDARY: float = 0.9  # Weight when only Lux is available
+    UV_WEIGHT_SECONDARY: float = 0.1  # Weight for UV when only Lux is available
+
+    # Pressure trend adjustment weights
+    PRESSURE_SHORT_TERM_WEIGHT: float = 0.3
+    PRESSURE_LONG_TERM_WEIGHT: float = 0.4
+
+
+@dataclass(frozen=True)
+class TrendConstants:
+    """Constants for trend analysis and seasonal factors."""
+
+    # Seasonal factors (0-1 scale, higher = more variable)
+    SEASONAL_FACTORS: Dict[int, float] = field(
+        default_factory=lambda: {
+            12: 0.8,
+            1: 0.9,
+            2: 0.7,  # Winter
+            3: 0.6,
+            4: 0.5,
+            5: 0.4,  # Spring
+            6: 0.3,
+            7: 0.4,
+            8: 0.5,  # Summer
+            9: 0.6,
+            10: 0.7,
+            11: 0.8,  # Fall
+        }
+    )
+
+    # Volatility thresholds
+    VOLATILITY_ACTIVE: float = 1.0  # Threshold for active weather
+    VOLATILITY_MODERATE: float = 0.5  # Threshold for moderate weather
+
+    # Correlation coefficients (estimated)
+    CORRELATION_TEMP_PRESSURE: float = -0.6  # Inverse relationship
+    CORRELATION_TEMP_HUMIDITY: float = -0.4  # Inverse relationship
