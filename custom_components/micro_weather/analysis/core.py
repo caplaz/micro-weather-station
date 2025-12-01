@@ -401,6 +401,16 @@ class WeatherConditionAnalyzer:
                 # Negative trend = temperature falling (favorable for fog)
                 is_cooling = trend_value < -0.5  # Dropping more than 0.5°F/hour
 
+        # Check if it was a clear day - fog doesn't appear immediately after sunset
+        # If conditions were sunny/clear during the day, be more skeptical of fog
+        # in the early evening hours
+        was_clear_day = self._was_recent_day_clear()
+        if was_clear_day and not params["is_daytime"]:
+            _LOGGER.debug(
+                "Skipping fog check: day was clear, fog unlikely in early evening"
+            )
+            return None
+
         fog_result = self.atmospheric.analyze_fog_conditions(
             sensors["outdoor_temp"],
             sensors["humidity"],
@@ -423,6 +433,63 @@ class WeatherConditionAnalyzer:
             return fog_result
 
         return None
+
+    def _was_recent_day_clear(self) -> bool:
+        """Check if conditions were predominantly clear during the recent daytime.
+
+        Fog formation takes time - it typically develops in the early morning
+        hours after prolonged radiative cooling. If the day was sunny/clear,
+        fog is unlikely to appear immediately after sunset.
+
+        Uses the solar analyzer's condition history to check recent daytime
+        conditions.
+
+        Returns:
+            True if the recent day was predominantly clear/sunny, False otherwise
+        """
+        try:
+            # Access the condition history from the solar analyzer
+            condition_history = getattr(self.solar, "_condition_history", None)
+            if not condition_history:
+                return False
+
+            # Look at conditions from the last 12 hours
+            from datetime import datetime, timedelta
+
+            cutoff_time = datetime.now() - timedelta(hours=12)
+
+            # Filter to daytime clear conditions (sunny, partlycloudy with low cloud cover)
+            daytime_clear_count = 0
+            daytime_total_count = 0
+
+            for entry in condition_history:
+                if entry.get("timestamp", datetime.min) > cutoff_time:
+                    condition = entry.get("condition", "")
+                    cloud_cover = entry.get("cloud_cover", 50.0)
+
+                    # Only count daytime conditions (not clear-night)
+                    if condition in {"sunny", "partlycloudy"}:
+                        daytime_total_count += 1
+                        # Consider it "clear" if cloud cover was low
+                        if cloud_cover < 40:
+                            daytime_clear_count += 1
+
+            # If we had at least 3 daytime readings and most were clear
+            if daytime_total_count >= 3:
+                clear_ratio = daytime_clear_count / daytime_total_count
+                if clear_ratio >= 0.6:  # 60% or more clear conditions
+                    _LOGGER.debug(
+                        "Recent day was predominantly clear (%.0f%% clear, %d readings)",
+                        clear_ratio * 100,
+                        daytime_total_count,
+                    )
+                    return True
+
+            return False
+
+        except Exception as e:
+            _LOGGER.debug("Error checking recent day conditions: %s", e)
+            return False
 
     def _check_severe_weather(
         self, sensors: Dict[str, float], params: Dict[str, Any]

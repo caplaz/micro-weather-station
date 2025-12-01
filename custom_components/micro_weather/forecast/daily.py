@@ -389,17 +389,30 @@ class DailyForecastGenerator:
 
         # Handle special conditions
         if current_condition == ATTR_CONDITION_FOG:
-            # Fog typically clears, evolve toward sunny
-            if trajectory_score > 20:
+            # Fog typically clears during the day - evolve toward sunny over time
+            # Day 0: likely still foggy/cloudy, Day 1+: progressively clearer
+            fog_clearing_bonus = day_idx * 15  # +15 per day as fog clears
+            adjusted_score = trajectory_score + fog_clearing_bonus
+            if adjusted_score > 30:
                 return ATTR_CONDITION_SUNNY
-            elif trajectory_score > 0:
+            elif adjusted_score > 10:
                 return ATTR_CONDITION_PARTLYCLOUDY
             else:
                 return ATTR_CONDITION_CLOUDY
 
         if current_condition == ATTR_CONDITION_SNOWY:
-            # Keep snowy if cold, otherwise treat like rainy
-            return ATTR_CONDITION_SNOWY
+            # Snow evolves based on trajectory - may continue, turn to rain, or clear
+            # Day 0-1: likely continues, Day 2+: may transition based on trajectory
+            snow_clearing_bonus = day_idx * 10  # +10 per day
+            adjusted_score = trajectory_score + snow_clearing_bonus
+            if adjusted_score > 40:
+                return ATTR_CONDITION_PARTLYCLOUDY  # Snow ended, clearing
+            elif adjusted_score > 20:
+                return ATTR_CONDITION_CLOUDY  # Snow ended, still cloudy
+            elif adjusted_score > 0:
+                return ATTR_CONDITION_RAINY  # Warming, snow turning to rain
+            else:
+                return ATTR_CONDITION_SNOWY  # Still cold, snow continues
 
         # Find current position on ladder
         try:

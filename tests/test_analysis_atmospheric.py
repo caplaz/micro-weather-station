@@ -63,30 +63,33 @@ class TestAtmosphericAnalyzer:
         assert result is None
 
         # Test dense fog conditions (nighttime)
-        # High humidity (98% = 40pts) + tight spread (0.1°F = 30pts) + calm winds (1.5mph = 15pts) + no solar (10pts) = 95pts
+        # High humidity (99.5% = 40pts) + tight spread (0.1°F = 30pts) + calm winds (1.5mph = 15pts) = 85pts
+        # Nighttime penalty: -10pts = 75pts (still dense fog threshold of 70)
         result_fog = analyzer.analyze_fog_conditions(
             70.0, 99.5, 69.9, 0.1, 1.5, 0.0, False
         )
         assert result_fog == ATTR_CONDITION_FOG
 
         # Test moderate fog conditions (nighttime)
-        # High humidity (92% = 20pts) + moderate spread (2.0°F = 15pts) + light winds (3mph = 10pts) + no solar (10pts) = 55pts
+        # High humidity (96% = 30pts) + tight spread (1.0°F = 25pts) + light winds (3mph = 10pts) = 65pts
+        # Nighttime penalty: -10pts = 55pts (moderate fog threshold)
+        # With spread <= 2.0°F, this triggers moderate fog
         result_moderate = analyzer.analyze_fog_conditions(
-            70.0, 92.0, 68.0, 2.0, 3.0, 0.0, False
+            70.0, 96.0, 69.0, 1.0, 3.0, 0.0, False
         )
         assert result_moderate == ATTR_CONDITION_FOG
 
-        # Test light fog (high humidity required, stricter spread requirement)
-        # Very high humidity (95% = 30pts) + tighter spread (1.5°F = 15pts) + light winds (4mph = 10pts) + no solar (10pts) = 65pts
-        # With updated fog detection requiring spread <= 2.0°F for moderate fog scores
+        # Test light fog - now requires more extreme conditions at night
+        # Very high humidity (98% = 40pts) + tight spread (0.8°F = 25pts) + light winds (4mph = 10pts) = 75pts
+        # Nighttime penalty: -10pts = 65pts - triggers moderate fog with spread check
         result_light = analyzer.analyze_fog_conditions(
-            70.0, 95.0, 68.5, 1.5, 4.0, 0.0, False
+            70.0, 98.0, 69.2, 0.8, 4.0, 0.0, False
         )
         assert result_light == ATTR_CONDITION_FOG
 
         # Test twilight conditions with extremely high humidity and tight spread - IS fog
         # Very high humidity (99% = 40pts) + very tight spread (0.3°F = 30pts) + calm winds (1.3mph = 15pts) = 85pts
-        # Even with 22 W/m² solar, the atmospheric conditions indicate dense fog blocking dawn light
+        # Nighttime penalty: -10pts = 75pts (still dense fog)
         result_twilight_fog = analyzer.analyze_fog_conditions(
             54.0, 99.0, 53.7, 0.3, 1.3, 22.0, False
         )
@@ -94,38 +97,53 @@ class TestAtmosphericAnalyzer:
 
         # Test twilight with moderate humidity - should NOT be fog
         # Moderate humidity (90% = 0pts) even with tight spread doesn't trigger fog
+        # Nighttime penalty makes this even less likely
         result_twilight_clear = analyzer.analyze_fog_conditions(
             54.0, 90.0, 53.0, 1.0, 3.0, 50.0, False
         )
         assert result_twilight_clear is None  # Normal dawn/twilight humidity, not fog
 
-        # Test daytime fog (sun shining through fog)
-        # Very high humidity (98% = 40pts) + tight spread (0.5°F = 30pts) + calm winds (2mph = 15pts) + low solar (<50 = 15pts) = 100pts
+        # Test borderline nighttime conditions - should NOT be fog
+        # This tests the case from the user's logs: 96% humidity, ~1.1°F spread
+        # High humidity (96% = 30pts) + spread (1.5°F = 15pts) + light winds (2.5mph = 10pts) = 55pts
+        # Nighttime penalty: -10pts = 45pts - below moderate fog threshold
+        result_borderline_night = analyzer.analyze_fog_conditions(
+            44.6, 96.0, 43.5, 1.1, 2.5, 0.0, False
+        )
+        assert result_borderline_night is None  # Clear humid night, not fog
+
+        # Test daytime fog (sun shining through fog) - no nighttime penalty
+        # Very high humidity (98% = 40pts) + tight spread (0.5°F = 30pts) + calm winds (2mph = 15pts)
+        # + low solar (<50 = 15pts) + temp bonus (5pts) = 105pts
         result_daytime_fog = analyzer.analyze_fog_conditions(
             70.0, 98.0, 69.5, 0.5, 2.0, 40.0, True
         )
         assert result_daytime_fog == ATTR_CONDITION_FOG
 
-        # Test marginal conditions (below threshold)
-        # Moderate humidity (88% = 10pts) + larger spread (3.5°F = 0pts) + moderate winds (6mph = 5pts) + low solar (10pts) = 25pts
+        # Test marginal conditions (below threshold) - nighttime
+        # Moderate humidity (88% = 10pts) + larger spread (3.5°F = 0pts) + moderate winds (6mph = 5pts) = 15pts
+        # Nighttime penalty: -10pts = 5pts - well below threshold
         result_marginal = analyzer.analyze_fog_conditions(
             70.0, 88.0, 64.5, 3.5, 6.0, 2.0, False
         )
-        assert result_marginal is None  # Below 45-point threshold
+        assert result_marginal is None  # Below threshold
 
-        # Test evaporation fog conditions (warmer temp bonus)
-        # Very high humidity (95% = 30pts) + tight spread (1.5°F = 15pts) + light winds (4mph = 10pts) + no solar (10pts) + temp bonus (5pts) = 70pts
+        # Test evaporation fog conditions - now requires daytime since
+        # the temperature bonus only applies during daytime
+        # Very high humidity (98% = 40pts) + tight spread (0.5°F = 30pts) + calm winds (2mph = 15pts)
+        # + low solar (<50 = 15pts) + temp bonus (5pts) = 105pts
         result_evap = analyzer.analyze_fog_conditions(
-            50.0, 95.0, 48.5, 1.5, 4.0, 0.0, False
+            50.0, 98.0, 49.5, 0.5, 2.0, 30.0, True
         )
         assert result_evap == ATTR_CONDITION_FOG
 
         # Test strong winds dispersing fog (negative score modifier)
-        # High humidity (95% = 30pts) + tight spread (1.0°F = 25pts) + strong winds (12mph = -10pts) + no solar (10pts) = 55pts
+        # High humidity (95% = 30pts) + tight spread (1.0°F = 25pts) + strong winds (12mph = -10pts) = 45pts
+        # Nighttime penalty: -10pts = 35pts - below threshold, winds disperse fog
         result_windy = analyzer.analyze_fog_conditions(
             70.0, 95.0, 69.0, 1.0, 12.0, 0.0, False
         )
-        assert result_windy == ATTR_CONDITION_FOG  # Still enough for moderate fog
+        assert result_windy is None  # Strong winds disperse fog
 
     def test_analyze_pressure_trends(self, analyzer):
         """Test pressure trend analysis."""

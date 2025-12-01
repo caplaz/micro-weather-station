@@ -220,6 +220,7 @@ class AtmosphericAnalyzer:
 
         # 4. Solar radiation factor (0-15 points)
         # During daytime, fog significantly reduces solar radiation
+        # At night, solar radiation is naturally zero - this is NOT evidence of fog
         if is_daytime:
             if solar_rad < FogThresholds.SOLAR_VERY_LOW:
                 fog_score += FogThresholds.SCORE_SOLAR_DENSE
@@ -232,23 +233,33 @@ class AtmosphericAnalyzer:
                 # this is a strong indicator against fog
                 fog_score -= 15
         else:
-            if solar_rad <= FogThresholds.SOLAR_MINIMAL_NIGHT:
-                fog_score += FogThresholds.SCORE_SOLAR_NIGHT
-            elif solar_rad <= FogThresholds.SOLAR_TWILIGHT:
-                fog_score += FogThresholds.SCORE_SOLAR_TWILIGHT
-            elif solar_rad <= FogThresholds.SOLAR_MODERATE_TWILIGHT:
-                fog_score += 0
-            else:
+            # At night, solar radiation being zero is EXPECTED and provides
+            # no evidence for or against fog. Only during twilight when we'd
+            # expect some light does reduced radiation indicate fog.
+            # We no longer give positive points just for being nighttime.
+            if solar_rad > FogThresholds.SOLAR_MODERATE_TWILIGHT:
+                # Unusual radiation at night - strong lights nearby, not fog
                 fog_score += FogThresholds.PENALTY_SOLAR_STRONG
 
         # 5. Temperature factor (bonus for evaporation fog)
         # Warm temps with high humidity and tight spread = evaporation fog
+        # Only apply during daytime when evaporation fog can form
         if (
-            temp > FogThresholds.TEMP_WARM_THRESHOLD
+            is_daytime
+            and temp > FogThresholds.TEMP_WARM_THRESHOLD
             and humidity >= FogThresholds.HUMIDITY_PROBABLE_FOG
             and spread <= FogThresholds.SPREAD_CLOSE
         ):
             fog_score += 5
+
+        # 6. Nighttime penalty - high humidity is NORMAL at night
+        # Without visibility sensors, we must be very conservative about
+        # calling fog at night. Radiative cooling naturally increases
+        # humidity and narrows dewpoint spread on clear nights.
+        if not is_daytime:
+            # Apply a penalty to counteract the naturally high humidity
+            # at night. Only truly extreme conditions should trigger fog.
+            fog_score -= 10
 
         _LOGGER.debug(
             "Fog score: %.1f (humidity=%.1f%%, spread=%.2f°F, "

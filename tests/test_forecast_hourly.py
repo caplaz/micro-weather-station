@@ -6,9 +6,11 @@ from unittest.mock import Mock
 from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
+    ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_RAINY,
+    ATTR_CONDITION_SNOWY,
     ATTR_CONDITION_SUNNY,
 )
 import pytest
@@ -377,3 +379,98 @@ class TestHourlyForecastGenerator:
         assert "long_term_direction" in result
         assert "urgency_factor" in result
         assert "confidence" in result
+
+    def test_fog_condition_evolves_over_hours(self, hourly_forecast_generator):
+        """Test that fog condition evolves differently for each hour.
+
+        Fog should progressively clear as hours pass (sun burns off fog),
+        not remain static for all forecast hours.
+        """
+        # Get conditions for each hour starting from fog
+        conditions = []
+        for hour_idx in range(24):
+            condition = hourly_forecast_generator._evolve_hourly_condition(
+                ATTR_CONDITION_FOG, 0.0, hour_idx  # Neutral trajectory score
+            )
+            conditions.append(condition)
+
+        # Fog should evolve over hours - not all the same
+        unique_conditions = set(conditions)
+        assert (
+            len(unique_conditions) > 1
+        ), "Fog should evolve over 24 hours, not stay static"
+
+        # Early hours should be cloudier, later hours clearer
+        assert conditions[0] == ATTR_CONDITION_CLOUDY  # Hour 0: trajectory ~0
+        # By hour 15+, should be partly cloudy or sunny (fog clearing bonus = 45+)
+        assert conditions[15] in [ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_SUNNY]
+
+    def test_snowy_condition_evolves_over_hours(self, hourly_forecast_generator):
+        """Test that snowy condition evolves differently for each hour.
+
+        Snow should progressively change over hours based on trajectory,
+        not remain static for all forecast hours.
+        """
+        # Get conditions for each hour starting from snowy with neutral trajectory
+        conditions = []
+        for hour_idx in range(24):
+            condition = hourly_forecast_generator._evolve_hourly_condition(
+                ATTR_CONDITION_SNOWY, 0.0, hour_idx  # Neutral trajectory score
+            )
+            conditions.append(condition)
+
+        # Snow should evolve over hours - not all the same
+        unique_conditions = set(conditions)
+        assert (
+            len(unique_conditions) > 1
+        ), "Snow should evolve over 24 hours, not stay static"
+
+        # Early hours should still be snowy
+        assert conditions[0] == ATTR_CONDITION_SNOWY  # Hour 0: still snowing
+        # Later hours should transition (snow clearing bonus accumulates)
+        # By hour 24, score = 48, should be at least rainy or cloudy
+        assert conditions[23] in [
+            ATTR_CONDITION_RAINY,
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+        ]
+
+    def test_fog_clears_faster_with_improving_trajectory(
+        self, hourly_forecast_generator
+    ):
+        """Test that fog clears faster when trajectory is improving."""
+        # With positive trajectory (improving conditions), fog should clear faster
+        conditions_improving = []
+        conditions_neutral = []
+
+        for hour_idx in range(12):
+            improving = hourly_forecast_generator._evolve_hourly_condition(
+                ATTR_CONDITION_FOG, 20.0, hour_idx  # Positive trajectory
+            )
+            neutral = hourly_forecast_generator._evolve_hourly_condition(
+                ATTR_CONDITION_FOG, 0.0, hour_idx  # Neutral trajectory
+            )
+            conditions_improving.append(improving)
+            conditions_neutral.append(neutral)
+
+        # Improving trajectory should reach sunny/partlycloudy earlier
+        _condition_order = [  # noqa: F841
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_SUNNY,
+        ]
+
+        def get_best_idx(conditions):
+            for i, c in enumerate(conditions):
+                if c == ATTR_CONDITION_SUNNY:
+                    return i
+                if c == ATTR_CONDITION_PARTLYCLOUDY:
+                    return i
+            return len(conditions)
+
+        # Improving should reach better conditions at same or earlier hour
+        improving_best = get_best_idx(conditions_improving)
+        neutral_best = get_best_idx(conditions_neutral)
+        assert (
+            improving_best <= neutral_best
+        ), "Improving trajectory should clear fog faster"

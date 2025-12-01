@@ -389,3 +389,147 @@ class TestDailyForecastGenerator:
 
         # Sunny should have larger range than cloudy
         assert range_sunny >= range_cloudy
+
+    def test_fog_condition_evolves_over_days(self, daily_forecast_generator):
+        """Test that fog condition evolves differently for each day.
+
+        Fog should progressively clear over multiple days, not remain static.
+        This tests the fix for the bug where fog returned the same condition
+        for all forecast days.
+        """
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 10.0,
+                "current_trend": 0.0,  # Neutral trajectory
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+            "cloud_analysis": {"cloud_cover": 40.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
+        }
+        historical_patterns = {"humidity": {"trend": 0.0}}
+        system_evolution = {}
+
+        # Get conditions for each day starting from fog
+        conditions = []
+        for day_idx in range(5):
+            condition = daily_forecast_generator.forecast_condition(
+                day_idx,
+                ATTR_CONDITION_FOG,
+                meteorological_state,
+                historical_patterns,
+                system_evolution,
+            )
+            conditions.append(condition)
+
+        # Fog should evolve over days - not all the same
+        # Day 0 should be cloudy (trajectory 0), later days should improve
+        assert conditions[0] == ATTR_CONDITION_CLOUDY  # Day 0: trajectory ~0
+        # At least one later day should be different (clearer)
+        assert (
+            ATTR_CONDITION_PARTLYCLOUDY in conditions
+            or ATTR_CONDITION_SUNNY in conditions
+        )
+        # Last day should be clearer than first day (fog clears over time)
+        condition_order = [
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_SUNNY,
+        ]
+        first_day_idx = (
+            condition_order.index(conditions[0])
+            if conditions[0] in condition_order
+            else 0
+        )
+        last_day_idx = (
+            condition_order.index(conditions[4])
+            if conditions[4] in condition_order
+            else 0
+        )
+        assert last_day_idx >= first_day_idx, "Fog should clear over time, not worsen"
+
+    def test_snowy_condition_evolves_over_days(self, daily_forecast_generator):
+        """Test that snowy condition evolves differently for each day.
+
+        Snow should progressively change over multiple days based on trajectory,
+        not remain static for all forecast days.
+        """
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 10.0,
+                "current_trend": 0.0,  # Neutral trajectory
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+            "cloud_analysis": {"cloud_cover": 40.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
+        }
+        historical_patterns = {"humidity": {"trend": 0.0}}
+        system_evolution = {}
+
+        # Get conditions for each day starting from snowy
+        conditions = []
+        for day_idx in range(5):
+            condition = daily_forecast_generator.forecast_condition(
+                day_idx,
+                ATTR_CONDITION_SNOWY,
+                meteorological_state,
+                historical_patterns,
+                system_evolution,
+            )
+            conditions.append(condition)
+
+        # Snow should evolve over days - not all the same
+        # With neutral trajectory, early days stay snowy, later days transition
+        assert conditions[0] == ATTR_CONDITION_SNOWY  # Day 0: still snowing
+        # At least one later day should be different
+        unique_conditions = set(conditions)
+        assert (
+            len(unique_conditions) > 1
+        ), "Snow should evolve over 5 days, not stay static"
+
+    def test_fog_clears_faster_with_improving_trajectory(
+        self, daily_forecast_generator
+    ):
+        """Test that fog clears faster when trajectory is improving (rising pressure)."""
+        # Improving conditions (rising pressure)
+        improving_state = {
+            "pressure_analysis": {
+                "pressure_system": "high",
+                "storm_probability": 5.0,
+                "current_trend": 0.5,  # Rising pressure
+                "long_term_trend": 0.3,
+            },
+            "atmospheric_stability": 0.8,
+            "cloud_analysis": {"cloud_cover": 20.0},
+            "moisture_analysis": {"condensation_potential": 0.2},
+        }
+        historical_patterns = {"humidity": {"trend": -1.0}}  # Falling humidity
+        system_evolution = {}
+
+        # With improving trajectory, fog should clear quickly
+        day_0 = daily_forecast_generator.forecast_condition(
+            0,
+            ATTR_CONDITION_FOG,
+            improving_state,
+            historical_patterns,
+            system_evolution,
+        )
+        day_2 = daily_forecast_generator.forecast_condition(
+            2,
+            ATTR_CONDITION_FOG,
+            improving_state,
+            historical_patterns,
+            system_evolution,
+        )
+
+        # Day 2 should be clearer than Day 0 with improving conditions
+        condition_order = [
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_SUNNY,
+        ]
+        if day_0 in condition_order and day_2 in condition_order:
+            assert condition_order.index(day_2) >= condition_order.index(day_0)

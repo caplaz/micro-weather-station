@@ -487,15 +487,29 @@ class HourlyForecastGenerator:
 
         # Handle special conditions
         if current_condition == ATTR_CONDITION_FOG:
-            if trajectory_score > 30:
+            # Fog typically clears as the day progresses (sun burns it off)
+            # or persists at night. Add clearing bonus for daytime hours.
+            fog_clearing_bonus = hour_idx * 3  # +3 per hour as fog clears
+            adjusted_score = trajectory_score + fog_clearing_bonus
+            if adjusted_score > 40:
                 return ATTR_CONDITION_SUNNY
-            elif trajectory_score > 0:
+            elif adjusted_score > 15:
                 return ATTR_CONDITION_PARTLYCLOUDY
             else:
                 return ATTR_CONDITION_CLOUDY
 
         if current_condition == ATTR_CONDITION_SNOWY:
-            return ATTR_CONDITION_SNOWY
+            # Snow evolves based on trajectory - may continue, turn to rain, or clear
+            snow_clearing_bonus = hour_idx * 2  # +2 per hour
+            adjusted_score = trajectory_score + snow_clearing_bonus
+            if adjusted_score > 50:
+                return ATTR_CONDITION_PARTLYCLOUDY  # Snow ended, clearing
+            elif adjusted_score > 30:
+                return ATTR_CONDITION_CLOUDY  # Snow ended, still cloudy
+            elif adjusted_score > 10:
+                return ATTR_CONDITION_RAINY  # Warming, snow turning to rain
+            else:
+                return ATTR_CONDITION_SNOWY  # Still cold, snow continues
 
         if current_condition == ATTR_CONDITION_CLEAR_NIGHT:
             current_condition = ATTR_CONDITION_SUNNY
