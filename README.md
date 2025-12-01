@@ -75,8 +75,8 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v3.0.2.zip
-   unzip v3.0.2.zip
+   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v4.0.0.zip
+   unzip v4.0.0.zip
 
    # Option B: Clone repository
    git clone https://github.com/caplaz/micro-weather-station.git
