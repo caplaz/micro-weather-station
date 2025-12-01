@@ -216,6 +216,9 @@ class WeatherDetector:
 
         # Prepare forecast data
         try:
+            # Get historical patterns from trends analyzer
+            historical_patterns = self.trends_analyzer.analyze_historical_patterns()
+
             forecast_data = self.daily_generator.generate_forecast(
                 condition,
                 self._prepare_forecast_sensor_data(sensor_data),
@@ -223,7 +226,7 @@ class WeatherDetector:
                 self.meteorological_analyzer.analyze_state(
                     self._prepare_analysis_sensor_data(sensor_data), altitude
                 ),
-                {},  # historical_patterns - empty for now
+                historical_patterns,
                 {},  # system_evolution - empty for now
             )
             # Convert forecast temperatures from Fahrenheit to Celsius for HA compatibility

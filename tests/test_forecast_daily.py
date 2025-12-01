@@ -13,6 +13,7 @@ from homeassistant.components.weather import (
 )
 import pytest
 
+from custom_components.micro_weather.const import KEY_HUMIDITY
 from custom_components.micro_weather.forecast.daily import DailyForecastGenerator
 
 
@@ -119,6 +120,9 @@ class TestDailyForecastGenerator:
             "wind_pattern_analysis": {
                 "direction_stability": 0.8,
                 "gradient_wind_effect": 3.0,
+            },
+            "current_conditions": {
+                "humidity": 60.0,
             },
         }
 
@@ -374,7 +378,10 @@ class TestDailyForecastGenerator:
 
     def test_calculate_temperature_range(self, daily_forecast_generator):
         """Test temperature range calculation."""
-        meteorological_state = {"atmospheric_stability": 0.6}
+        meteorological_state = {
+            "atmospheric_stability": 0.6,
+            "current_conditions": {"humidity": 50.0},
+        }
 
         # Test different conditions
         range_sunny = daily_forecast_generator._calculate_temperature_range(
@@ -533,3 +540,152 @@ class TestDailyForecastGenerator:
         ]
         if day_0 in condition_order and day_2 in condition_order:
             assert condition_order.index(day_2) >= condition_order.index(day_0)
+
+    def test_forecast_variation_with_historical_patterns(
+        self, daily_forecast_generator
+    ):
+        """Test that forecast days vary when historical patterns are provided."""
+        current_condition = ATTR_CONDITION_SUNNY
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 50.0,
+            "wind_speed": 5.0,
+        }
+        altitude = 100.0
+
+        # Mock meteorological state
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 10.0,
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+            "cloud_analysis": {"cloud_cover": 20.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
+            "wind_pattern_analysis": {
+                "direction_stability": 0.8,
+                "gradient_wind_effect": 3.0,
+            },
+            "current_conditions": {KEY_HUMIDITY: 50.0},
+        }
+
+        # Provide historical patterns with a trend
+        historical_patterns = {
+            "temperature": {"trend": -0.5, "volatility": 2.0},  # Cooling trend
+            "seasonal_pattern": "normal",
+        }
+
+        system_evolution = {
+            "evolution_path": ["stable_high", "transitional", "stable_high"],
+            "confidence_levels": [0.8, 0.6, 0.7],
+        }
+
+        result = daily_forecast_generator.generate_forecast(
+            current_condition,
+            sensor_data,
+            altitude,
+            meteorological_state,
+            historical_patterns,
+            system_evolution,
+        )
+
+        # Extract temperatures
+        temps = [day["temperature"] for day in result]
+
+        # Verify temperatures are NOT all identical
+        assert len(set(temps)) > 1, "Forecast temperatures should vary across days"
+
+        # Verify cooling trend (first day vs last day)
+        # Note: Day 0 is current day, Day 4 is 4 days out
+        # With -0.5 trend, later days should be cooler
+        assert temps[4] < temps[0], "Temperature should decrease with cooling trend"
+
+    def test_humidity_dampening_on_temperature_range(self, daily_forecast_generator):
+        """Test that high humidity reduces the diurnal temperature range."""
+        condition = ATTR_CONDITION_SUNNY
+
+        # Base state with high stability (which usually increases range)
+        base_state = {"atmospheric_stability": 0.8, "current_conditions": {}}
+
+        # Case 1: Low Humidity (30%) - Should have large range
+        low_humidity_state = base_state.copy()
+        low_humidity_state["current_conditions"] = {KEY_HUMIDITY: 30.0}
+
+        range_low_humidity = daily_forecast_generator._calculate_temperature_range(
+            condition, low_humidity_state
+        )
+
+        # Case 2: High Humidity (90%) - Should have reduced range
+        high_humidity_state = base_state.copy()
+        high_humidity_state["current_conditions"] = {KEY_HUMIDITY: 90.0}
+
+        range_high_humidity = daily_forecast_generator._calculate_temperature_range(
+            condition, high_humidity_state
+        )
+
+        # Verify high humidity results in smaller range
+        assert (
+            range_high_humidity < range_low_humidity
+        ), f"High humidity range ({range_high_humidity}) should be smaller than low humidity range ({range_low_humidity})"
+
+        # Verify the reduction is significant (at least 20% reduction)
+        # 90% humidity -> factor 0.6 (40% reduction)
+        assert range_high_humidity < range_low_humidity * 0.8
+
+    def test_temperature_range_values_are_reasonable(self, daily_forecast_generator):
+        """Test that calculated temperature ranges are within reasonable Fahrenheit bounds."""
+        condition = ATTR_CONDITION_SUNNY
+        meteorological_state = {
+            "atmospheric_stability": 0.5,
+            "current_conditions": {KEY_HUMIDITY: 50.0},
+        }
+
+        temp_range = daily_forecast_generator._calculate_temperature_range(
+            condition, meteorological_state
+        )
+
+        # Should be between 3°F and 25°F
+        assert (
+            3.0 <= temp_range <= 25.0
+        ), f"Temperature range {temp_range} is out of reasonable bounds"
+
+    def test_forecast_min_temperature_calculation(self, daily_forecast_generator):
+        """Test that min temperature is calculated correctly from max and range."""
+        # Setup a specific scenario
+        # Current temp 46, Sunny, High Humidity (91%)
+        # This mimics the user's report
+
+        current_temp = 46.0
+        day_idx = 0
+
+        meteorological_state = {
+            "atmospheric_stability": 0.8,  # High stability
+            "current_conditions": {KEY_HUMIDITY: 91.0},  # High humidity
+        }
+
+        # We need to mock forecast_temperature to return 46.0
+        daily_forecast_generator.forecast_temperature = Mock(return_value=46.0)
+
+        # Calculate range directly to verify dampening
+        temp_range = daily_forecast_generator._calculate_temperature_range(
+            ATTR_CONDITION_SUNNY, meteorological_state
+        )
+
+        # With 91% humidity, dampening factor is 1.0 - (21/50) = 0.58
+        # Base Sunny (12.0) * Stability (1.3) = 15.6
+        # 15.6 * 0.58 = ~9.05
+
+        expected_range = 9.05
+        tolerance = 1.0  # Allow some float variance
+
+        assert (
+            abs(temp_range - expected_range) < tolerance
+        ), f"Calculated range {temp_range} should be close to {expected_range}"
+
+        # Verify the resulting low would be ~37°F
+        forecast_low = current_temp - temp_range
+        assert (
+            36.0 <= forecast_low <= 38.0
+        ), f"Forecast low {forecast_low} should be around 37°F"

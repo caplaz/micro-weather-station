@@ -409,17 +409,18 @@ class ForecastConstants:
     CONFIDENCE_THRESHOLD_HIGH: float = 0.7  # High confidence threshold
     DAY_ZERO_MIN_CONFIDENCE: float = 0.8  # Minimum confidence for day 0
 
-    # Temperature range calculations (°C)
-    DEFAULT_TEMP_RANGE: float = 8.0  # Default diurnal temperature range
+    # Temperature range calculations (°F)
+    # Note: Forecasts are generated in Fahrenheit internally
+    DEFAULT_TEMP_RANGE: float = 10.0  # Default diurnal temperature range
     TEMP_RANGE_SUNNY: float = 12.0  # Large range on clear days
     TEMP_RANGE_PARTLYCLOUDY: float = 10.0
-    TEMP_RANGE_CLOUDY: float = 6.0  # Small range on cloudy days
-    TEMP_RANGE_RAINY: float = 4.0  # Very small range during rain
-    TEMP_RANGE_LIGHTNING_RAINY: float = 3.0
-    TEMP_RANGE_FOG: float = 2.0  # Minimal range in fog
+    TEMP_RANGE_CLOUDY: float = 7.0  # Small range on cloudy days
+    TEMP_RANGE_RAINY: float = 5.0  # Very small range during rain
+    TEMP_RANGE_LIGHTNING_RAINY: float = 4.0
+    TEMP_RANGE_FOG: float = 3.0  # Minimal range in fog
     TEMP_RANGE_STABILITY_BASE: float = 0.5  # Base stability factor
-    MIN_TEMP_RANGE: float = 2.0  # Minimum temperature range
-    MAX_TEMP_RANGE: float = 15.0  # Maximum temperature range
+    MIN_TEMP_RANGE: float = 3.0  # Minimum temperature range
+    MAX_TEMP_RANGE: float = 20.0  # Maximum temperature range
 
     # Wind speed bounds (km/h)
     MIN_WIND_SPEED: float = 1.0  # Minimum reported wind speed

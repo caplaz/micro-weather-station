@@ -916,6 +916,15 @@ class DailyForecastGenerator:
         )  # Stable air = larger range, unstable = smaller range
         condition_range *= stability_factor
 
+        # Humidity dampening (High humidity reduces diurnal range)
+        # This counteracts the stability boost from humidity and reflects
+        # the greenhouse effect of water vapor preventing cooling at night.
+        current_humidity = meteorological_state["current_conditions"][KEY_HUMIDITY]
+        if current_humidity > 70:
+            # Reduce range by up to 50% for high humidity (e.g. 90% -> 0.6 factor)
+            humidity_factor = max(0.5, 1.0 - ((current_humidity - 70) / 50.0))
+            condition_range *= humidity_factor
+
         return max(
             ForecastConstants.MIN_TEMP_RANGE,
             min(ForecastConstants.MAX_TEMP_RANGE, condition_range),

@@ -306,12 +306,22 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         )
             altitude = altitude_value
 
+            # Get historical patterns from trends analyzer
+            historical_patterns = {}
+            if (
+                hasattr(self.coordinator, "trends_analyzer")
+                and self.coordinator.trends_analyzer
+            ):
+                historical_patterns = (
+                    self.coordinator.trends_analyzer.analyze_historical_patterns()
+                )
+
             forecast_data = self._daily_generator.generate_forecast(
                 current_condition,
                 sensor_data,
                 altitude,
                 self._meteorological_analyzer.analyze_state(sensor_data, altitude),
-                {},  # historical_patterns - empty for now
+                historical_patterns,
                 {},  # system_evolution - empty for now
             )
 
