@@ -98,15 +98,13 @@ For advanced users or custom setups.
    ├── config_flow.py
    ├── const.py
    ├── manifest.json
+   ├── meteorological_constants.py
    ├── sensor.py
    ├── strings.json
    ├── version.py
    ├── weather.py
-   ├── weather_analysis.py
    ├── weather_detector.py
-   ├── weather_forecast.py
    ├── weather_utils.py
-   ├── meteorological_constants.py
    ├── analysis/
    │   ├── __init__.py
    │   ├── core.py
@@ -116,9 +114,7 @@ For advanced users or custom setups.
    ├── forecast/
    │   ├── __init__.py
    │   ├── meteorological.py
-   │   ├── patterns.py
    │   ├── evolution.py
-   │   ├── astronomical.py
    │   ├── daily.py
    │   └── hourly.py
    └── translations/
@@ -789,11 +785,11 @@ See [CHANGELOG](CHANGELOG.md) for the complete changelog.
 
 [ci-shield]: https://img.shields.io/github/actions/workflow/status/caplaz/micro-weather-station/ci.yml?style=for-the-badge&label=CI
 [ci]: https://github.com/caplaz/micro-weather-station/actions/workflows/ci.yml
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=3.0.2
+[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=4.0.0
 [commits]: https://github.com/caplaz/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=3.0.2
+[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=4.0.0
 [releases]: https://github.com/caplaz/micro-weather-station/releases
 [logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png
