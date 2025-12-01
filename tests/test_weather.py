@@ -998,27 +998,34 @@ class TestMicroWeatherEntity:
                 assert result is not None
                 assert len(result) == 24
 
-                # Forecast spans from 6:30 PM today through ~5:30 PM tomorrow
-                # Today's hours (1-11, 6:30 PM - 5:30 AM) should all be nighttime (after 6 PM sunset)
-                # Tomorrow's hours (12-23, 6:30 AM - 5:30 PM) use fallback 6-18 hours, so:
-                #   - 6:30 AM - 5:59 PM should be daytime
-                #   - Rest should be nighttime
+                # Forecast spans from current hour (5 PM) through ~4 PM tomorrow
+                # Current time is 5:30 PM, rounded down to 5 PM
+                # idx 0: 5 PM (daytime, before sunset at 6 PM)
+                # idx 1: 6 PM (at sunset)
+                # idx 2-11: 7 PM to 4 AM (nighttime, after sunset)
+                # idx 12-23: Tomorrow 5 AM to 4 PM (using fallback 6-18 logic)
 
                 for idx, forecast in enumerate(result):
                     forecast_time = datetime.fromisoformat(forecast["datetime"])
                     condition = forecast["condition"]
 
-                    # First 11 hours: 6:30 PM to 5:30 AM (all after today's sunset)
-                    if idx < 11:
-                        # Should be nighttime
+                    if idx == 0:
+                        # First hour: 5 PM, still daytime before sunset
+                        assert condition in [
+                            ATTR_CONDITION_SUNNY,
+                            ATTR_CONDITION_PARTLYCLOUDY,
+                            ATTR_CONDITION_CLOUDY,
+                        ], f"First hour before sunset should be daytime, got {condition} at {forecast_time}"
+                    elif idx < 12:
+                        # Hours 1-11: 6 PM to 4 AM (after sunset, nighttime)
                         assert condition in [
                             ATTR_CONDITION_CLEAR_NIGHT,
                             ATTR_CONDITION_CLOUDY,
-                        ], f"Hours after sunset today should be nighttime, got {condition} at {forecast_time}"
+                        ], f"Hours after sunset should be nighttime, got {condition} at {forecast_time}"
                     else:
-                        # Hours 12-23: Tomorrow 6:30 AM to 5:30 PM
+                        # Hours 12-23: Tomorrow 5 AM to 4 PM
                         # Using fallback 6-18 hours for tomorrow:
-                        # 6:30 AM, 7:30 AM, ... 5:30 PM are all daytime (between 6-18)
+                        # 6 AM - 5:59 PM should be daytime
                         is_daytime = 6 <= forecast_time.hour < 18
                         if is_daytime:
                             # Should be daytime conditions

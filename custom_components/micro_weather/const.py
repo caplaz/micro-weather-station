@@ -26,7 +26,6 @@ CONF_UV_INDEX_SENSOR = "uv_index_sensor"
 CONF_SUN_SENSOR = "sun_sensor"
 CONF_ALTITUDE = "altitude"
 CONF_ZENITH_MAX_RADIATION = "zenith_max_radiation"
-CONF_LUMINANCE_MULTIPLIER = "luminance_multiplier"
 
 # Default configuration values
 DEFAULT_TEMPERATURE_RANGE = (-10, 35)  # Celsius
@@ -35,7 +34,6 @@ DEFAULT_PRESSURE_RANGE = (990, 1030)  # hPa
 DEFAULT_WIND_SPEED_RANGE = (0, 25)  # km/h
 DEFAULT_UPDATE_INTERVAL = 5  # minutes
 DEFAULT_ZENITH_MAX_RADIATION = 1000.0  # W/m² at zenith
-DEFAULT_LUMINANCE_MULTIPLIER = 1.0  # No multiplier by default
 
 # Sensor data keys
 KEY_TEMPERATURE = "temperature"

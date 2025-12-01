@@ -259,21 +259,20 @@ The configuration flow will guide you through selecting your sensors:
 
 Configure additional sensors for enhanced weather detection:
 
-| Sensor Type              | Description                      | Purpose                                                                                             |
-| ------------------------ | -------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Dewpoint**             | Dewpoint temperature sensor      | Direct dewpoint measurement for improved accuracy                                                   |
-| **Humidity**             | Humidity percentage sensor       | Humidity readings and fog detection                                                                 |
-| **Pressure**             | Atmospheric pressure sensor      | Storm prediction and weather forecasting                                                            |
-| **Wind Speed**           | Wind speed sensor                | Wind conditions and storm detection                                                                 |
-| **Wind Direction**       | Wind direction sensor            | Wind data and storm tracking                                                                        |
-| **Wind Gust**            | Wind gust sensor                 | Severe weather and storm detection                                                                  |
-| **Rain Rate**            | Precipitation rate sensor        | Precipitation intensity measurement                                                                 |
-| **Rain State**           | Rain state sensor (dry/wet)      | Boolean precipitation detection                                                                     |
-| **Solar Radiation**      | Solar radiation sensor (W/m²)    | Cloud cover detection and solar analysis                                                            |
-| **Solar Lux**            | Light level sensor (lx)          | Day/night and cloud detection (backup)                                                              |
-| **UV Index**             | UV index sensor                  | Clear sky detection and solar intensity                                                             |
-| **Sun Sensor**           | Solar elevation sensor           | Precise cloud cover calculations based on sun position                                              |
-| **Luminance Multiplier** | Luminance multiplier (0.1x-5.0x) | Adjusts solar luminance readings based on sun elevation for improved accuracy during low sun angles |
+| Sensor Type         | Description                   | Purpose                                                |
+| ------------------- | ----------------------------- | ------------------------------------------------------ |
+| **Dewpoint**        | Dewpoint temperature sensor   | Direct dewpoint measurement for improved accuracy      |
+| **Humidity**        | Humidity percentage sensor    | Humidity readings and fog detection                    |
+| **Pressure**        | Atmospheric pressure sensor   | Storm prediction and weather forecasting               |
+| **Wind Speed**      | Wind speed sensor             | Wind conditions and storm detection                    |
+| **Wind Direction**  | Wind direction sensor         | Wind data and storm tracking                           |
+| **Wind Gust**       | Wind gust sensor              | Severe weather and storm detection                     |
+| **Rain Rate**       | Precipitation rate sensor     | Precipitation intensity measurement                    |
+| **Rain State**      | Rain state sensor (dry/wet)   | Boolean precipitation detection                        |
+| **Solar Radiation** | Solar radiation sensor (W/m²) | Cloud cover detection and solar analysis               |
+| **Solar Lux**       | Light level sensor (lx)       | Day/night and cloud detection (backup)                 |
+| **UV Index**        | UV index sensor               | Clear sky detection and solar intensity                |
+| **Sun Sensor**      | Solar elevation sensor        | Precise cloud cover calculations based on sun position |
 
 #### Unit Conversion Support
 

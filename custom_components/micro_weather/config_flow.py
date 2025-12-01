@@ -14,7 +14,6 @@ from .const import (
     CONF_ALTITUDE,
     CONF_DEWPOINT_SENSOR,
     CONF_HUMIDITY_SENSOR,
-    CONF_LUMINANCE_MULTIPLIER,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
     CONF_RAIN_RATE_SENSOR,
@@ -28,7 +27,6 @@ from .const import (
     CONF_WIND_GUST_SENSOR,
     CONF_WIND_SPEED_SENSOR,
     CONF_ZENITH_MAX_RADIATION,
-    DEFAULT_LUMINANCE_MULTIPLIER,
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_ZENITH_MAX_RADIATION,
     DOMAIN,
@@ -528,20 +526,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     max=1800,
                     step=10,
                     unit_of_measurement="W/m²",
-                )
-            )
-
-            schema_dict[
-                vol.Optional(
-                    CONF_LUMINANCE_MULTIPLIER,
-                    default=DEFAULT_LUMINANCE_MULTIPLIER,
-                )
-            ] = selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=0.1,
-                    max=5.0,
-                    step=0.1,
-                    unit_of_measurement="x",
                 )
             )
 

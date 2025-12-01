@@ -18,7 +18,6 @@ from .const import (
     CONF_ALTITUDE,
     CONF_DEWPOINT_SENSOR,
     CONF_HUMIDITY_SENSOR,
-    CONF_LUMINANCE_MULTIPLIER,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
     CONF_RAIN_RATE_SENSOR,
@@ -31,7 +30,6 @@ from .const import (
     CONF_WIND_GUST_SENSOR,
     CONF_WIND_SPEED_SENSOR,
     CONF_ZENITH_MAX_RADIATION,
-    DEFAULT_LUMINANCE_MULTIPLIER,
     DEFAULT_ZENITH_MAX_RADIATION,
     KEY_CONDITION,
     KEY_DEWPOINT,
@@ -364,51 +362,6 @@ class WeatherDetector:
                             sun_state.attributes.get("elevation", 0)
                         )
                         sensor_data["solar_elevation"] = solar_elevation
-
-                        # Apply luminance multiplier based on solar elevation
-                        # The multiplier is more effective when the sun is low
-                        luminance_multiplier = self.options.get(
-                            CONF_LUMINANCE_MULTIPLIER, DEFAULT_LUMINANCE_MULTIPLIER
-                        )
-                        if luminance_multiplier != 1.0:
-                            # Calculate elevation factor: 1.0 when elevation=0°, 0.0 when elevation=90°
-                            elevation_factor = max(0.0, 1.0 - (solar_elevation / 90.0))
-                            # Effective multiplier: approaches 1.0 as sun gets higher
-                            effective_multiplier = (
-                                1.0 + (luminance_multiplier - 1.0) * elevation_factor
-                            )
-
-                            # Apply multiplier to solar radiation (primary for cloud cover)
-                            if (
-                                "solar_radiation" in sensor_data
-                                and sensor_data["solar_radiation"] is not None
-                            ):
-                                sensor_data["solar_radiation"] *= effective_multiplier
-                                _LOGGER.debug(
-                                    "Applied luminance multiplier to radiation: %.2f (base: %.2f, elevation: %.1f°, "
-                                    "factor: %.2f) → radiation: %.1f W/m²",
-                                    effective_multiplier,
-                                    luminance_multiplier,
-                                    solar_elevation,
-                                    elevation_factor,
-                                    sensor_data["solar_radiation"],
-                                )
-
-                            # Also apply to lux for consistency (secondary for cloud cover)
-                            if (
-                                "solar_lux" in sensor_data
-                                and sensor_data["solar_lux"] is not None
-                            ):
-                                sensor_data["solar_lux"] *= effective_multiplier
-                                _LOGGER.debug(
-                                    "Applied luminance multiplier to lux: %.2f (base: %.2f, elevation: %.1f°, "
-                                    "factor: %.2f) → lux: %.0f",
-                                    effective_multiplier,
-                                    luminance_multiplier,
-                                    solar_elevation,
-                                    elevation_factor,
-                                    sensor_data["solar_lux"],
-                                )
                     except (ValueError, TypeError):
                         _LOGGER.warning(
                             "Could not get solar elevation from sun sensor %s",
