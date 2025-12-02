@@ -1,5 +1,28 @@
 # Changelog
 
+## 4.0.1 (2025-12-02)
+
+### Forecast Logic Improvements
+
+- **Historical Volatility-Based Temperature Variation**: Replaced hardcoded day-to-day temperature patterns with calculations based on observed sensor volatility
+  - Temperature forecasts now show realistic variation scaled to historical temperature swings
+  - Natural day-to-day temperature changes based on actual weather patterns rather than static values
+  - Added seasonal temperature adjustments for more accurate forecasts
+  - Enhanced test coverage for volatility-scaled temperature variation
+
+### Weather Detection Improvements
+
+- **Improved Fog Detection at Sunrise**: Enhanced fog detection logic to prevent false positives at low solar elevations
+  - Added clear-sky radiation model for sun angles below 15° to determine expected solar radiation
+  - At sunrise/sunset, compares actual solar radiation to expected clear-sky values
+  - Prevents false fog detection when low solar radiation is normal for the sun angle
+  - Maintains fog detection when solar radiation is abnormally low for the elevation
+  - Added comprehensive tests for sunrise fog scenarios
+
+### Bug Fixes
+
+- Placeholder for additional bug fixes in v4.0.1
+
 ## 4.0.0 (2025-11-30)
 
 ### Bug Fixes
