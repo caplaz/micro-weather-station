@@ -372,23 +372,49 @@ class WeatherConditionAnalyzer:
             return None
 
         # Additional pre-check: during daytime, fog should significantly
-        # reduce solar radiation. If solar radiation is high, it's not fog.
+        # reduce solar radiation. If solar radiation is close to clear-sky
+        # values for the current solar elevation, it's not fog.
         if params["is_daytime"]:
             solar_elevation = sensors.get("solar_elevation", 45.0)
-            if solar_elevation and solar_elevation > 10:
-                # During daytime with reasonable sun angle,
-                # fog would significantly reduce radiation
-                expected_min_radiation = min(200.0, solar_elevation * 8)
-                if sensors["solar_radiation"] > expected_min_radiation:
-                    # Solar radiation is too high for fog
-                    _LOGGER.debug(
-                        "Skipping fog check: solar radiation %.1f W/m² too high "
-                        "for fog (expected < %.1f at elevation %.1f°)",
-                        sensors["solar_radiation"],
-                        expected_min_radiation,
-                        solar_elevation,
-                    )
-                    return None
+            solar_rad = sensors.get("solar_radiation", 0)
+
+            if solar_elevation and solar_elevation > 0:
+                # Calculate expected clear-sky radiation for this elevation
+                # At low angles, use a proportional calculation
+                # At high angles, fog should reduce radiation significantly
+                if solar_elevation <= 15:
+                    # At low sun angles (sunrise/sunset), expected radiation is low
+                    # Use a formula that accounts for atmospheric path length
+                    # Clear-sky at 6°: ~60 W/m², at 10°: ~120 W/m², at 15°: ~200 W/m²
+                    # Fog would reduce these by 50-80%
+                    expected_clear_sky = solar_elevation * 13  # Rough linear estimate
+                    # If actual radiation is > 60% of clear-sky, probably not fog
+                    if solar_rad > expected_clear_sky * 0.6:
+                        _LOGGER.debug(
+                            "Skipping fog check: solar %.1f W/m² is %.0f%% of "
+                            "expected clear-sky %.1f W/m² at elevation %.1f°",
+                            solar_rad,
+                            (
+                                (solar_rad / expected_clear_sky * 100)
+                                if expected_clear_sky > 0
+                                else 0
+                            ),
+                            expected_clear_sky,
+                            solar_elevation,
+                        )
+                        return None
+                elif solar_elevation > 15:
+                    # At higher angles, fog would significantly reduce radiation
+                    expected_min_radiation = min(200.0, solar_elevation * 8)
+                    if solar_rad > expected_min_radiation:
+                        _LOGGER.debug(
+                            "Skipping fog check: solar radiation %.1f W/m² too high "
+                            "for fog (expected < %.1f at elevation %.1f°)",
+                            solar_rad,
+                            expected_min_radiation,
+                            solar_elevation,
+                        )
+                        return None
 
         # Check temperature trend - fog often forms when temperature is falling
         # toward dewpoint (evening/night radiational cooling)

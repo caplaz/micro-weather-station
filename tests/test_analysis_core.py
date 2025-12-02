@@ -386,3 +386,76 @@ class TestWeatherConditionAnalyzer:
         assert isinstance(
             result_invalid, (int, float)
         )  # Should handle invalid dewpoint
+
+    def test_no_fog_at_sunrise_with_normal_solar_for_elevation(
+        self, analyzers, mock_sensor_history
+    ):
+        """Test that fog is not detected at sunrise when solar radiation is normal for the sun angle.
+
+        At low solar elevations (e.g., 6.45° at 7:50 AM), solar radiation is naturally low
+        (e.g., 42.9 W/m²) but this is normal for clear conditions at that sun angle.
+        The fog check should recognize this as clear sky conditions, not fog.
+        """
+        # Simulate sunrise conditions: 7:50 AM, low elevation but clear
+        sensor_data = {
+            "outdoor_temp": 42.0,  # Cool morning
+            "humidity": 78.0,  # Moderate humidity (not fog-level)
+            "dewpoint": 35.0,  # Spread of 7°F - not very close
+            "wind_speed": 0.0,  # Calm
+            "wind_gust": 5.0,
+            "solar_radiation": 45.0,  # Low but normal for sunrise
+            "solar_lux": 5000.0,
+            "uv_index": 0.1,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "pressure": 29.92,
+            "solar_elevation": 6.5,  # Just after sunrise - low elevation
+        }
+
+        # With low elevation (6.5°), clear-sky max is ~50-60 W/m², so 45 W/m² is ~80% of max
+        # This should NOT trigger fog since it's consistent with clear-sky at this angle
+
+        # Check that fog is not detected
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+
+        # Should NOT be fog (likely cloudy or partly cloudy due to low solar, but not fog)
+        assert result != ATTR_CONDITION_FOG, (
+            f"Expected no fog at sunrise with normal solar radiation for elevation, "
+            f"but got {result}"
+        )
+
+    def test_fog_still_detected_at_sunrise_when_solar_abnormally_low(
+        self, analyzers, mock_sensor_history
+    ):
+        """Test that fog IS detected when solar radiation is abnormally low for the elevation.
+
+        If solar radiation is much lower than expected for the sun angle (indicating
+        something blocking sunlight), fog should still be detected.
+        """
+        # Simulate sunrise with fog: very low solar for the elevation + high humidity
+        sensor_data = {
+            "outdoor_temp": 42.0,  # Cool morning
+            "humidity": 95.0,  # Very high humidity (fog-like)
+            "dewpoint": 40.0,  # Spread of only 2°F - very close (fog condition)
+            "wind_speed": 0.0,  # Calm
+            "wind_gust": 2.0,
+            "solar_radiation": 5.0,  # Much lower than expected for elevation (~10% of max)
+            "solar_lux": 500.0,
+            "uv_index": 0.0,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "pressure": 29.92,
+            "solar_elevation": 6.5,  # Just after sunrise
+        }
+
+        # With low elevation, clear-sky max is ~50-60 W/m², so 5 W/m² is only ~10%
+        # This SHOULD allow fog detection since solar is abnormally low
+
+        # High humidity + abnormally low solar should trigger fog
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+
+        # With 95% humidity, 2°F dewpoint spread, and very low solar, fog should be detected
+        assert result == ATTR_CONDITION_FOG, (
+            f"Expected fog with abnormally low solar radiation and high humidity, "
+            f"but got {result}"
+        )
