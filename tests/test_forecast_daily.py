@@ -13,7 +13,7 @@ from homeassistant.components.weather import (
 )
 import pytest
 
-from custom_components.micro_weather.const import KEY_HUMIDITY
+from custom_components.micro_weather.const import KEY_HUMIDITY, KEY_TEMPERATURE
 from custom_components.micro_weather.forecast.daily import DailyForecastGenerator
 
 
@@ -658,7 +658,6 @@ class TestDailyForecastGenerator:
         # This mimics the user's report
 
         current_temp = 46.0
-        day_idx = 0
 
         meteorological_state = {
             "atmospheric_stability": 0.8,  # High stability
@@ -666,7 +665,7 @@ class TestDailyForecastGenerator:
         }
 
         # We need to mock forecast_temperature to return 46.0
-        daily_forecast_generator.forecast_temperature = Mock(return_value=46.0)
+        daily_forecast_generator.forecast_temperature = Mock(return_value=current_temp)
 
         # Calculate range directly to verify dampening
         temp_range = daily_forecast_generator._calculate_temperature_range(
@@ -689,3 +688,108 @@ class TestDailyForecastGenerator:
         assert (
             36.0 <= forecast_low <= 38.0
         ), f"Forecast low {forecast_low} should be around 37°F"
+
+    def test_temperature_forecast_has_daily_variation(self, daily_forecast_generator):
+        """Test that temperature forecasts vary day-to-day based on historical volatility.
+
+        When temperature trends are 0 and pressure is stable, forecasts should
+        still show natural day-to-day variation based on observed volatility
+        to avoid identical values for all 5 forecast days.
+        """
+        # Stable conditions with no trends but observed volatility
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 10.0,
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.5,
+            "cloud_analysis": {"cloud_cover": 50.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
+            "current_conditions": {KEY_HUMIDITY: 60.0},
+        }
+        # Volatility of 5.0 means we've observed ~5°F swings in temperature
+        historical_patterns = {KEY_TEMPERATURE: {"trend": 0.0, "volatility": 5.0}}
+        system_evolution = {"confidence_levels": [0.9, 0.8, 0.7, 0.6, 0.5]}
+        current_temp = 50.0
+
+        # Get temperatures for all 5 days
+        temps = []
+        for day_idx in range(5):
+            temp = daily_forecast_generator.forecast_temperature(
+                day_idx,
+                current_temp,
+                meteorological_state,
+                historical_patterns,
+                system_evolution,
+            )
+            temps.append(temp)
+
+        # Temperatures should NOT all be identical
+        unique_temps = set(round(t, 1) for t in temps)
+        assert (
+            len(unique_temps) > 1
+        ), f"Forecasts should vary day-to-day, but got identical values: {temps}"
+
+        # Verify reasonable spread based on volatility
+        temp_range = max(temps) - min(temps)
+        assert (
+            temp_range >= 2.0
+        ), f"With volatility=5.0, temp range should be at least 2°F, but was {temp_range}"
+
+    def test_temperature_variation_scales_with_volatility(
+        self, daily_forecast_generator
+    ):
+        """Test that temperature variation scales with historical volatility.
+
+        Higher volatility in historical data should produce larger day-to-day
+        variations in the forecast. Low volatility should produce smaller swings.
+        """
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 10.0,
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.5,
+            "cloud_analysis": {"cloud_cover": 50.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
+            "current_conditions": {KEY_HUMIDITY: 60.0},
+        }
+        system_evolution = {"confidence_levels": [0.9, 0.8, 0.7, 0.6, 0.5]}
+        current_temp = 50.0
+
+        # Test with LOW volatility (stable weather history)
+        low_volatility_patterns = {KEY_TEMPERATURE: {"trend": 0.0, "volatility": 1.0}}
+        low_temps = []
+        for day_idx in range(5):
+            temp = daily_forecast_generator.forecast_temperature(
+                day_idx,
+                current_temp,
+                meteorological_state,
+                low_volatility_patterns,
+                system_evolution,
+            )
+            low_temps.append(temp)
+        low_range = max(low_temps) - min(low_temps)
+
+        # Test with HIGH volatility (variable weather history)
+        high_volatility_patterns = {KEY_TEMPERATURE: {"trend": 0.0, "volatility": 8.0}}
+        high_temps = []
+        for day_idx in range(5):
+            temp = daily_forecast_generator.forecast_temperature(
+                day_idx,
+                current_temp,
+                meteorological_state,
+                high_volatility_patterns,
+                system_evolution,
+            )
+            high_temps.append(temp)
+        high_range = max(high_temps) - min(high_temps)
+
+        # Higher volatility should produce larger variation
+        assert (
+            high_range > low_range
+        ), f"High volatility range ({high_range}) should exceed low ({low_range})"

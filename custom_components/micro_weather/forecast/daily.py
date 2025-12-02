@@ -198,6 +198,11 @@ class DailyForecastGenerator:
         if not isinstance(temp_trend_per_hour, (int, float)):
             temp_trend_per_hour = 0.0
 
+        # Get historical volatility for natural variation
+        temp_volatility = temp_pattern.get("volatility", 3.0)
+        if not isinstance(temp_volatility, (int, float)):
+            temp_volatility = 3.0
+
         # Extrapolate trend forward (24 hours per day)
         # But dampen the extrapolation for distant days
         hours_forward = (day_idx + 1) * 24
@@ -212,6 +217,21 @@ class DailyForecastGenerator:
             meteorological_state, day_idx
         )
         forecast_temp += pressure_influence
+
+        # Seasonal adjustment (warming in spring, cooling in fall)
+        seasonal_adjustment = self._calculate_seasonal_temperature_adjustment(day_idx)
+        forecast_temp += seasonal_adjustment
+
+        # Natural day-to-day variation based on historical volatility
+        # Use the observed temperature variability to create realistic daily swings
+        # The pattern oscillates around the trend using volatility as amplitude
+        # Day 0: baseline, Day 1-4: oscillate based on volatility
+        variation_amplitude = min(temp_volatility, 5.0)  # Cap at 5°F variation
+        # Create oscillating pattern: 0, +amp*0.6, -amp*0.4, +amp*0.8, -amp*0.3
+        # This mimics real weather's tendency to warm/cool in waves
+        variation_pattern = [0.0, 0.6, -0.4, 0.8, -0.3]
+        day_variation = variation_amplitude * variation_pattern[day_idx]
+        forecast_temp += day_variation
 
         # Clamp unreasonable extrapolations
         # Max reasonable change: ±30°F over 5 days in extreme conditions

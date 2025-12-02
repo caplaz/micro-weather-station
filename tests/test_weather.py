@@ -2216,6 +2216,7 @@ class TestMicroWeatherEntity:
             "cloud_analysis": {"cloud_cover": 20.0},
             "moisture_analysis": {"condensation_potential": 0.2},
             "wind_pattern_analysis": {"direction_stability": 0.7},
+            "current_conditions": {"humidity": 40.0},
         }
 
         with patch.object(
@@ -2254,6 +2255,7 @@ class TestMicroWeatherEntity:
             "cloud_analysis": {"cloud_cover": 80.0},
             "moisture_analysis": {"condensation_potential": 0.7},
             "wind_pattern_analysis": {"direction_stability": 0.4},
+            "current_conditions": {"humidity": 70.0},
         }
 
         with patch.object(
