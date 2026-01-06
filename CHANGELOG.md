@@ -21,7 +21,29 @@
 
 ### Bug Fixes
 
+
 - Placeholder for additional bug fixes in v4.0.1
+
+## 4.1.0 (2025-12-04)
+
+### New Features
+
+
+- **Native Weather Properties**: Expose key weather metrics as native properties for better integration
+  - Added `uv_index` native property
+  - Added `cloud_coverage` native property
+  - Improves compatibility with Home Assistant's weather card and other integrations
+
+### Breaking Changes
+
+- **Dewpoint Attribute Removed**: The `dewpoint` attribute has been removed from `extra_state_attributes` and promoted to the standard `native_dew_point` property.
+  - Templates using `state_attr('weather.micro_weather_station', 'dewpoint')` must be updated to use the native property or state attribute if accessed differently.
+  - This standardized approach ensures better integration with Home Assistant dashboards.
+
+### Bug Fixes
+
+- **Atmospheric Analyzer Initialization**: Fixed missing dependency in fallback initialization logic
+- **Configuration Flow**: Fixed `getattr` access on dictionary object for altitude retrieval
 
 ## 4.0.0 (2025-11-30)
 
