@@ -71,6 +71,111 @@ def convert_precipitation_rate(
         return round(rain_rate, 1)
 
 
+def calculate_heat_index(temp_f: float, humidity: float) -> Optional[float]:
+    """Calculate Heat Index based on NOAA equation.
+
+    Rothfusz regression is used.
+    """
+    if temp_f is None or humidity is None:
+        return None
+
+    # NOAA's formula is only valid for temps >= 80F
+    if temp_f < 80:
+        return temp_f
+
+    # Simple formula first
+    hi = 0.5 * (temp_f + 61.0 + ((temp_f - 68.0) * 1.2) + (humidity * 0.094))
+
+    # If simple formula result is >= 80, use full regression
+    if hi >= 80:
+        hi = (
+            -42.379
+            + 2.04901523 * temp_f
+            + 10.14333127 * humidity
+            - 0.22475541 * temp_f * humidity
+            - 0.00683783 * temp_f * temp_f
+            - 0.05481717 * humidity * humidity
+            + 0.00122874 * temp_f * temp_f * humidity
+            + 0.00085282 * temp_f * humidity * humidity
+            - 0.00000199 * temp_f * temp_f * humidity * humidity
+        )
+
+        # Adjustments
+        if humidity < 13 and 80 <= temp_f <= 112:
+            hi -= ((13 - humidity) / 4) * ((17 - abs(temp_f - 95)) / 17) ** 0.5
+        elif humidity > 85 and 80 <= temp_f <= 87:
+            hi += ((humidity - 85) / 10) * ((87 - temp_f) / 5)
+
+    return round(hi, 1)
+
+
+def calculate_wind_chill(temp_f: float, wind_speed_mph: float) -> Optional[float]:
+    """Calculate Wind Chill based on NOAA equation."""
+    if temp_f is None or wind_speed_mph is None:
+        return None
+
+    # Wind chill is only defined for temps <= 50F and wind > 3 mph
+    if temp_f > 50 or wind_speed_mph <= 3:
+        return temp_f
+
+    wc = (
+        35.74
+        + 0.6215 * temp_f
+        - 35.75 * (wind_speed_mph**0.16)
+        + 0.4275 * temp_f * (wind_speed_mph**0.16)
+    )
+
+    return round(wc, 1)
+
+
+def calculate_apparent_temperature(
+    temp: float,
+    humidity: float,
+    wind_speed: float,
+    temp_unit: str = "F",
+    wind_unit: str = "mph",
+) -> Optional[float]:
+    """Calculate apparent temperature (Feels Like).
+
+    Combines Heat Index and Wind Chill.
+    Supports input in C or F, and mph, km/h, or m/s for wind.
+    Returns result in the same unit as temp_unit.
+    """
+    if temp is None:
+        return None
+
+    # Normalize inputs to Imperial (Fahrenheit/mph) for calculation
+    # The NOAA formulas require Imperial units.
+    temp_f = temp
+    if temp_unit.lower() in ["c", "celsius", "°c"]:
+        temp_f = convert_to_fahrenheit(temp)
+
+    wind_speed_mph = wind_speed
+    if wind_speed is not None:
+        if wind_unit.lower() in ["km/h", "kmh", "kph"]:
+             wind_speed_mph = wind_speed / 1.60934
+        elif wind_unit.lower() in ["m/s", "ms"]:
+             wind_speed_mph = wind_speed * 2.23694
+
+    apparent_temp_f = temp_f
+
+    # Wind Chill
+    if temp_f <= 50 and wind_speed_mph is not None and wind_speed_mph > 3:
+        apparent_temp_f = calculate_wind_chill(temp_f, wind_speed_mph)
+    # Heat Index
+    elif temp_f >= 80 and humidity is not None:
+        apparent_temp_f = calculate_heat_index(temp_f, humidity)
+
+    if apparent_temp_f is None:
+        return None
+
+    # Return in requested unit
+    if temp_unit.lower() in ["c", "celsius", "°c"]:
+        return convert_to_celsius(apparent_temp_f)
+
+    return round(apparent_temp_f, 1)
+
+
 def get_sun_times(hass: HomeAssistant) -> tuple[datetime | None, datetime | None]:
     """Get sunrise and sunset times from the sun.sun entity.
 

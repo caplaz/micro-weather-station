@@ -22,6 +22,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
+    KEY_APPARENT_TEMPERATURE,
     KEY_CONDITION,
     KEY_DEWPOINT,
     KEY_FORECAST,
@@ -155,6 +156,13 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         """Return the temperature."""
         if self.coordinator.data:
             return self.coordinator.data.get(KEY_TEMPERATURE)
+        return None
+
+    @property
+    def native_apparent_temperature(self) -> float | None:
+        """Return the apparent temperature."""
+        if self.coordinator.data:
+            return self.coordinator.data.get(KEY_APPARENT_TEMPERATURE)
         return None
 
     @property

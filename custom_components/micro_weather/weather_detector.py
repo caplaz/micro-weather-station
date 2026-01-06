@@ -32,6 +32,7 @@ from .const import (
     CONF_ZENITH_MAX_RADIATION,
     DEFAULT_ZENITH_MAX_RADIATION,
     KEY_CONDITION,
+    KEY_APPARENT_TEMPERATURE,
     KEY_DEWPOINT,
     KEY_FORECAST,
     KEY_HUMIDITY,
@@ -53,6 +54,7 @@ from .const import (
 )
 from .forecast import DailyForecastGenerator, MeteorologicalAnalyzer
 from .weather_utils import (
+    calculate_apparent_temperature,
     convert_altitude_to_meters,
     convert_to_celsius,
     convert_to_hpa,
@@ -257,6 +259,23 @@ class WeatherDetector:
                 dewpoint_unit = "F"  # Calculated dewpoint is in Fahrenheit
                 _LOGGER.debug("Dewpoint calculated: %.1f°F", dewpoint_value)
 
+        # Calculate Apparent Temperature (Feels Like) using flexible units
+        # We pass the raw sensor values and their units directly
+        temp_val = sensor_data.get(KEY_OUTDOOR_TEMP) or sensor_data.get(KEY_TEMPERATURE)
+        temp_unit = sensor_data.get(KEY_TEMPERATURE_UNIT)
+        
+        wind_val = sensor_data.get(KEY_WIND_SPEED)
+        wind_unit = sensor_data.get(KEY_WIND_SPEED_UNIT)
+
+        apparent_temp_value = calculate_apparent_temperature(
+            temp_val,
+            sensor_data.get("humidity"),  # Humidity is always %
+            wind_val,
+            temp_unit=temp_unit or "C",  # Default to C if unit missing
+            wind_unit=wind_unit or "km/h" # Default to km/h if unit missing
+        )
+        apparent_temp_unit = temp_unit or "C" # Result is in same unit as input
+
         # Convert units and prepare data
         weather_data = {
             KEY_TEMPERATURE: self._convert_temperature(
@@ -277,6 +296,9 @@ class WeatherDetector:
             KEY_DEWPOINT: self._convert_temperature(
                 dewpoint_value, dewpoint_unit
             ),  # Use sensor's unit or "F" for calculated values
+            KEY_APPARENT_TEMPERATURE: self._convert_temperature(
+                apparent_temp_value, apparent_temp_unit
+            ),
             KEY_CONDITION: condition,
             KEY_FORECAST: forecast_data,
             KEY_LAST_UPDATED: datetime.now().isoformat(),

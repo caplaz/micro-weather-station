@@ -27,6 +27,7 @@ import pytest
 
 from custom_components.micro_weather.const import (
     DOMAIN,
+    KEY_APPARENT_TEMPERATURE,
     KEY_CONDITION,
     KEY_FORECAST,
     KEY_HUMIDITY,
@@ -207,6 +208,16 @@ class TestMicroWeatherEntity:
         """Test precipitation unit property when unit is None."""
         coordinator.data = {"precipitation_unit": None}
         assert weather_entity.native_precipitation_unit is None
+
+    def test_native_apparent_temperature_no_data(self, weather_entity, coordinator):
+        """Test apparent temperature property when no data."""
+        coordinator.data = None
+        assert weather_entity.native_apparent_temperature is None
+
+    def test_native_apparent_temperature_with_data(self, weather_entity, coordinator):
+        """Test apparent temperature property with data."""
+        coordinator.data = {KEY_APPARENT_TEMPERATURE: 28.5}
+        assert weather_entity.native_apparent_temperature == 28.5
 
     async def test_async_forecast_daily_no_data(self, weather_entity, coordinator):
         """Test daily forecast when no data."""

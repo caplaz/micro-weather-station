@@ -580,6 +580,7 @@ class TestWeatherDetector:
             "wind_direction",
             "visibility",
             "condition",
+            "apparent_temperature",
             "forecast",
             "last_updated",
         ]
@@ -592,6 +593,7 @@ class TestWeatherDetector:
         assert isinstance(result["humidity"], (float, type(None)))
         assert isinstance(result["pressure"], (float, type(None)))
         assert isinstance(result["wind_speed"], (float, type(None)))
+        assert isinstance(result["apparent_temperature"], (float, type(None)))
         assert isinstance(result["condition"], str)
         assert isinstance(result["forecast"], list)
 
