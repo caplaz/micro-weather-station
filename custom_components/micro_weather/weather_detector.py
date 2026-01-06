@@ -269,6 +269,9 @@ class WeatherDetector:
             KEY_WIND_SPEED: self._convert_wind_speed(
                 sensor_data.get("wind_speed"), sensor_data.get(KEY_WIND_SPEED_UNIT)
             ),
+            KEY_WIND_GUST: self._convert_wind_speed(
+                sensor_data.get("wind_gust"), sensor_data.get(KEY_WIND_GUST_UNIT)
+            ),
             KEY_WIND_DIRECTION: sensor_data.get("wind_direction"),
             KEY_VISIBILITY: self.analysis.estimate_visibility(
                 condition, self._prepare_analysis_sensor_data(sensor_data)
