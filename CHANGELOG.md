@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.1.0 (Unreleased)
+
+### Features
+
+- **"Feels Like" Temperature**: Added Apparent Temperature calculation (#Feature)
+  - Calculates "Feels Like" temperature using Heat Index (Rothfusz algorithm) and Wind Chill (NOAA algorithm)
+  - Automatically applies Wind Chill when temp ≤ 50°F and wind > 3 mph
+  - Automatically applies Heat Index when temp ≥ 80°F
+  - Exposed as `apparent_temperature` attribute on the weather entity
+  - Smart unit handling (performs internal calculations in required Imperial units, converts output to match user preference)
+
 ## 4.0.1 (2025-12-02)
 
 ### Forecast Logic Improvements
