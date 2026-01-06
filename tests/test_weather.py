@@ -35,6 +35,7 @@ from custom_components.micro_weather.const import (
     KEY_TEMPERATURE,
     KEY_VISIBILITY,
     KEY_WIND_DIRECTION,
+    KEY_WIND_GUST,
     KEY_WIND_SPEED,
 )
 from custom_components.micro_weather.weather import (
@@ -162,6 +163,16 @@ class TestMicroWeatherEntity:
         """Test wind speed property with data."""
         coordinator.data = {KEY_WIND_SPEED: 15.5}
         assert weather_entity.native_wind_speed == 15.5
+
+    def test_native_wind_gust_speed_no_data(self, weather_entity, coordinator):
+        """Test wind gust speed property when no data."""
+        coordinator.data = None
+        assert weather_entity.native_wind_gust_speed is None
+
+    def test_native_wind_gust_speed_with_data(self, weather_entity, coordinator):
+        """Test wind gust speed property with data."""
+        coordinator.data = {KEY_WIND_GUST: 25.5}
+        assert weather_entity.native_wind_gust_speed == 25.5
 
     def test_wind_bearing_no_data(self, weather_entity, coordinator):
         """Test wind bearing property when no data."""
