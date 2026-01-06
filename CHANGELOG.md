@@ -21,7 +21,10 @@
 
 ### Bug Fixes
 
-- Placeholder for additional bug fixes in v4.0.1
+- **False Positive Lightning Reports**: Fixed issue where "Lightning" was reported in windy conditions without precipitation
+  - Increased wind gust threshold for dry lightning detection from 20 mph to 40 mph
+  - Prevents false alerts when high turbulence (gust factor > 3.0) occurs with moderate wind gusts
+  - Ensures lightning alerts are reserved for truly severe weather events or when precipitation is present
 
 ## 4.0.0 (2025-11-30)
 
