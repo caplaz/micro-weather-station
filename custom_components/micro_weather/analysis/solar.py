@@ -205,7 +205,11 @@ class SolarAnalyzer:
         # Safety check for miscalibration
         radiation_ratio = avg_solar_radiation / max_solar_radiation
 
-        if radiation_ratio > 1.05:
+        if (
+            radiation_ratio > SolarAnalysisConstants.CLEAR_SKY_EXCESS_THRESHOLD_RATIO
+            and (avg_solar_radiation - max_solar_radiation)
+            > SolarAnalysisConstants.CLEAR_SKY_EXCESS_THRESHOLD_ABS
+        ):
             _LOGGER.warning(
                 "Solar radiation (%.1f W/m²) exceeds clear-sky max (%.1f W/m²). "
                 "Consider increasing zenith_max_radiation from %.1f W/m².",
