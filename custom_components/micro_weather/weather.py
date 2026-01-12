@@ -34,6 +34,7 @@ from .const import (
     KEY_UV_INDEX,
     KEY_VISIBILITY,
     KEY_WIND_DIRECTION,
+    KEY_WIND_GUST,
     KEY_WIND_SPEED,
 )
 from .forecast import (
@@ -183,6 +184,13 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         """Return the wind bearing."""
         if self.coordinator.data:
             return self.coordinator.data.get(KEY_WIND_DIRECTION)
+        return None
+
+    @property
+    def native_wind_gust_speed(self) -> float | None:
+        """Return the wind gust speed."""
+        if self.coordinator.data:
+            return self.coordinator.data.get(KEY_WIND_GUST)
         return None
 
     @property

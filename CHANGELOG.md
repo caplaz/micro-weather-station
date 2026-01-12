@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.0.2 (2026-01-06)
+
+### New Features
+
+- **Wind Gust Support**: Added support for wind gust data in the weather entity
+  - Exposes wind gust speed via `native_wind_gust_speed` attribute
+  - Updates weather detector to process wind gust data from configured sensors
+  - Includes unit conversion support consistent with wind speed handling
 ## 4.0.2 (2025-12-30)
 
 ### Bug Fixes
