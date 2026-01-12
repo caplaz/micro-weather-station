@@ -1,5 +1,32 @@
 # Changelog
 
+## 4.1.1 (2026-01-12)
+
+### New Features
+
+- **Apparent Temperature Support**: Added support for "Feels Like" temperature (Heat Index & Wind Chill)
+
+  - Exposes apparent temperature via `native_apparent_temperature` attribute in weather entity
+  - Calculates Heat Index for hot conditions and Wind Chill for cold conditions
+  - Automatically switches between heat index and wind chill based on temperature thresholds
+  - Includes comprehensive unit conversion and validation
+
+- **Enhanced Weather Properties**: Exposed additional native weather properties for better integration
+
+  - Added `native_dew_point` attribute for dew point temperature
+  - Added `native_visibility` attribute for visibility distance
+  - Added `native_uv_index` attribute for UV index
+  - Improved sensor coverage and data availability for weather forecasting
+
+- **Native Weather Sensors**: Added native weather sensor entities for individual weather metrics
+  - Created separate sensor entities for temperature, humidity, pressure, wind speed, etc.
+  - Provides granular control and monitoring of individual weather parameters
+  - Enhanced test coverage for all new sensor implementations
+
+### Acknowledgments
+
+- Special thanks to [@Intecpsp](https://github.com/Intecpsp) for their continued valuable contributions to this release!
+
 ## 4.1.0 (2026-01-12)
 
 ### New Features
@@ -56,7 +83,6 @@
 ## 4.1.0 (2025-12-04)
 
 ### New Features
-
 
 - **Native Weather Properties**: Expose key weather metrics as native properties for better integration
   - Added `uv_index` native property
