@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.0.2 (2026-01-06)
+## 4.1.0 (2026-01-12)
 
 ### New Features
 
@@ -8,14 +8,27 @@
   - Exposes wind gust speed via `native_wind_gust_speed` attribute
   - Updates weather detector to process wind gust data from configured sensors
   - Includes unit conversion support consistent with wind speed handling
-## 4.0.2 (2025-12-30)
+
+### Acknowledgments
+
+- Special thanks to [@Intecpsp](https://github.com/Intecpsp) for their valuable contribution to this release!
 
 ### Bug Fixes
 
+- **False Positive Lightning Reports**: Fixed issue where "Lightning" was reported in windy conditions without precipitation
+  - Increased wind gust threshold for dry lightning detection from 20 mph to 40 mph
+  - Prevents false alerts when high turbulence (gust factor > 3.0) occurs with moderate wind gusts
+  - Ensures lightning alerts are reserved for truly severe weather events or when precipitation is present
 - **Fix Solar Radiation Validation Warning**: Relaxed validation thresholds to prevent false positive warnings in logs (#20)
   - Increased warning threshold from 5% to 10% above theoretical clear-sky maximum
   - Added absolute difference threshold (20 W/m²) to prevent warnings at low radiation levels
   - Resolves log spam when measured radiation slightly exceeds calculated theoretical maximum
+- **Code Quality Improvements**: Proactive refactoring of weather detection components
+  - Centralized unit conversion logic in `weather_utils.py` for better maintainability and consistency
+  - Replaced hardcoded math in `weather_detector.py` with standardized utility functions
+  - Standardized sensor key usage with constants from `const.py` to prevent typos
+  - Added strict unit tests for all new conversion functions
+  - Cleaned up duplicate constants and improved code organization
 
 ## 4.0.1 (2025-12-02)
 
@@ -38,16 +51,7 @@
 
 ### Bug Fixes
 
-- **False Positive Lightning Reports**: Fixed issue where "Lightning" was reported in windy conditions without precipitation
-  - Increased wind gust threshold for dry lightning detection from 20 mph to 40 mph
-  - Prevents false alerts when high turbulence (gust factor > 3.0) occurs with moderate wind gusts
-  - Ensures lightning alerts are reserved for truly severe weather events or when precipitation is present
-- **Code Quality Improvements**: Proactive refactoring of weather detection components
-  - Centralized unit conversion logic in `weather_utils.py` for better maintainability and consistency
-  - Replaced hardcoded math in `weather_detector.py` with standardized utility functions
-  - Standardized sensor key usage with constants from `const.py` to prevent typos
-  - Added strict unit tests for all new conversion functions
-  - Cleaned up duplicate constants and improved code organization
+- Placeholder for additional bug fixes in v4.0.1
 
 ## 4.0.0 (2025-11-30)
 
