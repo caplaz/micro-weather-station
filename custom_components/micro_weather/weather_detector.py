@@ -42,7 +42,10 @@ from .const import (
     KEY_PRESSURE,
     KEY_PRESSURE_UNIT,
     KEY_RAIN_RATE,
+    KEY_RAIN_STATE,
+    KEY_SOLAR_LUX_INTERNAL,
     KEY_SOLAR_RADIATION,
+    KEY_SUN,
     KEY_TEMPERATURE,
     KEY_TEMPERATURE_UNIT,
     KEY_UV_INDEX,
@@ -56,9 +59,12 @@ from .const import (
 from .forecast import DailyForecastGenerator, MeteorologicalAnalyzer
 from .weather_utils import (
     convert_altitude_to_meters,
+    convert_ms_to_mph,
     convert_to_celsius,
     convert_to_hpa,
+    convert_to_inhg,
     convert_to_kmh,
+    convert_to_mph,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -143,19 +149,19 @@ class WeatherDetector:
 
         # Sensor entity IDs mapping
         self.sensors = {
-            "outdoor_temp": options.get(CONF_OUTDOOR_TEMP_SENSOR),
-            "humidity": options.get(CONF_HUMIDITY_SENSOR),
-            "dewpoint": options.get(CONF_DEWPOINT_SENSOR),
-            "pressure": options.get(CONF_PRESSURE_SENSOR),
-            "wind_speed": options.get(CONF_WIND_SPEED_SENSOR),
-            "wind_direction": options.get(CONF_WIND_DIRECTION_SENSOR),
-            "wind_gust": options.get(CONF_WIND_GUST_SENSOR),
-            "rain_rate": options.get(CONF_RAIN_RATE_SENSOR),
-            "rain_state": options.get(CONF_RAIN_STATE_SENSOR),
-            "solar_radiation": options.get(CONF_SOLAR_RADIATION_SENSOR),
-            "solar_lux": options.get(CONF_SOLAR_LUX_SENSOR),
-            "uv_index": options.get(CONF_UV_INDEX_SENSOR),
-            "sun": options.get(CONF_SUN_SENSOR),
+            KEY_OUTDOOR_TEMP: options.get(CONF_OUTDOOR_TEMP_SENSOR),
+            KEY_HUMIDITY: options.get(CONF_HUMIDITY_SENSOR),
+            KEY_DEWPOINT: options.get(CONF_DEWPOINT_SENSOR),
+            KEY_PRESSURE: options.get(CONF_PRESSURE_SENSOR),
+            KEY_WIND_SPEED: options.get(CONF_WIND_SPEED_SENSOR),
+            KEY_WIND_DIRECTION: options.get(CONF_WIND_DIRECTION_SENSOR),
+            KEY_WIND_GUST: options.get(CONF_WIND_GUST_SENSOR),
+            KEY_RAIN_RATE: options.get(CONF_RAIN_RATE_SENSOR),
+            KEY_RAIN_STATE: options.get(CONF_RAIN_STATE_SENSOR),
+            KEY_SOLAR_RADIATION: options.get(CONF_SOLAR_RADIATION_SENSOR),
+            KEY_SOLAR_LUX_INTERNAL: options.get(CONF_SOLAR_LUX_SENSOR),
+            KEY_UV_INDEX: options.get(CONF_UV_INDEX_SENSOR),
+            KEY_SUN: options.get(CONF_SUN_SENSOR),
         }
 
     def get_weather_data(self) -> Dict[str, Any]:
@@ -271,6 +277,9 @@ class WeatherDetector:
             KEY_WIND_SPEED: self._convert_wind_speed(
                 sensor_data.get("wind_speed"), sensor_data.get(KEY_WIND_SPEED_UNIT)
             ),
+            KEY_WIND_GUST: self._convert_wind_speed(
+                sensor_data.get("wind_gust"), sensor_data.get(KEY_WIND_GUST_UNIT)
+            ),
             KEY_WIND_DIRECTION: sensor_data.get("wind_direction"),
             KEY_VISIBILITY: self.analysis.estimate_visibility(
                 condition, self._prepare_analysis_sensor_data(sensor_data)
@@ -325,7 +334,7 @@ class WeatherDetector:
                 continue
 
             # Skip sun sensor - it's handled separately below
-            if sensor_key == "sun":
+            if sensor_key == KEY_SUN:
                 continue
 
             state = self.hass.states.get(entity_id)
@@ -340,7 +349,7 @@ class WeatherDetector:
 
                 try:
                     # Handle string sensors (rain state detection)
-                    if sensor_key == "rain_state":
+                    if sensor_key == KEY_RAIN_STATE:
                         sensor_data[sensor_key] = state.state.lower()
                     else:
                         sensor_data[sensor_key] = float(state.state)
@@ -356,7 +365,7 @@ class WeatherDetector:
                     )
 
         # Get sun.sun sensor data for solar position calculations
-        sun_entity_id = self.sensors.get("sun")
+        sun_entity_id = self.sensors.get(KEY_SUN)
         if sun_entity_id:
             sun_state = self.hass.states.get(sun_entity_id)
             if sun_state and sun_state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
@@ -501,31 +510,29 @@ class WeatherDetector:
         if wind_unit in ["km/h", "kmh", "kph"]:
             wind_kmh = sensor_data.get(KEY_WIND_SPEED)
             if wind_kmh is not None:
-                forecast_data[KEY_WIND_SPEED] = round(wind_kmh / 1.60934, 1)
+                forecast_data[KEY_WIND_SPEED] = convert_to_mph(wind_kmh)
         elif wind_unit in ["m/s", "ms"]:
             wind_ms = sensor_data.get(KEY_WIND_SPEED)
             if wind_ms is not None:
-                forecast_data[KEY_WIND_SPEED] = round(
-                    wind_ms / 0.44704, 1
-                )  # m/s to mph
+                forecast_data[KEY_WIND_SPEED] = convert_ms_to_mph(wind_ms)
 
         # Convert pressure back to inHg if it was in hPa
         pressure_unit = sensor_data.get(KEY_PRESSURE_UNIT)
         if pressure_unit in ["hPa", "mbar", "mb"]:
             pressure_hpa = sensor_data.get(KEY_PRESSURE)
             if pressure_hpa is not None:
-                forecast_data[KEY_PRESSURE] = round(pressure_hpa / 33.8639, 2)
+                forecast_data[KEY_PRESSURE] = convert_to_inhg(pressure_hpa)
 
         # Wind gust also needs conversion if present
         gust_unit = sensor_data.get(KEY_WIND_GUST_UNIT)
         if gust_unit in ["km/h", "kmh", "kph"]:
             gust_kmh = sensor_data.get(KEY_WIND_GUST)
             if gust_kmh is not None:
-                forecast_data[KEY_WIND_GUST] = round(gust_kmh / 1.60934, 1)
+                forecast_data[KEY_WIND_GUST] = convert_to_mph(gust_kmh)
         elif gust_unit in ["m/s", "ms"]:
             gust_ms = sensor_data.get(KEY_WIND_GUST)
             if gust_ms is not None:
-                forecast_data[KEY_WIND_GUST] = round(gust_ms / 0.44704, 1)
+                forecast_data[KEY_WIND_GUST] = convert_ms_to_mph(gust_ms)
 
         return forecast_data
 
@@ -559,31 +566,29 @@ class WeatherDetector:
         if wind_unit in ["km/h", "kmh", "kph"]:
             wind_kmh = sensor_data.get(KEY_WIND_SPEED)
             if wind_kmh is not None:
-                analysis_data[KEY_WIND_SPEED] = round(wind_kmh / 1.60934, 1)
+                analysis_data[KEY_WIND_SPEED] = convert_to_mph(wind_kmh)
         elif wind_unit in ["m/s", "ms"]:
             wind_ms = sensor_data.get(KEY_WIND_SPEED)
             if wind_ms is not None:
-                analysis_data[KEY_WIND_SPEED] = round(
-                    wind_ms / 0.44704, 1
-                )  # m/s to mph
+                analysis_data[KEY_WIND_SPEED] = convert_ms_to_mph(wind_ms)
 
         # Convert pressure to inHg if it was in hPa
         pressure_unit = sensor_data.get(KEY_PRESSURE_UNIT)
         if pressure_unit in ["hPa", "mbar", "mb"]:
             pressure_hpa = sensor_data.get(KEY_PRESSURE)
             if pressure_hpa is not None:
-                analysis_data[KEY_PRESSURE] = round(pressure_hpa / 33.8639, 2)
+                analysis_data[KEY_PRESSURE] = convert_to_inhg(pressure_hpa)
 
         # Wind gust also needs conversion if present
         gust_unit = sensor_data.get(KEY_WIND_GUST_UNIT)
         if gust_unit in ["km/h", "kmh", "kph"]:
             gust_kmh = sensor_data.get(KEY_WIND_GUST)
             if gust_kmh is not None:
-                analysis_data[KEY_WIND_GUST] = round(gust_kmh / 1.60934, 1)
+                analysis_data[KEY_WIND_GUST] = convert_to_mph(gust_kmh)
         elif gust_unit in ["m/s", "ms"]:
             gust_ms = sensor_data.get(KEY_WIND_GUST)
             if gust_ms is not None:
-                analysis_data[KEY_WIND_GUST] = round(gust_ms / 0.44704, 1)
+                analysis_data[KEY_WIND_GUST] = convert_ms_to_mph(gust_ms)
 
         # Convert dewpoint to Fahrenheit if it was in Celsius
         dewpoint_unit = sensor_data.get("dewpoint_unit")

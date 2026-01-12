@@ -6,6 +6,7 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
+    ATTR_CONDITION_LIGHTNING,
     ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_POURING,
@@ -146,6 +147,53 @@ class TestWeatherDetector:
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
         assert result["condition"] == ATTR_CONDITION_POURING
+
+    def test_detect_gusty_wind_no_lightning(self, mock_hass, mock_options, mock_sensor_data):
+        """Test that gusty winds without extreme gusts do not trigger lightning."""
+        # Regression test for false positive lightning with high gust factor
+        mock_states = {}
+        for sensor_key, value in mock_sensor_data.items():
+            if sensor_key == "wind_speed":
+                state = Mock()
+                state.state = "7.18"  # Moderate wind
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "wind_gust":
+                state = Mock()
+                state.state = "22.85"  # High gust (Factor ~3.18)
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "pressure":
+                state = Mock()
+                state.state = "29.91"  # Normal pressure
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "rain_rate":
+                state = Mock()
+                state.state = "0.0"
+                mock_states[f"sensor.{sensor_key}"] = state
+            elif sensor_key == "rain_state":
+                state = Mock()
+                state.state = "Dry"
+                mock_states[f"sensor.{sensor_key}"] = state
+            else:
+                state = Mock()
+                state.state = str(value)
+                mock_states[f"sensor.{sensor_key}"] = state
+        
+        # Ensure mappings correct
+        mock_states["sensor.outdoor_temperature"] = mock_states.get("sensor.outdoor_temp", Mock(state="70.0"))
+        
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+        
+        # Should NOT be lightning
+        assert result["condition"] != ATTR_CONDITION_LIGHTNING
+        # Should likely be Cloudy or PartlyCloudy depending on solar, or Windy if wind speed high enough
+        # In this case wind speed 7.18 is LIGHT_BREEZE (8 is threshold for light breeze? check constants)
+        # Actually WindThresholds.LIGHT_BREEZE = 8.
+        # So it's CALM/LIGHT AIR.
+        # Solar defaults in mock_sensor_data might trigger sunny/cloudy.
+
 
     def test_detect_stormy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of stormy conditions (thunderstorm with precipitation)."""

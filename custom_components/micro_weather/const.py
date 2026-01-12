@@ -57,7 +57,9 @@ KEY_LAST_UPDATED = "last_updated"
 KEY_OUTDOOR_TEMP = "outdoor_temp"
 KEY_RAIN_RATE = "rain_rate"
 KEY_WIND_GUST = "wind_gust"
-KEY_DEWPOINT = "dewpoint"
+KEY_RAIN_STATE = "rain_state"
+KEY_SUN = "sun"
+
 KEY_SOLAR_LUX_INTERNAL = "solar_lux"
 
 # Sensor unit keys
