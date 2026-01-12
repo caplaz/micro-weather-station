@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.0.2 (2025-12-30)
+
+### Bug Fixes
+
+- **Fix Solar Radiation Validation Warning**: Relaxed validation thresholds to prevent false positive warnings in logs (#20)
+  - Increased warning threshold from 5% to 10% above theoretical clear-sky maximum
+  - Added absolute difference threshold (20 W/m²) to prevent warnings at low radiation levels
+  - Resolves log spam when measured radiation slightly exceeds calculated theoretical maximum
+
 ## 4.0.1 (2025-12-02)
 
 ### Forecast Logic Improvements
