@@ -27,6 +27,7 @@ import pytest
 
 from custom_components.micro_weather.const import (
     DOMAIN,
+    KEY_APPARENT_TEMPERATURE,
     KEY_CLOUD_COVERAGE,
     KEY_CONDITION,
     KEY_DEWPOINT,
@@ -319,6 +320,15 @@ class TestMicroWeatherEntity:
         coordinator.data = {"precipitation_unit": None}
         assert weather_entity.native_precipitation_unit is None
 
+    def test_native_apparent_temperature_no_data(self, weather_entity, coordinator):
+        """Test apparent temperature property when no data."""
+        coordinator.data = None
+        assert weather_entity.native_apparent_temperature is None
+
+    def test_native_apparent_temperature_with_data(self, weather_entity, coordinator):
+        """Test apparent temperature property with data."""
+        coordinator.data = {KEY_APPARENT_TEMPERATURE: 28.5}
+        assert weather_entity.native_apparent_temperature == 28.5
     def test_native_dew_point_no_data(self, weather_entity, coordinator):
         """Test dew point property when no data."""
         coordinator.data = None

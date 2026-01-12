@@ -31,6 +31,7 @@ This integration analyzes your real sensor data to provide weather conditions th
 - 🧠 **Intelligent Algorithms**: Uses solar radiation, precipitation, wind, and pressure data
 - 📊 **Individual Sensors**: Separate sensor entities for each weather parameter
 - 🌦️ **Weather Entity**: Complete weather entity with current conditions and intelligent forecasts
+- 🌡️ **"Feels Like" Temp**: Calculates Apparent Temperature (Heat Index/Wind Chill) automatically
 - 📈 **Intelligent Forecasting**: 5-day daily and 24-hour hourly forecasts based on pressure trends
 - ⚙️ **Flexible Configuration**: Works with any combination of available sensors
 - 🔧 **Dynamic Sensor Management**: Add or remove sensors anytime through the options flow

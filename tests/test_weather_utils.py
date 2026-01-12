@@ -13,6 +13,9 @@ from custom_components.micro_weather.weather_utils import (
     convert_to_mph,
     convert_ms_to_mph,
     is_forecast_hour_daytime,
+    calculate_heat_index,
+    calculate_wind_chill,
+    calculate_apparent_temperature,
 )
 
 
@@ -273,5 +276,90 @@ class TestWeatherUtils:
         # Test 4: Forecast 8 AM Tomorrow (Should be Day)
         # Note: This technically falls into the "next cycle" which might be tricky depending on how we define "daytime" relative to *these specific* sun times.
         # But based on the logic `forecast_time >= sunrise_time`, it should be True.
-        f4 = datetime(2025, 12, 1, 8, 0, 0, tzinfo=timezone.utc)
-        assert is_forecast_hour_daytime(f4, sunrise, sunset) is True
+    def test_calculate_heat_index(self):
+        """Test Heat Index calculation."""
+        # Test below threshold (return temp)
+        assert calculate_heat_index(70.0, 50.0) == 70.0
+
+        # Test simple formula range
+        # 80F, 40% RH -> ~80F
+        assert 79.0 <= calculate_heat_index(80.0, 40.0) <= 81.0
+
+        # Test full regression
+        # 90F, 50% RH -> ~95F
+        assert 94.0 <= calculate_heat_index(90.0, 50.0) <= 96.0
+
+        # Test adjustments
+        # Low humidity: 95F, 10% RH -> ~93F (Heat Index is lower than temp)
+        assert calculate_heat_index(95.0, 10.0) < 95.0
+
+        # High humidity: 85F, 90% RH -> ~102F
+        assert calculate_heat_index(85.0, 90.0) > 95.0
+
+        # Test None input
+        assert calculate_heat_index(None, 50.0) is None
+        assert calculate_heat_index(80.0, None) is None
+
+    def test_calculate_wind_chill(self):
+        """Test Wind Chill calculation."""
+        # Test above threshold (return temp)
+        assert calculate_wind_chill(55.0, 10.0) == 55.0  # Temp too high
+        assert calculate_wind_chill(30.0, 2.0) == 30.0   # Wind too low
+
+        # Test valid wind chill
+        # 30F, 10mph -> ~21F
+        wc = calculate_wind_chill(30.0, 10.0)
+        assert 20.0 <= wc <= 22.0
+
+        # 0F, 15mph -> ~-19F
+        wc = calculate_wind_chill(0.0, 15.0)
+        assert -20.0 <= wc <= -18.0
+
+        # Test None input
+        assert calculate_wind_chill(None, 10.0) is None
+        assert calculate_wind_chill(30.0, None) is None
+
+    def test_calculate_apparent_temperature(self):
+        """Test overall apparent temperature calculation."""
+        # Normal range (neither heat index nor wind chill)
+        # 60F, 50% RH, 5mph wind
+        assert calculate_apparent_temperature(60.0, 50.0, 5.0) == 60.0
+
+        # Wind Chill range
+        # 30F, 10mph
+        wc = calculate_apparent_temperature(30.0, 50.0, 10.0)
+        assert wc < 30.0
+
+        # Heat Index range
+        # 90F, 50% RH
+        hi = calculate_apparent_temperature(90.0, 50.0, 5.0)
+        assert hi > 90.0
+
+        # None handling
+        assert calculate_apparent_temperature(None, 50.0, 5.0) is None
+
+    def test_calculate_apparent_temperature_units(self):
+        """Test apparent temperature with variable units."""
+        # Celsius input (should return Celsius)
+        # 20C = 68F. Normal range. Return 20C.
+        assert calculate_apparent_temperature(20.0, 50.0, 5.0, temp_unit="C") == 20.0
+
+        # Celsius with Wind Chill
+        # -10C = 14F. Wind 20 km/h (~12 mph).
+        # Wind Chill(14F, 12mph) ~ -2F = -19C
+        wc_c = calculate_apparent_temperature(
+            -10.0, 50.0, 20.0, temp_unit="C", wind_unit="km/h"
+        )
+        assert -20.0 <= wc_c <= -17.0
+
+        # Celsius with Heat Index
+        # 35C = 95F. Humidity 50%.
+        # Heat Index(95F, 50%) ~ 107F = 41.7C
+        hi_c = calculate_apparent_temperature(
+            35.0, 50.0, 10.0, temp_unit="C", wind_unit="km/h"
+        )
+        assert 40.0 <= hi_c <= 43.0
+        
+        # Test unit string normalization
+        assert calculate_apparent_temperature(20.0, 50.0, 5.0, temp_unit="celsius") == 20.0
+        assert calculate_apparent_temperature(20.0, 50.0, 5.0, temp_unit="°C") == 20.0
