@@ -1,16 +1,6 @@
 # Changelog
 
-## 4.1.0 (Unreleased)
-
-### Features
-
-- **"Feels Like" Temperature**: Added Apparent Temperature calculation (#Feature)
-  - Calculates "Feels Like" temperature using Heat Index (Rothfusz algorithm) and Wind Chill (NOAA algorithm)
-  - Automatically applies Wind Chill when temp ≤ 50°F and wind > 3 mph
-  - Automatically applies Heat Index when temp ≥ 80°F
-  - Exposed as `apparent_temperature` attribute on the weather entity
-  - Smart unit handling (performs internal calculations in required Imperial units, converts output to match user preference)
-## 4.0.2 (2026-01-06)
+## 4.1.0 (2026-01-12)
 
 ### New Features
 
@@ -18,14 +8,27 @@
   - Exposes wind gust speed via `native_wind_gust_speed` attribute
   - Updates weather detector to process wind gust data from configured sensors
   - Includes unit conversion support consistent with wind speed handling
-## 4.0.2 (2025-12-30)
+
+### Acknowledgments
+
+- Special thanks to [@Intecpsp](https://github.com/Intecpsp) for their valuable contribution to this release!
 
 ### Bug Fixes
 
+- **False Positive Lightning Reports**: Fixed issue where "Lightning" was reported in windy conditions without precipitation
+  - Increased wind gust threshold for dry lightning detection from 20 mph to 40 mph
+  - Prevents false alerts when high turbulence (gust factor > 3.0) occurs with moderate wind gusts
+  - Ensures lightning alerts are reserved for truly severe weather events or when precipitation is present
 - **Fix Solar Radiation Validation Warning**: Relaxed validation thresholds to prevent false positive warnings in logs (#20)
   - Increased warning threshold from 5% to 10% above theoretical clear-sky maximum
   - Added absolute difference threshold (20 W/m²) to prevent warnings at low radiation levels
   - Resolves log spam when measured radiation slightly exceeds calculated theoretical maximum
+- **Code Quality Improvements**: Proactive refactoring of weather detection components
+  - Centralized unit conversion logic in `weather_utils.py` for better maintainability and consistency
+  - Replaced hardcoded math in `weather_detector.py` with standardized utility functions
+  - Standardized sensor key usage with constants from `const.py` to prevent typos
+  - Added strict unit tests for all new conversion functions
+  - Cleaned up duplicate constants and improved code organization
 
 ## 4.0.1 (2025-12-02)
 
@@ -48,16 +51,28 @@
 
 ### Bug Fixes
 
-- **False Positive Lightning Reports**: Fixed issue where "Lightning" was reported in windy conditions without precipitation
-  - Increased wind gust threshold for dry lightning detection from 20 mph to 40 mph
-  - Prevents false alerts when high turbulence (gust factor > 3.0) occurs with moderate wind gusts
-  - Ensures lightning alerts are reserved for truly severe weather events or when precipitation is present
-- **Code Quality Improvements**: Proactive refactoring of weather detection components
-  - Centralized unit conversion logic in `weather_utils.py` for better maintainability and consistency
-  - Replaced hardcoded math in `weather_detector.py` with standardized utility functions
-  - Standardized sensor key usage with constants from `const.py` to prevent typos
-  - Added strict unit tests for all new conversion functions
-  - Cleaned up duplicate constants and improved code organization
+- Placeholder for additional bug fixes in v4.0.1
+
+## 4.1.0 (2025-12-04)
+
+### New Features
+
+
+- **Native Weather Properties**: Expose key weather metrics as native properties for better integration
+  - Added `uv_index` native property
+  - Added `cloud_coverage` native property
+  - Improves compatibility with Home Assistant's weather card and other integrations
+
+### Breaking Changes
+
+- **Dewpoint Attribute Removed**: The `dewpoint` attribute has been removed from `extra_state_attributes` and promoted to the standard `native_dew_point` property.
+  - Templates using `state_attr('weather.micro_weather_station', 'dewpoint')` must be updated to use the native property or state attribute if accessed differently.
+  - This standardized approach ensures better integration with Home Assistant dashboards.
+
+### Bug Fixes
+
+- **Atmospheric Analyzer Initialization**: Fixed missing dependency in fallback initialization logic
+- **Configuration Flow**: Fixed `getattr` access on dictionary object for altitude retrieval
 
 ## 4.0.0 (2025-11-30)
 

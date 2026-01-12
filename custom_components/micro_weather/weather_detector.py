@@ -33,6 +33,7 @@ from .const import (
     DEFAULT_ZENITH_MAX_RADIATION,
     KEY_CONDITION,
     KEY_APPARENT_TEMPERATURE,
+    KEY_CLOUD_COVERAGE,
     KEY_DEWPOINT,
     KEY_FORECAST,
     KEY_HUMIDITY,
@@ -312,7 +313,14 @@ class WeatherDetector:
             KEY_CONDITION: condition,
             KEY_FORECAST: forecast_data,
             KEY_LAST_UPDATED: datetime.now().isoformat(),
+            KEY_UV_INDEX: sensor_data.get("uv_index"),
         }
+
+        # Add cloud coverage if available from history
+        if "cloud_cover" in self._sensor_history:
+            history = self._sensor_history["cloud_cover"]
+            if history:
+                weather_data[KEY_CLOUD_COVERAGE] = history[-1]["value"]
 
         # Set precipitation_unit based on rain_rate_unit, mapping rate units
         # to distance units

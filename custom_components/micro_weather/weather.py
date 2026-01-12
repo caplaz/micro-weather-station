@@ -23,6 +23,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     KEY_APPARENT_TEMPERATURE,
+    KEY_CLOUD_COVERAGE,
     KEY_CONDITION,
     KEY_DEWPOINT,
     KEY_FORECAST,
@@ -116,9 +117,11 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             zenith_max_radiation = config_entry.options.get(
                 CONF_ZENITH_MAX_RADIATION, DEFAULT_ZENITH_MAX_RADIATION
             )
-            atmospheric_analyzer = AtmosphericAnalyzer()
-            solar_analyzer = SolarAnalyzer(None, zenith_max_radiation)
             trends_analyzer = TrendsAnalyzer()
+            # Pass trends_analyzer to AtmosphericAnalyzer
+            atmospheric_analyzer = AtmosphericAnalyzer(trends_analyzer=trends_analyzer)
+            solar_analyzer = SolarAnalyzer(None, zenith_max_radiation)
+            
             core_analyzer = WeatherConditionAnalyzer(
                 atmospheric_analyzer, solar_analyzer, trends_analyzer
             )
@@ -216,6 +219,27 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         return None
 
     @property
+    def native_dew_point(self) -> float | None:
+        """Return the dew point."""
+        if self.coordinator.data:
+            return self.coordinator.data.get(KEY_DEWPOINT)
+        return None
+
+    @property
+    def uv_index(self) -> float | None:
+        """Return the UV index."""
+        if self.coordinator.data:
+            return self.coordinator.data.get(KEY_UV_INDEX)
+        return None
+
+    @property
+    def cloud_coverage(self) -> float | None:
+        """Return the cloud coverage."""
+        if self.coordinator.data:
+            return self.coordinator.data.get(KEY_CLOUD_COVERAGE)
+        return None
+
+    @property
     def native_precipitation_unit(self) -> str | None:
         """Return the unit of measurement for precipitation."""
         if self.coordinator.data:
@@ -230,14 +254,8 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
         if not self.coordinator.data:
             return None
 
-        attributes = {}
-
-        # Add dewpoint if available
-        dewpoint = self.coordinator.data.get(KEY_DEWPOINT)
-        if dewpoint is not None and not hasattr(dewpoint, "_mock_name"):
-            attributes["dewpoint"] = round(dewpoint, 1)
-
-        return attributes if attributes else None
+        # Attributes are empty as all previously extra attributes are now native
+        return None
 
     async def async_forecast_daily(self) -> list[Forecast] | None:
         """Return the daily forecast using comprehensive meteorological analysis."""
@@ -318,7 +336,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         self.coordinator.entry.options, "_mock_name"
                     ):  # Not a MagicMock
                         altitude_value = float(
-                            getattr(self.coordinator.entry.options, "altitude", 0.0)
+                            self.coordinator.entry.options.get("altitude", 0.0)
                         )
             altitude = altitude_value
 
@@ -433,7 +451,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         self.coordinator.entry.options, "_mock_name"
                     ):  # Not a MagicMock
                         altitude_value = float(
-                            getattr(self.coordinator.entry.options, "altitude", 0.0)
+                            self.coordinator.entry.options.get("altitude", 0.0)
                         )
             altitude = altitude_value
 
