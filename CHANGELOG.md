@@ -21,7 +21,12 @@
 
 ### Bug Fixes
 
-- Placeholder for additional bug fixes in v4.0.1
+- **Code Quality Improvements**: Proactive refactoring of weather detection components
+  - Centralized unit conversion logic in `weather_utils.py` for better maintainability and consistency
+  - Replaced hardcoded math in `weather_detector.py` with standardized utility functions
+  - Standardized sensor key usage with constants from `const.py` to prevent typos
+  - Added strict unit tests for all new conversion functions
+  - Cleaned up duplicate constants and improved code organization
 
 ## 4.0.0 (2025-11-30)
 
