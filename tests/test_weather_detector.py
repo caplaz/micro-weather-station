@@ -629,7 +629,10 @@ class TestWeatherDetector:
             "visibility",
             "condition",
             "forecast",
+            "forecast",
             "last_updated",
+            "uv_index",
+            "cloud_coverage",
         ]
 
         for field in required_fields:
@@ -642,6 +645,8 @@ class TestWeatherDetector:
         assert isinstance(result["wind_speed"], (float, type(None)))
         assert isinstance(result["condition"], str)
         assert isinstance(result["forecast"], list)
+        assert isinstance(result["uv_index"], (float, type(None)))
+        assert isinstance(result["cloud_coverage"], (float, type(None)))
 
     def test_sensor_data_filtering(self, mock_hass, mock_options, mock_sensor_data):
         """Test that None values are filtered from results."""
