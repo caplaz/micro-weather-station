@@ -165,8 +165,6 @@ def calculate_apparent_temperature(
     if temp is None:
         return None
 
-    assert temp is not None  # for mypy
-
     # Normalize inputs to Imperial (Fahrenheit/mph) for calculation
     # The NOAA formulas require Imperial units.
     temp_f: float = temp
