@@ -121,4 +121,15 @@ SENSOR_TYPES = {
         "icon": "mdi:thermometer-water",
         "device_class": "temperature",
     },
+    "apparent_temperature": {
+        "name": "Apparent Temperature",
+        "unit": "°C",
+        "icon": "mdi:thermometer",
+        "device_class": "temperature",
+    },
+    "uv_index": {
+        "name": "UV Index",
+        "unit": "",
+        "icon": "mdi:sun-wireless",
+    },
 }
