@@ -27,11 +27,32 @@ def convert_to_hpa(pressure_inhg: Optional[float]) -> Optional[float]:
     return round(pressure_inhg * 33.8639, 1)
 
 
+def convert_to_inhg(pressure_hpa: Optional[float]) -> Optional[float]:
+    """Convert hPa to inches of mercury."""
+    if pressure_hpa is None:
+        return None
+    return round(pressure_hpa / 33.8639, 2)
+
+
 def convert_to_kmh(speed_mph: Optional[float]) -> Optional[float]:
     """Convert miles per hour to kilometers per hour."""
     if speed_mph is None:
         return None
     return round(speed_mph * 1.60934, 1)
+
+
+def convert_to_mph(speed_kmh: Optional[float]) -> Optional[float]:
+    """Convert kilometers per hour to miles per hour."""
+    if speed_kmh is None:
+        return None
+    return round(speed_kmh / 1.60934, 1)
+
+
+def convert_ms_to_mph(speed_ms: Optional[float]) -> Optional[float]:
+    """Convert meters per second to miles per hour."""
+    if speed_ms is None:
+        return None
+    return round(speed_ms / 0.44704, 1)
 
 
 def convert_altitude_to_meters(

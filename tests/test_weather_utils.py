@@ -8,8 +8,10 @@ from custom_components.micro_weather.weather_utils import (
     convert_to_celsius,
     convert_to_fahrenheit,
     convert_to_hpa,
+    convert_to_inhg,
     convert_to_kmh,
-    convert_to_kmh,
+    convert_to_mph,
+    convert_ms_to_mph,
     is_forecast_hour_daytime,
     calculate_heat_index,
     calculate_wind_chill,
@@ -110,6 +112,39 @@ class TestWeatherUtils:
         # Convert back approximately (1 hPa ≈ 0.02953 inHg)
         pressure_inhg_back = pressure_hpa * 0.02953
         assert abs(pressure_inhg - pressure_inhg_back) < 0.1
+
+    def test_convert_to_inhg(self):
+        """Test pressure conversion from hPa to inHg."""
+        # Test standard pressure
+        assert abs(convert_to_inhg(1013.25) - 29.92) < 0.01
+
+        # Test low pressure
+        assert abs(convert_to_inhg(948.0) - 28.0) < 0.1
+
+        # Test high pressure
+        assert abs(convert_to_inhg(1050.0) - 31.0) < 0.1
+
+        # Test None input
+        assert convert_to_inhg(None) is None
+
+    def test_convert_to_mph(self):
+        """Test kilometers per hour to miles per hour conversion."""
+        # Test common wind speeds
+        assert abs(convert_to_mph(1.609) - 1.0) < 0.01  # 1 mph
+        assert abs(convert_to_mph(16.093) - 10.0) < 0.01  # 10 mph
+        assert abs(convert_to_mph(96.6) - 60.0) < 0.1  # 60 mph
+
+        # Test None input
+        assert convert_to_mph(None) is None
+
+    def test_convert_ms_to_mph(self):
+        """Test meters per second to miles per hour conversion."""
+        # Test common wind speeds
+        assert abs(convert_ms_to_mph(1.0) - 2.2) < 0.1  # 1 m/s approx 2.237 mph, rounded to 2.2
+        assert abs(convert_ms_to_mph(10.0) - 22.4) < 0.1
+
+        # Test None input
+        assert convert_ms_to_mph(None) is None
 
     def test_wind_speed_conversion_precision(self):
         """Test wind speed conversion precision."""

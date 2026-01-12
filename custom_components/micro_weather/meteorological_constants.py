@@ -277,6 +277,10 @@ class SolarAnalysisConstants:
     VERY_LOW_RADIATION_THRESHOLD_RATIO = 0.1  # 10% of clear-sky max
     EXTREME_LOW_RADIATION_THRESHOLD_RATIO = 0.2  # 20% of clear-sky max
 
+    # Solar validation thresholds
+    CLEAR_SKY_EXCESS_THRESHOLD_RATIO = 1.10  # Warn if > 110% of theoretical max
+    CLEAR_SKY_EXCESS_THRESHOLD_ABS = 20.0  # And absolute difference > 20 W/m²
+
     # Solar measurement thresholds for fallback logic
     MIN_SOLAR_RADIATION = 50  # W/m² - Minimum significant radiation
     MIN_SOLAR_LUX = 20000  # lux - Minimum significant illuminance
