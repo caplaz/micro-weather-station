@@ -1,7 +1,7 @@
 """Weather utility functions for unit conversions and calculations."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, cast
 
 from homeassistant.core import HomeAssistant
 
@@ -150,9 +150,9 @@ def calculate_wind_chill(temp_f: float, wind_speed_mph: float) -> Optional[float
 
 
 def calculate_apparent_temperature(
-    temp: float,
-    humidity: float,
-    wind_speed: float,
+    temp: Optional[float],
+    humidity: Optional[float],
+    wind_speed: Optional[float],
     temp_unit: str = "F",
     wind_unit: str = "mph",
 ) -> Optional[float]:
@@ -165,20 +165,22 @@ def calculate_apparent_temperature(
     if temp is None:
         return None
 
+    assert temp is not None  # for mypy
+
     # Normalize inputs to Imperial (Fahrenheit/mph) for calculation
     # The NOAA formulas require Imperial units.
-    temp_f = temp
+    temp_f: float = temp
     if temp_unit.lower() in ["c", "celsius", "°c"]:
-        temp_f = convert_to_fahrenheit(temp)
+        temp_f = cast(float, convert_to_fahrenheit(temp))
 
-    wind_speed_mph = wind_speed
+    wind_speed_mph: Optional[float] = wind_speed
     if wind_speed is not None:
         if wind_unit.lower() in ["km/h", "kmh", "kph"]:
-             wind_speed_mph = wind_speed / 1.60934
+            wind_speed_mph = wind_speed / 1.60934
         elif wind_unit.lower() in ["m/s", "ms"]:
-             wind_speed_mph = wind_speed * 2.23694
+            wind_speed_mph = wind_speed * 2.23694
 
-    apparent_temp_f = temp_f
+    apparent_temp_f: Optional[float] = temp_f
 
     # Wind Chill
     if temp_f <= 50 and wind_speed_mph is not None and wind_speed_mph > 3:
@@ -192,7 +194,7 @@ def calculate_apparent_temperature(
 
     # Return in requested unit
     if temp_unit.lower() in ["c", "celsius", "°c"]:
-        return convert_to_celsius(apparent_temp_f)
+        return cast(float, convert_to_celsius(apparent_temp_f))
 
     return round(apparent_temp_f, 1)
 
