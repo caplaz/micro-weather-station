@@ -541,7 +541,7 @@ class WeatherConditionAnalyzer:
         # Severe turbulence or very low pressure with strong winds
         is_severe = (
             gust_factor > WindThresholds.GUST_FACTOR_SEVERE
-            and sensors["wind_gust"] > WindThresholds.GUST_SEVERE
+            and sensors["wind_gust"] > WindThresholds.GUST_EXTREME
         ) or sensors["wind_gust"] > WindThresholds.GUST_EXTREME
 
         wind_strong = (

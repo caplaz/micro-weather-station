@@ -30,6 +30,10 @@
 
 ### Bug Fixes
 
+- **False Positive Lightning Reports**: Fixed issue where "Lightning" was reported in windy conditions without precipitation
+  - Increased wind gust threshold for dry lightning detection from 20 mph to 40 mph
+  - Prevents false alerts when high turbulence (gust factor > 3.0) occurs with moderate wind gusts
+  - Ensures lightning alerts are reserved for truly severe weather events or when precipitation is present
 - **Code Quality Improvements**: Proactive refactoring of weather detection components
   - Centralized unit conversion logic in `weather_utils.py` for better maintainability and consistency
   - Replaced hardcoded math in `weather_detector.py` with standardized utility functions
