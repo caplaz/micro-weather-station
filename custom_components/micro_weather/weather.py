@@ -121,7 +121,7 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
             # Pass trends_analyzer to AtmosphericAnalyzer
             atmospheric_analyzer = AtmosphericAnalyzer(trends_analyzer=trends_analyzer)
             solar_analyzer = SolarAnalyzer(None, zenith_max_radiation)
-            
+
             core_analyzer = WeatherConditionAnalyzer(
                 atmospheric_analyzer, solar_analyzer, trends_analyzer
             )

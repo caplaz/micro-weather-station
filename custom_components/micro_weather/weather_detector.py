@@ -31,9 +31,9 @@ from .const import (
     CONF_WIND_SPEED_SENSOR,
     CONF_ZENITH_MAX_RADIATION,
     DEFAULT_ZENITH_MAX_RADIATION,
-    KEY_CONDITION,
     KEY_APPARENT_TEMPERATURE,
     KEY_CLOUD_COVERAGE,
+    KEY_CONDITION,
     KEY_DEWPOINT,
     KEY_FORECAST,
     KEY_HUMIDITY,
@@ -271,7 +271,7 @@ class WeatherDetector:
         # We pass the raw sensor values and their units directly
         temp_val = sensor_data.get(KEY_OUTDOOR_TEMP) or sensor_data.get(KEY_TEMPERATURE)
         temp_unit = sensor_data.get(KEY_TEMPERATURE_UNIT)
-        
+
         wind_val = sensor_data.get(KEY_WIND_SPEED)
         wind_unit = sensor_data.get(KEY_WIND_SPEED_UNIT)
 
@@ -280,9 +280,9 @@ class WeatherDetector:
             sensor_data.get("humidity"),  # Humidity is always %
             wind_val,
             temp_unit=temp_unit or "C",  # Default to C if unit missing
-            wind_unit=wind_unit or "km/h" # Default to km/h if unit missing
+            wind_unit=wind_unit or "km/h",  # Default to km/h if unit missing
         )
-        apparent_temp_unit = temp_unit or "C" # Result is in same unit as input
+        apparent_temp_unit = temp_unit or "C"  # Result is in same unit as input
 
         # Convert units and prepare data
         weather_data = {
