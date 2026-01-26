@@ -57,10 +57,10 @@ from .const import (
     KEY_WIND_SPEED,
     KEY_WIND_SPEED_UNIT,
     PRESSURE_HPA_UNIT,
-    PRESSURE_INHG_UNIT,
-    PRESSURE_PSI_UNIT,
     PRESSURE_HPA_UNITS,
+    PRESSURE_INHG_UNIT,
     PRESSURE_INHG_UNITS,
+    PRESSURE_PSI_UNIT,
     PRESSURE_PSI_UNITS,
 )
 from .forecast import DailyForecastGenerator, MeteorologicalAnalyzer
