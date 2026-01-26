@@ -56,14 +56,18 @@ from .const import (
     KEY_WIND_GUST_UNIT,
     KEY_WIND_SPEED,
     KEY_WIND_SPEED_UNIT,
+    PRESSURE_HPA_UNIT,
+    PRESSURE_INHG_UNIT,
+    PRESSURE_PSI_UNIT,
+    PRESSURE_HPA_UNITS,
+    PRESSURE_INHG_UNITS,
+    PRESSURE_PSI_UNITS,
 )
 from .forecast import DailyForecastGenerator, MeteorologicalAnalyzer
 from .weather_utils import (
     calculate_apparent_temperature,
     convert_altitude_to_meters,
     convert_ms_to_mph,
-    convert_psi_to_hpa,
-    convert_psi_to_inhg,
     convert_to_celsius,
     convert_to_hpa,
     convert_to_inhg,
@@ -472,14 +476,14 @@ class WeatherDetector:
             return None
 
         # If unit is hPa, mbar, or not specified, assume it's already in hPa
-        if unit in ["hPa", "mbar", "mb"]:
+        if unit in PRESSURE_HPA_UNITS:
             return round(pressure, 1)
         # If unit is inHg, convert to hPa using utils function
-        elif unit in ["inHg", "inhg", '"Hg']:
+        elif unit in PRESSURE_INHG_UNITS:
             return convert_to_hpa(pressure)
         # If unit is PSI, convert to hPa
-        elif unit in ["psi", "lbs/sq in", "lbs/in2"]:
-            return convert_psi_to_hpa(pressure)
+        elif unit in PRESSURE_PSI_UNITS:
+            return convert_to_hpa(pressure, unit=PRESSURE_PSI_UNIT)
         else:
             # Unknown unit, assume hPa (most common for weather stations)
             _LOGGER.debug("Unknown pressure unit '%s', assuming hPa", unit)
@@ -545,14 +549,16 @@ class WeatherDetector:
 
         # Convert pressure back to inHg if it was in hPa
         pressure_unit = sensor_data.get(KEY_PRESSURE_UNIT)
-        if pressure_unit in ["hPa", "mbar", "mb"]:
+        if pressure_unit in PRESSURE_HPA_UNITS:
             pressure_hpa = sensor_data.get(KEY_PRESSURE)
             if pressure_hpa is not None:
                 forecast_data[KEY_PRESSURE] = convert_to_inhg(pressure_hpa)
-        elif pressure_unit in ["psi", "lbs/sq in", "lbs/in2"]:
+        elif pressure_unit in PRESSURE_PSI_UNITS:
             pressure_psi = sensor_data.get(KEY_PRESSURE)
             if pressure_psi is not None:
-                forecast_data[KEY_PRESSURE] = convert_psi_to_inhg(pressure_psi)
+                forecast_data[KEY_PRESSURE] = convert_to_inhg(
+                    pressure_psi, unit=PRESSURE_PSI_UNIT
+                )
 
         # Wind gust also needs conversion if present
         gust_unit = sensor_data.get(KEY_WIND_GUST_UNIT)
@@ -605,14 +611,16 @@ class WeatherDetector:
 
         # Convert pressure to inHg if it was in hPa
         pressure_unit = sensor_data.get(KEY_PRESSURE_UNIT)
-        if pressure_unit in ["hPa", "mbar", "mb"]:
+        if pressure_unit in PRESSURE_HPA_UNITS:
             pressure_hpa = sensor_data.get(KEY_PRESSURE)
             if pressure_hpa is not None:
                 analysis_data[KEY_PRESSURE] = convert_to_inhg(pressure_hpa)
-        elif pressure_unit in ["psi", "lbs/sq in", "lbs/in2"]:
+        elif pressure_unit in PRESSURE_PSI_UNITS:
             pressure_psi = sensor_data.get(KEY_PRESSURE)
             if pressure_psi is not None:
-                analysis_data[KEY_PRESSURE] = convert_psi_to_inhg(pressure_psi)
+                analysis_data[KEY_PRESSURE] = convert_to_inhg(
+                    pressure_psi, unit=PRESSURE_PSI_UNIT
+                )
 
         # Wind gust also needs conversion if present
         gust_unit = sensor_data.get(KEY_WIND_GUST_UNIT)
