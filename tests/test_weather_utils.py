@@ -17,6 +17,11 @@ from custom_components.micro_weather.weather_utils import (
     calculate_wind_chill,
     calculate_apparent_temperature,
 )
+from custom_components.micro_weather.const import (
+    PRESSURE_HPA_UNIT,
+    PRESSURE_INHG_UNIT,
+    PRESSURE_PSI_UNIT,
+)
 
 
 class TestWeatherUtils:
@@ -145,6 +150,34 @@ class TestWeatherUtils:
 
         # Test None input
         assert convert_ms_to_mph(None) is None
+
+    def test_convert_to_hpa_from_psi(self):
+        """Test PSI to hPa conversion."""
+        # Test standard pressure (1 atm ≈ 14.696 PSI ≈ 1013.25 hPa)
+        assert abs(convert_to_hpa(14.696, unit=PRESSURE_PSI_UNIT) - 1013.3) < 0.5
+        
+        # Test user's case: 15 PSI -> ~1034 hPa
+        assert abs(convert_to_hpa(15.0, unit=PRESSURE_PSI_UNIT) - 1034.2) < 0.5
+        
+        # Test None input
+        assert convert_to_hpa(None, unit=PRESSURE_PSI_UNIT) is None
+        
+        # Test 0 PSI
+        assert convert_to_hpa(0.0, unit=PRESSURE_PSI_UNIT) == 0.0
+
+    def test_convert_to_inhg_from_psi(self):
+        """Test PSI to inHg conversion."""
+        # Test standard pressure (1 atm ≈ 14.696 PSI ≈ 29.92 inHg)
+        assert abs(convert_to_inhg(14.696, unit=PRESSURE_PSI_UNIT) - 29.92) < 0.1
+        
+        # Test user's case: 15 PSI -> ~30.54 inHg
+        assert abs(convert_to_inhg(15.0, unit=PRESSURE_PSI_UNIT) - 30.54) < 0.1
+        
+        # Test None input
+        assert convert_to_inhg(None, unit=PRESSURE_PSI_UNIT) is None
+        
+        # Test 0 PSI
+        assert convert_to_inhg(0.0, unit=PRESSURE_PSI_UNIT) == 0.0
 
     def test_wind_speed_conversion_precision(self):
         """Test wind speed conversion precision."""

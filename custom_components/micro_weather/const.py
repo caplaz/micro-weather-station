@@ -72,6 +72,16 @@ KEY_WIND_SPEED_UNIT = "wind_speed_unit"
 KEY_WIND_GUST_UNIT = "wind_gust_unit"
 KEY_RAIN_RATE_UNIT = "rain_rate_unit"
 
+# Pressure Units
+PRESSURE_HPA_UNIT = "hPa"
+PRESSURE_INHG_UNIT = "inHg"
+PRESSURE_PSI_UNIT = "psi"
+
+# Pressure Unit Variants (for matching)
+PRESSURE_HPA_UNITS = {PRESSURE_HPA_UNIT, "hpa", "mbar", "mb"}
+PRESSURE_INHG_UNITS = {PRESSURE_INHG_UNIT, "inhg", '"Hg', '"hg', "inch hg", "in hg"}
+PRESSURE_PSI_UNITS = {PRESSURE_PSI_UNIT, "lbs/sq in", "lbs/in2"}
+
 # Sensor types configuration for individual sensor entities
 SENSOR_TYPES = {
     "temperature": {

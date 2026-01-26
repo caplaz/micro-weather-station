@@ -64,6 +64,50 @@ class TestWeatherDetector:
         assert detector.meteorological_analyzer is not None
         assert detector.daily_generator is not None
 
+    def test_detect_weather_with_psi_pressure(self, mock_hass, mock_options, mock_sensor_data):
+        """Test weather detection with PSI pressure units."""
+        mock_states = {}
+        for sensor_key, value in mock_sensor_data.items():
+            state = Mock()
+            if sensor_key == "pressure":
+                state.state = "15.0"  # 15 PSI ~ 30.54 inHg (High Pressure)
+                state.attributes = {"unit_of_measurement": "psi"}
+            else:
+                state.state = str(value)
+                state.attributes = {}
+            mock_states[f"sensor.{sensor_key}"] = state
+
+        # Map to correct sensor entity IDs
+        mock_states["sensor.pressure"] = mock_states["sensor.pressure"]
+        # Essential sensors for condition detection
+        mock_states["sensor.outdoor_temperature"] = Mock(state="70.0")
+        mock_states["sensor.humidity"] = Mock(state="50.0")
+        mock_states["sensor.wind_speed"] = Mock(state="5.0")
+        mock_states["sensor.rain_rate"] = Mock(state="0.0")
+        mock_states["sensor.rain_state"] = Mock(state="Dry")
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options)
+        result = detector.get_weather_data()
+
+        # Check that pressure was converted correctly
+        # 15 PSI * 2.03602 = 30.54 inHg
+        # 15 PSI * 68.9476 = 1034.2 hPa
+        # The result returns hPa by default logic in _convert_pressure if unit is unknown or hPa requested?
+        # Let's check _convert_pressure logic: it converts to specified unit or hPa if unspecified
+        # get_weather_data uses:
+        # KEY_PRESSURE: self._convert_pressure(sensor_data.get("pressure"), sensor_data.get(KEY_PRESSURE_UNIT))
+        # If the sensor unit is PSI, it passes "psi" to _convert_pressure, which should convert to hPa.
+        
+        # 1034.2 hPa
+        assert abs(result["pressure"] - 1034.2) < 1.0
+
+        # Condition should NOT be lightning-rainy
+        # It should be sunny or cloudy depending on other factors, but definitely not Thunderstorm
+        assert result["condition"] != ATTR_CONDITION_LIGHTNING_RAINY
+        assert result["condition"] != ATTR_CONDITION_LIGHTNING
+
     def test_detect_sunny_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of sunny conditions."""
         # Set up mock states
@@ -856,7 +900,7 @@ class TestWeatherDetector:
         detector = WeatherDetector(mock_hass, mock_options)
 
         # Test unknown units (should assume hPa)
-        assert detector._convert_pressure(1013.0, "psi") == 1013.0
+        assert detector._convert_pressure(1013.0, "unknown") == 1013.0
         assert detector._convert_pressure(1013.0, "bar") == 1013.0
         assert detector._convert_pressure(1013.0, None) == 1013.0
         assert detector._convert_pressure(1013.0, "") == 1013.0

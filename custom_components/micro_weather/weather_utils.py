@@ -5,51 +5,110 @@ from typing import Optional, cast
 
 from homeassistant.core import HomeAssistant
 
+from .const import (
+    PRESSURE_HPA_UNIT,
+    PRESSURE_INHG_UNIT,
+    PRESSURE_PSI_UNIT,
+    PRESSURE_PSI_UNITS,
+)
+
 
 def convert_to_celsius(temp_f: Optional[float]) -> Optional[float]:
-    """Convert Fahrenheit to Celsius."""
+    """Convert Fahrenheit to Celsius.
+
+    Formula: (F - 32) * 5/9
+    Reference: https://www.nist.gov/pml/weights-and-measures/si-units-temperature
+    """
     if temp_f is None:
         return None
     return round((temp_f - 32) * 5 / 9, 1)
 
 
 def convert_to_fahrenheit(temp_c: Optional[float]) -> Optional[float]:
-    """Convert Celsius to Fahrenheit."""
+    """Convert Celsius to Fahrenheit.
+
+    Formula: (C * 9/5) + 32
+    Reference: https://www.nist.gov/pml/weights-and-measures/si-units-temperature
+    """
     if temp_c is None:
         return None
     return round((temp_c * 9 / 5) + 32, 1)
 
 
-def convert_to_hpa(pressure_inhg: Optional[float]) -> Optional[float]:
-    """Convert inches of mercury to hPa."""
-    if pressure_inhg is None:
+def convert_to_hpa(
+    pressure: Optional[float], unit: str = PRESSURE_INHG_UNIT
+) -> Optional[float]:
+    """Convert pressure to hPa.
+
+    Supported units:
+    - inHg (default): Formula: inHg * 33.8639
+      Reference: https://www.weather.gov/media/epz/wxcalc/pressureConversion.pdf
+    - psi: Formula: PSI * 68.9476
+      Reference: https://www.nist.gov/pml/special-publication-811/nist-guide-si-appendix-b-conversion-factors/nist-guide-si-appendix-b8
+    """
+    if pressure is None:
         return None
-    return round(pressure_inhg * 33.8639, 1)
+
+    if unit.lower() in PRESSURE_PSI_UNITS:
+        return round(pressure * 68.9476, 1)
+
+    # Default to inHg
+    return round(pressure * 33.8639, 1)
 
 
-def convert_to_inhg(pressure_hpa: Optional[float]) -> Optional[float]:
-    """Convert hPa to inches of mercury."""
-    if pressure_hpa is None:
+def convert_to_inhg(
+    pressure: Optional[float], unit: str = PRESSURE_HPA_UNIT
+) -> Optional[float]:
+    """Convert pressure to inches of mercury.
+
+    Supported units:
+    - hPa (default): Formula: hPa / 33.8639
+      Reference: https://www.weather.gov/media/epz/wxcalc/pressureConversion.pdf
+    - psi: Converts PSI -> hPa -> inHg.
+      Reference: https://www.nist.gov/pml/special-publication-811/nist-guide-si-appendix-b-conversion-factors/nist-guide-si-appendix-b8
+    """
+    if pressure is None:
         return None
-    return round(pressure_hpa / 33.8639, 2)
+
+    if unit.lower() in PRESSURE_PSI_UNITS:
+        # Convert PSI -> hPa -> inHg
+        hpa = convert_to_hpa(pressure, unit=PRESSURE_PSI_UNIT)
+        if hpa is None:
+            return None
+        return convert_to_inhg(hpa, unit=PRESSURE_HPA_UNIT)
+
+    # Default to hPa
+    return round(pressure / 33.8639, 2)
 
 
 def convert_to_kmh(speed_mph: Optional[float]) -> Optional[float]:
-    """Convert miles per hour to kilometers per hour."""
+    """Convert miles per hour to kilometers per hour.
+
+    Formula: mph * 1.60934
+    Reference: https://www.nist.gov/pml/special-publication-811/nist-guide-si-appendix-b-conversion-factors/nist-guide-si-appendix-b8
+    """
     if speed_mph is None:
         return None
     return round(speed_mph * 1.60934, 1)
 
 
 def convert_to_mph(speed_kmh: Optional[float]) -> Optional[float]:
-    """Convert kilometers per hour to miles per hour."""
+    """Convert kilometers per hour to miles per hour.
+
+    Formula: km/h / 1.60934
+    Reference: https://www.nist.gov/pml/special-publication-811/nist-guide-si-appendix-b-conversion-factors/nist-guide-si-appendix-b8
+    """
     if speed_kmh is None:
         return None
     return round(speed_kmh / 1.60934, 1)
 
 
 def convert_ms_to_mph(speed_ms: Optional[float]) -> Optional[float]:
-    """Convert meters per second to miles per hour."""
+    """Convert meters per second to miles per hour.
+
+    Formula: m/s * 2.23694
+    Reference: https://www.weather.gov/media/epz/wxcalc/windConversion.pdf
+    """
     if speed_ms is None:
         return None
     return round(speed_ms / 0.44704, 1)
@@ -58,7 +117,11 @@ def convert_ms_to_mph(speed_ms: Optional[float]) -> Optional[float]:
 def convert_altitude_to_meters(
     altitude: Optional[float], is_imperial: bool = False
 ) -> Optional[float]:
-    """Convert altitude to meters if it's in feet."""
+    """Convert altitude to meters if it's in feet.
+
+    Formula: ft * 0.3048
+    Reference: https://www.nist.gov/pml/special-publication-811/nist-guide-si-appendix-b-conversion-factors/nist-guide-si-appendix-b8
+    """
     if altitude is None:
         return None
     if is_imperial:
@@ -69,7 +132,11 @@ def convert_altitude_to_meters(
 def convert_precipitation_rate(
     rain_rate: Optional[float], unit: Optional[str]
 ) -> Optional[float]:
-    """Convert precipitation rate to mm/h."""
+    """Convert precipitation rate to mm/h.
+
+    Formula: in/hr * 25.4
+    Reference: https://www.nist.gov/pml/special-publication-811/nist-guide-si-appendix-b-conversion-factors/nist-guide-si-appendix-b8
+    """
     if rain_rate is None:
         return None
 
@@ -95,7 +162,11 @@ def convert_precipitation_rate(
 def calculate_heat_index(temp_f: float, humidity: float) -> Optional[float]:
     """Calculate Heat Index based on NOAA equation.
 
-    Rothfusz regression is used.
+    Uses the Rothfusz regression.
+
+    Formula (Simple): 0.5 * (T + 61.0 + ((T - 68.0) * 1.2) + (RH * 0.094))
+    Formula (Regression): -42.379 + 2.049T + 10.14R - 0.224TR - 6.83e-3T^2 - 5.48e-2R^2 + 1.22e-3T^2R + 8.52e-4TR^2 - 1.99e-6T^2R^2
+    Reference: https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml
     """
     if temp_f is None or humidity is None:
         return None
@@ -131,7 +202,11 @@ def calculate_heat_index(temp_f: float, humidity: float) -> Optional[float]:
 
 
 def calculate_wind_chill(temp_f: float, wind_speed_mph: float) -> Optional[float]:
-    """Calculate Wind Chill based on NOAA equation."""
+    """Calculate Wind Chill based on NOAA equation.
+
+    Formula: 35.74 + 0.6215T - 35.75(V^0.16) + 0.4275T(V^0.16)
+    Reference: https://www.weather.gov/media/epz/wxcalc/windChill.pdf
+    """
     if temp_f is None or wind_speed_mph is None:
         return None
 
@@ -158,7 +233,12 @@ def calculate_apparent_temperature(
 ) -> Optional[float]:
     """Calculate apparent temperature (Feels Like).
 
-    Combines Heat Index and Wind Chill.
+    Combines Heat Index and Wind Chill based on NOAA/NWS thresholds.
+
+    - Temps >= 80F: Heat Index (https://www.wpc.ncep.noaa.gov/html/heatindex_equation.shtml)
+    - Temps <= 50F: Wind Chill (https://www.weather.gov/media/epz/wxcalc/windChill.pdf)
+    - Reference: https://www.weather.gov/bgm/forecast_terms (Apparent Temperature)
+
     Supports input in C or F, and mph, km/h, or m/s for wind.
     Returns result in the same unit as temp_unit.
     """

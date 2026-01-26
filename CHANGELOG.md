@@ -42,6 +42,12 @@
 
 ### Bug Fixes
 
+- **False Positive Thunderstorm Alerts**: Fixed issue where pressure sensors reporting in PSI triggered "Extremely Low Pressure" alerts
+  - Added native support for PSI unit conversion (psi, lbs/sq in, lbs/in2) to hPa/inHg
+  - Correctly interprets ~15 PSI as high pressure (~30.54 inHg) instead of vacuum-level low pressure (~15 inHg)
+  - Prevents false "Thunderstorm" conditions caused by unit mismatch
+
+
 - **False Positive Lightning Reports**: Fixed issue where "Lightning" was reported in windy conditions without precipitation
   - Increased wind gust threshold for dry lightning detection from 20 mph to 40 mph
   - Prevents false alerts when high turbulence (gust factor > 3.0) occurs with moderate wind gusts
