@@ -12,6 +12,8 @@ from custom_components.micro_weather.weather_utils import (
     convert_to_kmh,
     convert_to_mph,
     convert_ms_to_mph,
+    convert_psi_to_hpa,
+    convert_psi_to_inhg,
     is_forecast_hour_daytime,
     calculate_heat_index,
     calculate_wind_chill,
@@ -145,6 +147,34 @@ class TestWeatherUtils:
 
         # Test None input
         assert convert_ms_to_mph(None) is None
+
+    def test_convert_psi_to_hpa(self):
+        """Test PSI to hPa conversion."""
+        # Test standard pressure (1 atm ≈ 14.696 PSI ≈ 1013.25 hPa)
+        assert abs(convert_psi_to_hpa(14.696) - 1013.3) < 0.5
+        
+        # Test user's case: 15 PSI -> ~1034 hPa
+        assert abs(convert_psi_to_hpa(15.0) - 1034.2) < 0.5
+        
+        # Test None input
+        assert convert_psi_to_hpa(None) is None
+        
+        # Test 0 PSI
+        assert convert_psi_to_hpa(0.0) == 0.0
+
+    def test_convert_psi_to_inhg(self):
+        """Test PSI to inHg conversion."""
+        # Test standard pressure (1 atm ≈ 14.696 PSI ≈ 29.92 inHg)
+        assert abs(convert_psi_to_inhg(14.696) - 29.92) < 0.1
+        
+        # Test user's case: 15 PSI -> ~30.54 inHg
+        assert abs(convert_psi_to_inhg(15.0) - 30.54) < 0.1
+        
+        # Test None input
+        assert convert_psi_to_inhg(None) is None
+        
+        # Test 0 PSI
+        assert convert_psi_to_inhg(0.0) == 0.0
 
     def test_wind_speed_conversion_precision(self):
         """Test wind speed conversion precision."""

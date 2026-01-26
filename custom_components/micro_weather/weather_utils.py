@@ -34,6 +34,20 @@ def convert_to_inhg(pressure_hpa: Optional[float]) -> Optional[float]:
     return round(pressure_hpa / 33.8639, 2)
 
 
+def convert_psi_to_hpa(pressure_psi: Optional[float]) -> Optional[float]:
+    """Convert PSI to hPa."""
+    if pressure_psi is None:
+        return None
+    return round(pressure_psi * 68.9476, 1)
+
+
+def convert_psi_to_inhg(pressure_psi: Optional[float]) -> Optional[float]:
+    """Convert PSI to inches of mercury."""
+    if pressure_psi is None:
+        return None
+    return round(pressure_psi * 2.03602, 2)
+
+
 def convert_to_kmh(speed_mph: Optional[float]) -> Optional[float]:
     """Convert miles per hour to kilometers per hour."""
     if speed_mph is None:
