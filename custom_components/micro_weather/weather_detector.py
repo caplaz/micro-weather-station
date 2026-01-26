@@ -62,13 +62,13 @@ from .weather_utils import (
     calculate_apparent_temperature,
     convert_altitude_to_meters,
     convert_ms_to_mph,
+    convert_psi_to_hpa,
+    convert_psi_to_inhg,
     convert_to_celsius,
     convert_to_hpa,
     convert_to_inhg,
     convert_to_kmh,
     convert_to_mph,
-    convert_psi_to_hpa,
-    convert_psi_to_inhg,
 )
 
 _LOGGER = logging.getLogger(__name__)
