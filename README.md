@@ -274,7 +274,7 @@ Configure additional sensors for enhanced weather detection:
 The integration automatically detects and converts between different sensor units:
 
 - **Temperature**: °C ↔ °F
-- **Pressure**: hPa/mbar ↔ inHg
+- **Pressure**: hPa/mbar ↔ inHg ↔ psi
 - **Wind Speed**: km/h, mph, m/s
 - **Altitude**: m ↔ ft (automatically adapts to your Home Assistant unit system)
 
