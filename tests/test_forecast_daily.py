@@ -7,6 +7,7 @@ from homeassistant.components.weather import (
     ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
+    ATTR_CONDITION_POURING,
     ATTR_CONDITION_RAINY,
     ATTR_CONDITION_SNOWY,
     ATTR_CONDITION_SUNNY,
@@ -688,6 +689,305 @@ class TestDailyForecastGenerator:
         assert (
             36.0 <= forecast_low <= 38.0
         ), f"Forecast low {forecast_low} should be around 37°F"
+
+    def test_precipitation_reduction_and_cap(self, daily_forecast_generator):
+        """Test that precipitation forecasts are reduced and capped (Fix for Issue #31)."""
+        day_idx = 0
+        condition = ATTR_CONDITION_RAINY  # Base 5.0 mm
+
+        # Scenario from issue: Falling pressure, Stormy, High humidity (implied by 97%)
+        # Let's create an aggressive scenario that previously caused 30mm+
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "low",
+                "storm_probability": 80.0,  # High storm probability
+                "current_trend": -0.6,  # Rapidly falling pressure
+                "long_term_trend": -0.2,
+            },
+            "moisture_analysis": {
+                "transport_potential": 5.0,
+                "condensation_potential": 0.8,  # High condensation
+            },
+            "atmospheric_stability": 0.3,  # Unstable
+        }
+
+        historical_patterns = {KEY_HUMIDITY: {"trend": 2.0}}  # Rising humidity
+
+        sensor_data = {"rain_rate_unit": "mm"}
+
+        result = daily_forecast_generator._forecast_precipitation(
+            day_idx,
+            condition,
+            meteorological_state,
+            historical_patterns,
+            sensor_data,
+        )
+
+        # Base: 5.0mm
+        # Previous logic multipliers:
+        #   Humidity: 1.5 (max)
+        #   Pressure: 1.5 (Rapid fall)
+        #   Storm Probability: 1.8 (High)
+        #   Condensation: 1.5 (High)
+        #   Total Multiplier: 1.5 * 1.5 * 1.8 * 1.5 = ~6.075
+        #   Previous Result: 5.0 * 6.075 = ~30.375 mm (Matching the issue report of ~28mm)
+
+        # New Logic Multipliers:
+        #   Humidity: 1.2 (max cap reduced to 0.2)
+        #   Pressure: 1.25 (Rapid fall reduced)
+        #   Storm Probability: 1.2 (High reduced)
+        #   Condensation: 1.16 (1 + 0.8*0.2)
+        #   Uncapped Result: 5.0 * 1.2 * 1.25 * 1.2 * 1.16 = ~10.44 mm
+
+        # Global Cap: Base * 2.0 = 10.0 mm
+
+        # Verify result is significantly reduced from the 28-30mm seen in the issue
+        assert (
+            result < 20.0
+        ), f"Precipitation {result} should be much less than the reported 28-30mm"
+
+        # Verify it respects the cap (approx 10.0)
+        assert (
+            result <= 10.1
+        ), f"Precipitation {result} should be close to or under the cap (10.0)"
+
+        # Verify it's still reasonable (not zero)
+        assert (
+            result > 5.0
+        ), "Precipitation should be increased from base due to conditions"
+
+    def test_precipitation_by_condition(self, daily_forecast_generator, mock_analyzers):
+        """Test base precipitation amounts for each weather condition."""
+        day_idx = 0
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 0.0,  # No storm probability to avoid overrides
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "moisture_analysis": {
+                "transport_potential": 0.0,
+                "condensation_potential": 0.0,  # No condensation boost
+            },
+            "atmospheric_stability": 0.7,
+        }
+        historical_patterns = {}  # No trends
+        sensor_data = {"rain_rate_unit": "mm"}
+
+        # Test each condition's base precipitation
+        test_cases = [
+            (ATTR_CONDITION_LIGHTNING_RAINY, 7.0),
+            (ATTR_CONDITION_POURING, 10.0),
+            (ATTR_CONDITION_RAINY, 5.0),
+            (ATTR_CONDITION_SNOWY, 3.0),
+            (ATTR_CONDITION_CLOUDY, 0.5),
+            (ATTR_CONDITION_FOG, 0.1),
+            (ATTR_CONDITION_SUNNY, 0.0),
+            (ATTR_CONDITION_PARTLYCLOUDY, 0.0),
+        ]
+
+        for condition, expected_base in test_cases:
+            result = daily_forecast_generator._forecast_precipitation(
+                day_idx,
+                condition,
+                meteorological_state,
+                historical_patterns,
+                sensor_data,
+            )
+            assert (
+                abs(result - expected_base) < 0.1
+            ), f"Condition {condition} should have base precipitation {expected_base}, got {result}"
+
+    def test_precipitation_multipliers(self, daily_forecast_generator, mock_analyzers):
+        """Test individual precipitation multiplier effects."""
+        day_idx = 0
+        condition = ATTR_CONDITION_RAINY  # Base 5.0 mm
+        sensor_data = {"rain_rate_unit": "mm"}
+
+        # Test humidity multiplier
+        meteorological_state_humidity = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 0.0,
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "moisture_analysis": {
+                "transport_potential": 0.0,
+                "condensation_potential": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+        }
+        historical_patterns_humidity = {
+            KEY_HUMIDITY: {"trend": 3.0}  # High rising humidity
+        }
+
+        result_humidity = daily_forecast_generator._forecast_precipitation(
+            day_idx,
+            condition,
+            meteorological_state_humidity,
+            historical_patterns_humidity,
+            sensor_data,
+        )
+        # Should be increased from base 5.0 due to humidity
+        assert (
+            result_humidity > 5.0
+        ), f"Humidity boost should increase precipitation from 5.0, got {result_humidity}"
+
+        # Test pressure multiplier
+        meteorological_state_pressure = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 0.0,
+                "current_trend": -1.0,  # Rapidly falling pressure
+                "long_term_trend": 0.0,
+            },
+            "moisture_analysis": {
+                "transport_potential": 0.0,
+                "condensation_potential": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+        }
+        historical_patterns_pressure = {}
+
+        result_pressure = daily_forecast_generator._forecast_precipitation(
+            day_idx,
+            condition,
+            meteorological_state_pressure,
+            historical_patterns_pressure,
+            sensor_data,
+        )
+        # Should be increased from base 5.0 due to falling pressure
+        assert (
+            result_pressure > 5.0
+        ), f"Pressure trend should increase precipitation from 5.0, got {result_pressure}"
+
+        # Test storm probability multiplier
+        meteorological_state_storm = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 80.0,  # High storm probability
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "moisture_analysis": {
+                "transport_potential": 0.0,
+                "condensation_potential": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+        }
+        historical_patterns_storm = {}
+
+        result_storm = daily_forecast_generator._forecast_precipitation(
+            day_idx,
+            condition,
+            meteorological_state_storm,
+            historical_patterns_storm,
+            sensor_data,
+        )
+        # Should be increased from base 5.0 due to storm probability
+        assert (
+            result_storm > 5.0
+        ), f"Storm probability should increase precipitation from 5.0, got {result_storm}"
+
+    def test_precipitation_unit_conversion(
+        self, daily_forecast_generator, mock_analyzers
+    ):
+        """Test precipitation unit conversion in forecasting."""
+        day_idx = 0
+        condition = ATTR_CONDITION_RAINY
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 0.0,
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "moisture_analysis": {
+                "transport_potential": 0.0,
+                "condensation_potential": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+        }
+        historical_patterns = {}
+
+        # Test mm units (should remain unchanged)
+        sensor_data_mm = {"rain_rate_unit": "mm"}
+        result_mm = daily_forecast_generator._forecast_precipitation(
+            day_idx,
+            condition,
+            meteorological_state,
+            historical_patterns,
+            sensor_data_mm,
+        )
+        assert (
+            result_mm == 5.0
+        ), f"MM units should give base precipitation 5.0, got {result_mm}"
+
+        # Test inch units (should convert to inches)
+        sensor_data_inches = {"rain_rate_unit": "in"}
+        result_inches = daily_forecast_generator._forecast_precipitation(
+            day_idx,
+            condition,
+            meteorological_state,
+            historical_patterns,
+            sensor_data_inches,
+        )
+        # Should be converted from mm to inches (5.0 mm / 25.4 = ~0.197 inches)
+        expected_inches = 5.0 / 25.4
+        assert (
+            abs(result_inches - expected_inches) < 0.01
+        ), f"Inch units should convert to inches: expected {expected_inches}, got {result_inches}"
+
+    def test_precipitation_distance_dampening(
+        self, daily_forecast_generator, mock_analyzers
+    ):
+        """Test that precipitation forecasts decrease for future days."""
+        condition = ATTR_CONDITION_RAINY
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 0.0,
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "moisture_analysis": {
+                "transport_potential": 0.0,
+                "condensation_potential": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+        }
+        historical_patterns = {}
+        sensor_data = {"rain_rate_unit": "mm"}
+
+        # Get precipitation for each day
+        results = []
+        for day_idx in range(5):
+            result = daily_forecast_generator._forecast_precipitation(
+                day_idx,
+                condition,
+                meteorological_state,
+                historical_patterns,
+                sensor_data,
+            )
+            results.append(result)
+
+        # Verify day 0 has base precipitation
+        assert (
+            results[0] == 5.0
+        ), f"Day 0 should have base precipitation 5.0, got {results[0]}"
+
+        # Verify subsequent days are reduced
+        for i in range(1, 5):
+            assert (
+                results[i] < results[0]
+            ), f"Day {i} precipitation {results[i]} should be less than day 0 {results[0]}"
+            # Should decrease by approximately 15% per day
+            expected_reduction = results[0] * max(0.3, 1.0 - (i * 0.15))
+            assert (
+                abs(results[i] - expected_reduction) < 0.1
+            ), f"Day {i} should be dampened to ~{expected_reduction}, got {results[i]}"
 
     def test_temperature_forecast_has_daily_variation(self, daily_forecast_generator):
         """Test that temperature forecasts vary day-to-day based on historical volatility.

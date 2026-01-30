@@ -1,18 +1,32 @@
 # Changelog
 
+## 4.1.2 (2026-01-30)
+
+### Bug Fixes
+
+- **False Positive Thunderstorm Alerts**: Fixed issue where pressure sensors reporting in PSI triggered "Extremely Low Pressure" alerts
+  - Added native support for PSI unit conversion (psi, lbs/sq in, lbs/in2) to hPa/inHg
+  - Correctly interprets ~15 PSI as high pressure (~30.54 inHg) instead of vacuum-level low pressure (~15 inHg)
+  - Prevents false "Thunderstorm" conditions caused by unit mismatch
+
+- **Excessive Daily Precipitation Forecasts**: Fixed issue where daily precipitation forecasts showed unrealistically high values (up to 10x actual amounts)
+  - Reduced base precipitation values for severe weather conditions (LIGHTNING_RAINY: 15→7mm, POURING: 20→10mm)
+  - Lowered multiplier caps to prevent runaway accumulation (humidity: 25%→20%, storm probability: 1.3→1.2)
+  - Implemented tighter safety caps (3x→2x base value maximum)
+  - Added comprehensive test coverage for precipitation forecasting logic
+  - Prevents gross overestimation while maintaining forecast utility for severe weather
+
 ## 4.1.1 (2026-01-12)
 
 ### New Features
 
 - **Apparent Temperature Support**: Added support for "Feels Like" temperature (Heat Index & Wind Chill)
-
   - Exposes apparent temperature via `native_apparent_temperature` attribute in weather entity
   - Calculates Heat Index for hot conditions and Wind Chill for cold conditions
   - Automatically switches between heat index and wind chill based on temperature thresholds
   - Includes comprehensive unit conversion and validation
 
 - **Enhanced Weather Properties**: Exposed additional native weather properties for better integration
-
   - Added `native_dew_point` attribute for dew point temperature
   - Added `native_visibility` attribute for visibility distance
   - Added `native_uv_index` attribute for UV index
@@ -41,12 +55,6 @@
 - Special thanks to [@Intecpsp](https://github.com/Intecpsp) for their valuable contribution to this release!
 
 ### Bug Fixes
-
-- **False Positive Thunderstorm Alerts**: Fixed issue where pressure sensors reporting in PSI triggered "Extremely Low Pressure" alerts
-  - Added native support for PSI unit conversion (psi, lbs/sq in, lbs/in2) to hPa/inHg
-  - Correctly interprets ~15 PSI as high pressure (~30.54 inHg) instead of vacuum-level low pressure (~15 inHg)
-  - Prevents false "Thunderstorm" conditions caused by unit mismatch
-
 
 - **False Positive Lightning Reports**: Fixed issue where "Lightning" was reported in windy conditions without precipitation
   - Increased wind gust threshold for dry lightning detection from 20 mph to 40 mph
@@ -119,33 +127,28 @@
 ### Forecast Logic Overhaul
 
 - **Trajectory-Based Condition Evolution**: Replaced static condition mapping with dynamic trajectory scoring
-
   - Conditions now evolve based on pressure trend direction and magnitude
   - Trajectory score (-100 to +100) determines condition ladder progression
   - Falling pressure moves conditions toward deterioration, rising toward improvement
   - Humidity trends influence precipitation/clearing transitions
 
 - **Trend-Integrated Temperature Forecasting**: Temperature forecasts now properly use trend data
-
   - Temperature projected forward using trend \* hours (not arbitrary multipliers)
   - Pressure gradient effects applied to daily temperature swings
   - Distance dampening reduces confidence for distant forecasts
 
 - **Deterministic Precipitation Forecasting**: Removed all random.uniform() calls
-
   - Precipitation now based on condition, humidity trends, and storm probability
   - Condensation potential only affects current day (not distant forecasts)
   - Rising humidity increases precipitation by up to 50%
   - Falling pressure amplifies precipitation amounts
 
 - **Improved Humidity Convergence**: Faster, more realistic humidity evolution
-
   - Humidity now converges 30% per hour toward target (was 10%)
   - Target humidity based on forecasted condition
   - Eliminated arbitrary hour-based modulation
 
 - **Evolution Model Improvements**: Weather system evolution based on actual trends
-
   - Evolution paths dynamically generated from pressure trend magnitude
   - Confidence degrades based on trend volatility (disagreement between short/long term)
   - Hourly change rate determined by trend magnitude (rapid/moderate/gradual)
@@ -158,20 +161,17 @@
 ### Weather Detection Improvements
 
 - **Improved Cloud Cover Thresholds**: Adjusted thresholds to be more conservative and accurate
-
   - Sunny threshold increased from 20% to 30% to avoid false sunny reports
   - Partly cloudy threshold increased from 50% to 60% for better gradation
   - Cloudy threshold increased from 75% to 85% for more accurate overcast detection
   - Improved documentation of cloud cover to condition mapping logic
 
 - **Enhanced Dew/Condensation Detection**: Added intelligent dew detection to prevent false rain alerts
-
   - System now uses consistent threshold matching `PrecipitationThresholds.SIGNIFICANT` (0.01 in/h)
   - Prevents false "rainy" conditions on humid mornings when dew triggers rain sensors
   - Clearer logic separation between dew/condensation and actual precipitation
 
 - **More Conservative Fog Detection**: Improved fog detection to reduce false positives
-
   - Added pre-validation requiring minimum 88% humidity before fog analysis
   - Added solar radiation check during daytime (fog should suppress radiation below expected minimum)
   - Added stricter dewpoint spread requirement (≤2.0°F) for moderate fog scores (55-70 range)
@@ -179,18 +179,15 @@
   - Better prevents false fog detection on humid but clear mornings
 
 - **Improved Condition Hysteresis**: Enhanced stability to prevent rapid oscillation between conditions
-
   - Adjacent condition transitions (sunny↔partlycloudy, partlycloudy↔cloudy) require 15% change
   - Non-adjacent transitions (sunny↔cloudy) require 25% change to prevent unrealistic jumps
   - Added trend-based threshold reduction for consistent patterns
 
 - **Solar Elevation Estimation**: Better cloud cover calculation when sun sensor is not configured
-
   - Estimates solar elevation based on radiation intensity (800+ W/m² → 60°, 500+ → 45°, 200+ → 25°, else → 15°)
   - Provides more accurate cloud cover percentages without explicit sun sensor data
 
 - **Storm Probability Threshold Consistency**: Fixed inconsistent threshold comparisons
-
   - Unified storm threshold comparisons to use `>=` for `STORM_THRESHOLD_SEVERE` (70%)
   - Ensures conditions exactly at thresholds are handled correctly
 
@@ -201,9 +198,7 @@
 ### Architecture Improvements
 
 - **Modular Architecture**: Reorganized codebase into specialized modules for improved maintainability and extensibility
-
   - **Analysis Modules**: Split weather analysis into dedicated modules
-
     - `analysis/core.py`: Priority-based weather condition determination
     - `analysis/atmospheric.py`: Pressure systems, fog detection, and storm probability
     - `analysis/solar.py`: Cloud cover analysis using solar radiation
@@ -218,7 +213,6 @@
     - `forecast/hourly.py`: 24-hour detailed predictions
 
 - **Facade Pattern**: Implemented clean coordination layers
-
   - `weather_analysis.py`: Coordinates analysis modules
   - `weather_forecast.py`: Orchestrates forecast generators
   - Maintains 100% backward compatibility with existing code
@@ -248,7 +242,6 @@
 ### Bug Fixes
 
 - **Daily Forecast Temperature Units**: Fixed issue where daily forecast temperatures displayed in Fahrenheit instead of Celsius (#17)
-
   - Added temperature conversion in weather_detector.py for external forecast data before storage
   - Improved external forecast handling in weather.py with proper unit conversion
   - Added convert_to_fahrenheit utility function for forecast generation
@@ -265,7 +258,6 @@
 ### Bug Fixes
 
 - **Temperature Conversion Bug**: Fixed double temperature conversion in weather forecasts causing incorrect temperature display
-
   - Removed unnecessary `convert_to_celsius()` calls in `generate_comprehensive_forecast` method
   - Fixed issue where Fahrenheit temperatures were being converted twice, resulting in wrong forecast temperatures
   - Removed unused import to maintain code quality standards
@@ -287,14 +279,12 @@
 ### Major Features
 
 - **Enhanced Cloud Cover Analysis**: Major improvements to cloud cover calculation accuracy and responsiveness
-
   - Added hysteresis with 30% maximum change limit to prevent extreme condition jumps
   - Expanded solar radiation bounds to 2000 W/m² for better overcast detection
   - Implemented sensor miscalibration warnings for zenith max radiation outside 800-2000 W/m² range
   - Enhanced astronomical calculations with improved edge case handling
 
 - **Advanced Weather Forecasting Engine**: Comprehensive overhaul of forecasting with pressure-aware evolution
-
   - Implemented pressure-aware forecast evolution with dynamic timing based on meteorological conditions
   - Added comprehensive diurnal condition variations for realistic 24-hour weather patterns
   - Enhanced storm probability integration with pressure-driven condition overrides
@@ -326,7 +316,6 @@
 ### Major Features
 
 - **Pressure Trend Integration**: Enhanced cloud detection with pressure trends for more accurate weather forecasting
-
   - Integrate pressure trends into cloud detection algorithms (falling pressure = more clouds)
   - Add pressure-based cloud cover adjustments for meteorological accuracy
   - Enhance forecast system to use cloud cover analysis for near-term predictions (days 0-1)
@@ -335,7 +324,6 @@
   - Add graceful fallbacks to pressure-based estimation when sensors unavailable
 
 - **Dynamic Sunrise/Sunset Detection**: Replace hardcoded sunrise/sunset times with dynamic data from sun.sun entity
-
   - Add dynamic sunrise/sunset detection using Home Assistant's sun.sun entity
   - Implement fallback to hardcoded 6 AM/6 PM when sun.sun entity unavailable
   - Add condition conversion for nighttime hours (sunny→clear_night, partlycloudy→cloudy)
@@ -365,19 +353,16 @@
 ### Major Features
 
 - **Configurable Zenith Maximum Radiation**: Added user-configurable `zenith_max_radiation` setting for precise solar calibration
-
   - Allows fine-tuning of solar radiation calculations for your specific sensor and location
   - Improves cloud cover detection accuracy by accounting for local atmospheric conditions
   - Available in the integration's configuration flow for easy adjustment
 
 - **Enhanced Wind Detection**: Improved wind condition analysis and classification
-
   - Better detection of gusts, turbulence, and severe wind events
   - More accurate wind-based weather condition determination
   - Enhanced handling of wind patterns for improved storm detection
 
 - **Gueymard 2003 Air Mass Formula**: Upgraded solar radiation calculations with scientifically accurate air mass formula
-
   - Replaced previous formula with the industry-standard Gueymard 2003 air mass calculation
   - Provides superior accuracy for solar radiation analysis at all solar elevations
   - Improves cloud cover estimation, especially at low sun angles
@@ -399,25 +384,21 @@
 ### Improvements
 
 - **Weather Entity Initialization**: Restored async_added_to_hass method for proper Home Assistant lifecycle
-
   - Ensures coordinator data refresh when entity is added to Home Assistant
   - Prevents entity from showing as unavailable on first load
 
 - **Enhanced Cloud Cover Analysis**: Improved astronomical calculations with better edge case handling
-
   - Complete overcast (100%) detection when no solar input detected
   - More accurate heavy overcast detection using astronomical principles
   - Better measurement weighting: solar radiation > lux > UV index
 
 - **Hysteresis Improvements**: Enhanced condition stability with time-based history management
-
   - Changed condition history from count-based (max 10) to time-based (1 hour window)
   - Hysteresis now compares against recent conditions within last hour instead of fixed count
   - Prevents issues with infrequent updates comparing against very old conditions
   - Maintains 24-hour cleanup to prevent unbounded memory growth
 
 - **Weather Condition Mapping**: Updated to use standard meteorological ranges
-
   - Sunny: ≤25% cloud cover (was ≤40%)
   - Partly cloudy: 25-50% cloud cover (was 40-60%)
   - Cloudy: 50-75% cloud cover (was 60-85%)
@@ -426,7 +407,6 @@
 ### Bug Fixes
 
 - **Severe Weather Detection**: Made severe weather detection more conservative
-
   - Require pressure < 29.50 inHg AND wind_speed ≥19mph AND gusty conditions for severe weather
   - Add separate condition for severe turbulence (gust_factor >3.0 with gusts >20mph OR gust >40mph)
   - Prevent false 'lightning' alerts for low pressure systems with moderate gusty winds
@@ -449,7 +429,6 @@
 ### Major Features
 
 - **Astronomical Cloud Cover Analysis**: Complete overhaul of cloud cover calculation algorithm using astronomical principles
-
   - Replaced fixed thresholds with relative percentages of theoretical clear-sky radiation
   - Implemented solar elevation-based calculations for maximum expected solar radiation
   - Added intelligent fallback logic that only applies when astronomical calculations are unreliable (<15° solar elevation)
@@ -473,13 +452,11 @@
 ### Bug Fixes
 
 - **Cloud Cover Calculation Improvements**: Enhanced accuracy for clear sky detection
-
   - Increased sunny threshold from 35% to 40% cloud cover
   - Balances meteorological accuracy with low sun angle conditions
   - Accommodates early morning/late afternoon when sun elevation is low
 
 - **UV Sensor Fault Handling**: Added intelligent detection and handling of faulty UV sensors
-
   - Detects when UV sensor is faulty/unavailable (uv_index = 0)
   - Redistributes weights: solar radiation 85%, lux 15% (instead of including UV)
   - Prevents false high cloud cover readings from broken UV sensors
@@ -500,7 +477,6 @@
 ### Bug Fixes
 
 - **Precipitation Unit Compatibility**: Fixed "mm/h is not a recognized distance unit" error that prevented forecast display when rain rate sensors were configured
-
   - Map rain rate units (mm/h, in/h) to distance units (mm, in) for Home Assistant weather entity compatibility
   - Maintains accurate precipitation values while using HA-compatible unit labels
   - Added exception handling for forecast generation to prevent crashes from invalid data
@@ -508,14 +484,12 @@
 ### User Experience Improvements
 
 - **Enhanced Sensor Selection**: Added device class filtering in configuration flow for better sensor discovery
-
   - Rain rate sensors now filter to `precipitation_intensity` device class only
   - Wind gust sensors now filter to `wind_speed` device class only
   - Prevents users from accidentally selecting inappropriate sensors (e.g., pressure sensors for rain rate)
   - Cleaner sensor dropdowns with relevant options only
 
 - **Debug Logging Configuration**: Added debug logging option to sensor configuration table
-
   - Users can now enable detailed logging for troubleshooting and development
   - Debug logging helps diagnose weather detection and sensor issues
   - Documented in README configuration section for easy reference
@@ -537,7 +511,6 @@
 ### Bug Fixes
 
 - **Forecast Precipitation Unit Conversion**: Fixed precipitation unit mismatch in forecast generation when rain sensors are configured
-
   - Forecast precipitation values now properly convert to match weather entity's native units (mm vs inches)
   - Fixed issue where forecast would not display when rain rate sensor was configured
   - Added isinstance check to prevent errors with Mock objects during testing
@@ -546,7 +519,6 @@
 ### Technical Improvements
 
 - **Comprehensive Weather Entity Test Coverage**: Added extensive test suite for weather entity functionality
-
   - Created `test_weather.py` with 32 comprehensive tests covering all weather entity methods
   - Improved test coverage from 76% to 86% overall, weather.py from 0% to 94%
   - Added tests for entity initialization, properties, availability, daily/hourly forecasts, and unit handling
@@ -564,7 +536,6 @@
 ### Bug Fixes
 
 - **Cloud Cover Calculation Accuracy**: Fixed inaccurate cloud cover estimates causing "cloudy" weather conditions despite clear skies
-
   - Cloud cover analysis now uses actual solar elevation from sun.sun sensor instead of defaulting to 45°
   - More accurate weather condition detection based on real solar position
   - Fixes false "cloudy" reports when solar radiation readings are actually good for clear conditions
@@ -575,7 +546,6 @@
 ### Bug Fixes
 
 - **Altitude Field Configuration**: Fixed options flow not remembering altitude value of 0
-
   - Altitude field now properly saves and restores 0 values (sea level)
   - Fixed falsy value handling in configuration saving logic
   - Added special handling for numeric fields that can legitimately be 0
@@ -589,7 +559,6 @@
 ### New Features
 
 - **Current Precipitation Support**: Weather entity now displays actual precipitation rate from rain_rate sensor
-
   - Added native_precipitation property to weather entity
   - Smart unit conversion between in/h and mm/h based on sensor units
   - Precipitation rate displayed in weather card reflects your actual local measurements
@@ -611,21 +580,18 @@
 ### Major Features
 
 - **New Config Flow with Single Panels**: Complete redesign of the configuration interface
-
   - Streamlined single-panel configuration flow for easier setup
   - Improved user experience with cleaner, more intuitive interface
   - Better sensor management and validation
   - Enhanced error handling and user feedback
 
 - **Altitude Support**: Added comprehensive altitude and elevation support (#8)
-
   - Dynamic altitude units support (meters/feet based on HA system settings)
   - Automatic pressure correction for elevation differences
   - Improved weather detection accuracy at various altitudes
   - Enhanced documentation for elevation data usage
 
 - **Enhanced Weather Detection Algorithms**: Major improvements to meteorological algorithms
-
   - Improved cloud cover thresholds for better sunny/partly cloudy detection
   - Enhanced wind turbulence analysis for severe weather detection
   - Low solar radiation fallback logic for cloudy conditions
@@ -635,7 +601,6 @@
 ### Technical Improvements
 
 - **Comprehensive Forecast Documentation**: Added detailed `WEATHER_FORECAST_ALGORITHM.md`
-
   - Complete coverage of 5-day daily and 24-hour hourly forecasting algorithms
   - Meteorological principles and pressure-based prediction methods
   - Technical implementation details and validation methods

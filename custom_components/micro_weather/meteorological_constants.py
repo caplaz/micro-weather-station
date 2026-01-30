@@ -483,8 +483,8 @@ class PrecipitationConstants:
     """
 
     # Base daily precipitation by condition (mm/day)
-    LIGHTNING_RAINY: float = 15.0  # Thunderstorms with heavy rain
-    POURING: float = 20.0  # Heavy continuous rain
+    LIGHTNING_RAINY: float = 7.0  # Thunderstorms with heavy rain
+    POURING: float = 10.0  # Heavy continuous rain
     RAINY: float = 5.0  # Moderate rain
     SNOWY: float = 3.0  # Snow (liquid equivalent)
     CLOUDY: float = 0.5  # Overcast with possible drizzle
@@ -492,6 +492,41 @@ class PrecipitationConstants:
 
     # Conversion factor
     MM_TO_INCHES: float = 25.4  # Millimeters to inches conversion
+
+
+@dataclass(frozen=True)
+class PrecipitationModelConstants:
+    """Constants for precipitation forecast modeling adjustments.
+
+    Multipliers applied to base precipitation based on atmospheric trends.
+    """
+
+    # Humidity trends
+    HUMIDITY_RISING_THRESHOLD: float = 0.5  # Trend threshold
+    HUMIDITY_MAX_BOOST: float = 0.2  # Max boost (+20%)
+    HUMIDITY_DIVISOR: float = 10.0  # Scaling divisor
+
+    # Pressure trends (Falling)
+    PRESSURE_RAPID_FALL: float = -0.5  # Threshold
+    PRESSURE_RAPID_MULT: float = 1.25  # Multiplier (reduced from 1.5)
+    PRESSURE_SLOW_FALL: float = -0.2  # Threshold
+    PRESSURE_SLOW_MULT: float = 1.15  # Multiplier (reduced from 1.25)
+
+    # Pressure trends (Rising/Clearing)
+    PRESSURE_RISING_THRESHOLD: float = 0.3
+    PRESSURE_RISING_MULT: float = 0.5  # Clearing multiplier
+
+    # Storm probability
+    STORM_HIGH_THRESHOLD: int = 70
+    STORM_HIGH_MULT: float = 1.2  # Reduced from 1.8
+    STORM_MEDIUM_THRESHOLD: int = 40
+    STORM_MEDIUM_MULT: float = 1.15  # Reduced from 1.4
+
+    # Condensation potential
+    CONDENSATION_MULT: float = 0.2  # Multiplier for Day 0 boost (reduced from 0.5)
+
+    # Global safety cap
+    MAX_PRECIP_MULTIPLIER: float = 2.0  # Cap total forecast at 2x base amount
 
 
 @dataclass(frozen=True)

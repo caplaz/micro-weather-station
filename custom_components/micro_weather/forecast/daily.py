@@ -42,6 +42,7 @@ from ..meteorological_constants import (
     ForecastConstants,
     HumidityTargetConstants,
     PrecipitationConstants,
+    PrecipitationModelConstants,
     WindAdjustmentConstants,
 )
 from ..weather_utils import convert_to_kmh
@@ -682,36 +683,56 @@ class DailyForecastGenerator:
         # Get humidity trend - rising humidity increases precipitation chance
         humidity_pattern = historical_patterns.get(KEY_HUMIDITY, {})
         humidity_trend = humidity_pattern.get("trend", 0)
-        if isinstance(humidity_trend, (int, float)) and humidity_trend > 0.5:
-            # Rising humidity increases precipitation by up to 50%
-            precipitation *= 1.0 + min(0.5, humidity_trend / 5.0)
+        if (
+            isinstance(humidity_trend, (int, float))
+            and humidity_trend > PrecipitationModelConstants.HUMIDITY_RISING_THRESHOLD
+        ):
+            # Rising humidity increases precipitation
+            precipitation *= 1.0 + min(
+                PrecipitationModelConstants.HUMIDITY_MAX_BOOST,
+                humidity_trend / PrecipitationModelConstants.HUMIDITY_DIVISOR,
+            )
 
         # Apply pressure trend adjustments
         pressure_analysis = meteorological_state.get("pressure_analysis", {})
         pressure_trend = pressure_analysis.get("current_trend", 0)
 
         if isinstance(pressure_trend, (int, float)):
-            if pressure_trend < -0.5:  # Rapidly falling pressure
-                precipitation *= 1.5
-            elif pressure_trend < -0.2:  # Slowly falling pressure
-                precipitation *= 1.25
-            elif pressure_trend > 0.3:  # Rising pressure (clearing)
-                precipitation *= 0.5
+            if pressure_trend < PrecipitationModelConstants.PRESSURE_RAPID_FALL:
+                # Rapidly falling pressure
+                precipitation *= PrecipitationModelConstants.PRESSURE_RAPID_MULT
+            elif pressure_trend < PrecipitationModelConstants.PRESSURE_SLOW_FALL:
+                # Slowly falling pressure
+                precipitation *= PrecipitationModelConstants.PRESSURE_SLOW_MULT
+            elif pressure_trend > PrecipitationModelConstants.PRESSURE_RISING_THRESHOLD:
+                # Rising pressure (clearing)
+                precipitation *= PrecipitationModelConstants.PRESSURE_RISING_MULT
 
         # Storm probability enhancement
         storm_probability = pressure_analysis.get("storm_probability", 0)
         if isinstance(storm_probability, (int, float)):
-            if storm_probability > 70:
-                precipitation *= 1.8
-            elif storm_probability > 40:
-                precipitation *= 1.4
+            if storm_probability > PrecipitationModelConstants.STORM_HIGH_THRESHOLD:
+                precipitation *= PrecipitationModelConstants.STORM_HIGH_MULT
+            elif storm_probability > PrecipitationModelConstants.STORM_MEDIUM_THRESHOLD:
+                precipitation *= PrecipitationModelConstants.STORM_MEDIUM_MULT
 
         # Condensation potential for today only
         if day_idx == 0:
             moisture_analysis = meteorological_state.get("moisture_analysis", {})
             condensation_potential = moisture_analysis.get("condensation_potential", 0)
             if isinstance(condensation_potential, (int, float)):
-                precipitation *= 1.0 + condensation_potential * 0.5
+                precipitation *= (
+                    1.0
+                    + condensation_potential
+                    * PrecipitationModelConstants.CONDENSATION_MULT
+                )
+
+        # Cap total multiplier effect to prevent runaway values
+        base_precip = self._get_base_precipitation_by_condition(condition)
+        if base_precip > 0:
+            max_precip = base_precip * PrecipitationModelConstants.MAX_PRECIP_MULTIPLIER
+            if precipitation > max_precip:
+                precipitation = max_precip
 
         # Distance dampening - less confident about distant precipitation
         distance_factor = max(0.3, 1.0 - (day_idx * 0.15))
