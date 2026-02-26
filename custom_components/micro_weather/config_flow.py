@@ -188,8 +188,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 return dict(self._config_entry.options)
             if hasattr(self, "config_entry") and self.config_entry is not None:
                 return dict(self.config_entry.options)
-        except Exception:
-            pass
+        except Exception as exc:
+            # Log at debug level instead of silently passing to satisfy Bandit
+            _LOGGER.debug("Could not read config_entry.options during tests: %s", exc)
         return {}
 
     def _get_default_altitude(self) -> float:
