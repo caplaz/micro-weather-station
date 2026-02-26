@@ -181,7 +181,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         """Initialize the options flow."""
         self._data = {}
 
-    def _current_options(self) -> dict:
+    def _current_options(self) -> dict[str, Any]:
         """Return current options safely (guard against missing config_entry during tests)."""
         try:
             if hasattr(self, "_config_entry") and self._config_entry is not None:
