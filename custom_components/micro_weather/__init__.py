@@ -67,7 +67,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from homeassistant.exceptions import ConfigEntryNotReady
 
     if not getattr(coordinator, "last_update_success", True):
-        _LOGGER.error("Initial coordinator refresh reported failure: last_update_success=False")
+        _LOGGER.error(
+            "Initial coordinator refresh reported failure: last_update_success=False"
+        )
         raise ConfigEntryNotReady
 
     # Store coordinator in hass data

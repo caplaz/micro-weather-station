@@ -274,12 +274,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             options[field] = value
                         else:
                             options[field] = None
-                entry = getattr(self, '_config_entry', None) or getattr(self, 'config_entry', None)
+                entry = getattr(self, "_config_entry", None) or getattr(
+                    self, "config_entry", None
+                )
                 if entry is not None:
                     self.hass.config_entries.async_update_entry(entry, options=options)
                 else:
                     # Fallback during tests: stash options and continue
-                    self._data.setdefault('stashed_options', {}).update(options)
+                    self._data.setdefault("stashed_options", {}).update(options)
 
                 return await self.async_step_init()
 
@@ -372,13 +374,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     options[field] = value
                 else:
                     options[field] = None
-            entry = getattr(self, '_config_entry', None) or getattr(self, 'config_entry', None)
+            entry = getattr(self, "_config_entry", None) or getattr(
+                self, "config_entry", None
+            )
             if entry is not None:
                 self.hass.config_entries.async_update_entry(entry, options=options)
             else:
                 # Fallback during tests: stash options and continue
-                self._data.setdefault('stashed_options', {}).update(options)
-            
+                self._data.setdefault("stashed_options", {}).update(options)
 
             return await self.async_step_init()
 
@@ -442,13 +445,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     options[field] = value
                 else:
                     options[field] = None
-            entry = getattr(self, '_config_entry', None) or getattr(self, 'config_entry', None)
+            entry = getattr(self, "_config_entry", None) or getattr(
+                self, "config_entry", None
+            )
             if entry is not None:
                 self.hass.config_entries.async_update_entry(entry, options=options)
             else:
                 # Fallback during tests: stash options and continue
-                self._data.setdefault('stashed_options', {}).update(options)
-            
+                self._data.setdefault("stashed_options", {}).update(options)
 
             return await self.async_step_init()
 
@@ -513,13 +517,14 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     options[field] = value
                 else:
                     options[field] = None
-            entry = getattr(self, '_config_entry', None) or getattr(self, 'config_entry', None)
+            entry = getattr(self, "_config_entry", None) or getattr(
+                self, "config_entry", None
+            )
             if entry is not None:
                 self.hass.config_entries.async_update_entry(entry, options=options)
             else:
                 # Fallback during tests: stash options and continue
-                self._data.setdefault('stashed_options', {}).update(options)
-            
+                self._data.setdefault("stashed_options", {}).update(options)
 
             return await self.async_step_init()
 
