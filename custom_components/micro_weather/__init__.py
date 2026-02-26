@@ -53,7 +53,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Create coordinator for managing updates
     coordinator = MicroWeatherCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
+    # Use async_refresh to avoid ConfigEntry-specific requirements in coordinators
+    await coordinator.async_refresh()
 
     # Store coordinator in hass data
     hass.data.setdefault(DOMAIN, {})
