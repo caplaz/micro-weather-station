@@ -224,8 +224,8 @@ class DailyForecastGenerator:
                     max(hourly_estimates) if hourly_estimates else forecast_temp
                 )
                 forecast_temp = max(forecast_temp, hourly_max)
-            except Exception:
-                pass
+            except Exception as exc:
+                _LOGGER.debug("Could not compute hourly_max for day-0 projection: %s", exc)
 
         # Pressure system influence (modifies the trend direction)
         pressure_influence = self._calculate_pressure_temperature_influence(
