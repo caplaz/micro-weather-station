@@ -184,9 +184,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     def _current_options(self) -> dict:
         """Return current options safely (guard against missing config_entry during tests)."""
         try:
-            return self._current_options()
+            if hasattr(self, "_config_entry") and self._config_entry is not None:
+                return dict(self._config_entry.options)
+            if hasattr(self, "config_entry") and self.config_entry is not None:
+                return dict(self.config_entry.options)
         except Exception:
-            return {}
+            pass
+        return {}
 
     def _get_default_altitude(self) -> float:
         """Get the default altitude in the appropriate unit for the HA system."""
