@@ -632,7 +632,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 # Always update the interval
                 update_interval = self._data.get(
                     CONF_UPDATE_INTERVAL,
-                    self.config_entry.options.get(
+                    self._current_options().get(
                         CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
                     ),
                 )
