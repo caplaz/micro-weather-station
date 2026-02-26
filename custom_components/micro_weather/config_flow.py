@@ -184,7 +184,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     def _current_options(self) -> dict:
         """Return current options safely (guard against missing config_entry during tests)."""
         try:
-            return dict(self.config_entry.options)
+            return self._current_options()
         except Exception:
             return {}
 
@@ -253,7 +253,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 self._data.update(user_input)
 
                 # Save changes immediately
-                options = dict(self.config_entry.options)
+                options = dict(self._current_options())
                 for field in user_input:
                     value = user_input[field]
                     # Handle different field types appropriately
@@ -276,7 +276,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = dict(self.config_entry.options)
+        current_options = dict(self._current_options())
 
         # Build atmospheric sensors schema
         schema_dict: dict[Any, Any] = {}
@@ -357,7 +357,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             self._data.update(user_input)
 
             # Save changes immediately
-            options = dict(self.config_entry.options)
+            options = dict(self._current_options())
             for field in user_input:
                 value = user_input[field]
                 if value and value not in ("", "None"):
@@ -371,7 +371,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = self._current_options()
 
         # Build wind sensors schema
         schema_dict: dict[Any, Any] = {}
@@ -423,7 +423,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             self._data.update(user_input)
 
             # Save changes immediately
-            options = dict(self.config_entry.options)
+            options = dict(self._current_options())
             for field in user_input:
                 value = user_input[field]
                 if value and value not in ("", "None"):
@@ -437,7 +437,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = self._current_options()
 
         # Build rain sensors schema
         schema_dict: dict[Any, Any] = {}
@@ -479,7 +479,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             ]
 
             # Only include zenith_max_radiation in optional fields if solar radiation sensor is configured
-            if self.config_entry.options.get(
+            if self._current_options().get(
                 CONF_SOLAR_RADIATION_SENSOR
             ) or user_input.get(CONF_SOLAR_RADIATION_SENSOR):
                 optional_fields.append(CONF_ZENITH_MAX_RADIATION)
@@ -490,7 +490,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             self._data.update(user_input)
 
             # Save changes immediately
-            options = dict(self.config_entry.options)
+            options = dict(self._current_options())
             for field in user_input:
                 value = user_input[field]
                 if value and value not in ("", "None"):
@@ -504,7 +504,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = self._current_options()
 
         # Check if solar radiation sensor is configured
         has_solar_radiation = bool(current_options.get(CONF_SOLAR_RADIATION_SENSOR))
@@ -573,7 +573,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 self._data.update(user_input)
 
                 # Build new options dict from current options and accumulated data
-                options = dict(self.config_entry.options)
+                options = dict(self._current_options())
 
                 # Process all sensor fields from accumulated data
                 all_sensor_fields = [
@@ -626,7 +626,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 errors["base"] = "unknown"
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = self._current_options()
 
         # Build final schema with update interval
         data_schema = vol.Schema(
