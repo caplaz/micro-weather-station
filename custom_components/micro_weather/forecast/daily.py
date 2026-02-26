@@ -217,8 +217,12 @@ class DailyForecastGenerator:
         # reporting current observed temp as the day's max when a trend exists.
         if day_idx == 0:
             try:
-                hourly_estimates = [current_temp + temp_trend_per_hour * h for h in range(1,24)]
-                hourly_max = max(hourly_estimates) if hourly_estimates else forecast_temp
+                hourly_estimates = [
+                    current_temp + temp_trend_per_hour * h for h in range(1, 24)
+                ]
+                hourly_max = (
+                    max(hourly_estimates) if hourly_estimates else forecast_temp
+                )
                 forecast_temp = max(forecast_temp, hourly_max)
             except Exception:
                 pass
