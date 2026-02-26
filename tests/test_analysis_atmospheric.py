@@ -96,10 +96,11 @@ class TestAtmosphericAnalyzer:
         assert result_twilight_fog == ATTR_CONDITION_FOG  # Dense fog even at twilight
 
         # Test twilight with moderate humidity - should NOT be fog
-        # Moderate humidity (90% = 0pts) even with tight spread doesn't trigger fog
-        # Nighttime penalty makes this even less likely
+        # Use the configured HUMIDITY_HIGH constant to ensure tests follow defaults.
+        from custom_components.micro_weather.meteorological_constants import HUMIDITY_HIGH
+        moderate_humidity = float(HUMIDITY_HIGH) - 5.0
         result_twilight_clear = analyzer.analyze_fog_conditions(
-            54.0, 90.0, 53.0, 1.0, 3.0, 50.0, False
+            54.0, moderate_humidity, 53.0, 1.0, 3.0, 50.0, False
         )
         assert result_twilight_clear is None  # Normal dawn/twilight humidity, not fog
 
