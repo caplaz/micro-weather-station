@@ -844,3 +844,6 @@ class TrendConstants:
     # Correlation coefficients (estimated)
     CORRELATION_TEMP_PRESSURE: float = -0.6  # Inverse relationship
     CORRELATION_TEMP_HUMIDITY: float = -0.4  # Inverse relationship
+
+# Module-level aliases for tests
+HUMIDITY_HIGH = TemperatureThresholds.HUMIDITY_HIGH
