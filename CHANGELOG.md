@@ -1,5 +1,30 @@
 # Changelog
 
+## 4.2.0 (2026-04-07)
+
+### Improvements
+
+- **Enhanced Fog Detection**: Major update to fog detection logic to reduce false positives.
+  - Increased high humidity threshold to 90% for more reliable fog identification.
+  - Improved synchronization between fog analysis and humidity constants across the codebase.
+  - Added specific test cases to ensure stability after constant tuning.
+- **Improved Solar Fallback**: Better weather condition estimation when solar sensors are unavailable.
+  - Now uses solar elevation as a daytime fallback to distinguish between sunny and clear-night conditions.
+- **Precipitation Analysis Accuracy**: Fixed rain rate unit mismatch in precipitation analysis to ensure consistent behavior across different sensor units.
+- **Forecast Reliability**:
+  - Improved day-0 daily maximum temperature projection using short-term hourly trends.
+  - Adjusted night cloud thresholds to prefer "clear-night" when cloud cover is low.
+- **Home Assistant Integration Stability**:
+  - Improved coordinator setup by treating refresh failures as `ConfigEntryNotReady`, allowing for proper retries.
+  - Enhanced config flow safety by guarding `config_entry.options` access to prevent recursion and runtime errors.
+  - Fixed issues where `config_entry` was accessed during initialization before it was fully ready.
+
+### Bug Fixes
+
+- **Config Flow Recursion**: Fixed a critical issue where accessing options during setup could trigger infinite recursion.
+- **Unit Conversion**: Resolved rain rate unit conversion inconsistencies in certain edge cases.
+- **CI/CD**: Harmonized code style using `black` across all components and fixed linting issues (bare excepts).
+
 ## 4.1.2 (2026-01-30)
 
 ### Bug Fixes
