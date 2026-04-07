@@ -459,3 +459,41 @@ class TestWeatherConditionAnalyzer:
             f"Expected fog with abnormally low solar radiation and high humidity, "
             f"but got {result}"
         )
+
+    def test_no_solar_sensors_uses_elevation_for_daytime(self, analyzers):
+        """Regression test for issue #38.
+
+        When a user has no solar radiation, solar lux, or UV index sensor,
+        is_daytime must fall back to solar_elevation so we never return a
+        night condition during actual daylight hours.
+        """
+        # Exact conditions from the bug report: 3 PM, elevation 34.22°,
+        # no solar sensors configured.
+        sensor_data = {
+            "outdoor_temp": 56.1,  # 13.4°C
+            "humidity": 43.0,
+            "dewpoint": 33.98,  # 1.1°C
+            "pressure": 29.78,  # 1008.4 hPa
+            "wind_speed": 12.3,  # 19.8 km/h
+            "wind_gust": 17.5,  # 28.1 km/h
+            "rain_rate": 0.0,
+            "rain_state": "off",
+            # No solar sensors — all zero
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            # solar_elevation is always available via sun.sun
+            "solar_elevation": 34.22,
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        assert result != "clear-night", (
+            f"Got 'clear-night' at solar_elevation=34.22° with no solar sensors — "
+            f"is_daytime fallback to solar_elevation is broken. Got: {result}"
+        )
+        # With elevation > 0 and no sensors, condition should be daytime
+        assert result in {
+            ATTR_CONDITION_SUNNY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_WINDY,
+        }, f"Expected a daytime condition, got: {result}"
