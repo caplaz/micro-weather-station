@@ -4,8 +4,11 @@ from collections import deque
 from datetime import datetime, timedelta
 
 from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
+    ATTR_CONDITION_LIGHTNING,
+    ATTR_CONDITION_LIGHTNING_RAINY,
     ATTR_CONDITION_PARTLYCLOUDY,
     ATTR_CONDITION_RAINY,
     ATTR_CONDITION_SUNNY,
@@ -497,3 +500,186 @@ class TestWeatherConditionAnalyzer:
             ATTR_CONDITION_CLOUDY,
             ATTR_CONDITION_WINDY,
         }, f"Expected a daytime condition, got: {result}"
+
+    def test_lightning_sensor_dry(self, analyzers):
+        """Test lightning detection from hardware sensor without rain."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 50.0,
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "wind_gust": 8.0,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "lightning_count": 5.0,
+            "lightning_distance": 6.0,  # 6 miles, within NEARBY (25)
+            "lightning_time": (datetime.now() - timedelta(minutes=5)).isoformat(),
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        assert result == ATTR_CONDITION_LIGHTNING
+
+    def test_lightning_sensor_with_rain(self, analyzers):
+        """Test lightning detection from hardware sensor with rain."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 80.0,
+            "pressure": 29.92,
+            "wind_speed": 10.0,
+            "wind_gust": 15.0,
+            "rain_rate": 0.2,
+            "rain_state": "wet",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "lightning_count": 10.0,
+            "lightning_distance": 3.0,  # 3 miles, IMMINENT
+            "lightning_time": (datetime.now() - timedelta(minutes=2)).isoformat(),
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        assert result == ATTR_CONDITION_LIGHTNING_RAINY
+
+    def test_lightning_sensor_too_old(self, analyzers):
+        """Test that stale lightning data is ignored (>30 min)."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 50.0,
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "wind_gust": 8.0,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "lightning_count": 5.0,
+            "lightning_distance": 6.0,
+            "lightning_time": (datetime.now() - timedelta(minutes=45)).isoformat(),
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        assert result != ATTR_CONDITION_LIGHTNING
+        assert result != ATTR_CONDITION_LIGHTNING_RAINY
+
+    def test_lightning_sensor_too_far(self, analyzers):
+        """Test that distant lightning is ignored (>25 miles)."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 50.0,
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "wind_gust": 8.0,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "lightning_count": 5.0,
+            "lightning_distance": 30.0,  # 30 miles, beyond NEARBY (25)
+            "lightning_time": (datetime.now() - timedelta(minutes=5)).isoformat(),
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        assert result != ATTR_CONDITION_LIGHTNING
+        assert result != ATTR_CONDITION_LIGHTNING_RAINY
+
+    def test_lightning_sensor_zero_count(self, analyzers):
+        """Test that zero strike count means no lightning."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 50.0,
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "wind_gust": 8.0,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "lightning_count": 0.0,
+            "lightning_distance": 6.0,
+            "lightning_time": (datetime.now() - timedelta(minutes=5)).isoformat(),
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        assert result != ATTR_CONDITION_LIGHTNING
+        assert result != ATTR_CONDITION_LIGHTNING_RAINY
+
+    def test_lightning_sensor_not_configured(self, analyzers):
+        """Test fallback when no lightning sensor is configured."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 50.0,
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "wind_gust": 8.0,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            # No lightning_count, lightning_distance, lightning_time
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        # Should fall through to normal condition detection
+        assert result not in [ATTR_CONDITION_LIGHTNING, ATTR_CONDITION_LIGHTNING_RAINY]
+
+    def test_lightning_sensor_datetime_object(self, analyzers):
+        """Test lightning time as datetime object (after Ecowitt/ha-ecowitt-iot#59)."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 50.0,
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "wind_gust": 8.0,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "lightning_count": 3.0,
+            "lightning_distance": 8.0,
+            "lightning_time": datetime.now() - timedelta(minutes=10),
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        assert result == ATTR_CONDITION_LIGHTNING
+
+    def test_lightning_sensor_ecowitt_string_format(self, analyzers):
+        """Test lightning time as Ecowitt raw string (MM/DD/YYYY HH:MM:SS)."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 50.0,
+            "pressure": 29.92,
+            "wind_speed": 5.0,
+            "wind_gust": 8.0,
+            "rain_rate": 0.0,
+            "rain_state": "dry",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "lightning_count": 3.0,
+            "lightning_distance": 8.0,
+            "lightning_time": datetime.now().strftime("%m/%d/%Y %H:%M:%S"),
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        assert result == ATTR_CONDITION_LIGHTNING
+
+    def test_lightning_priority_over_precipitation(self, analyzers):
+        """Test that lightning sensor has highest priority (before rain check)."""
+        sensor_data = {
+            "outdoor_temp": 70.0,
+            "humidity": 80.0,
+            "pressure": 29.50,  # Very low pressure
+            "wind_speed": 20.0,
+            "wind_gust": 35.0,
+            "rain_rate": 0.5,  # Heavy rain
+            "rain_state": "wet",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "lightning_count": 8.0,
+            "lightning_distance": 2.0,  # Very close
+            "lightning_time": (datetime.now() - timedelta(minutes=1)).isoformat(),
+        }
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+        # Lightning sensor should take priority, returning lightning-rainy
+        assert result == ATTR_CONDITION_LIGHTNING_RAINY
