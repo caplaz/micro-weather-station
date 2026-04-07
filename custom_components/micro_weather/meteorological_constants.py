@@ -217,7 +217,7 @@ class TemperatureThresholds:
     SPREAD_DRY = 15.0  # Dry air
 
     # Humidity thresholds for condition analysis (%)
-    HUMIDITY_HIGH = 90  # High humidity - fog/rain likely
+    HUMIDITY_HIGH = 95  # High humidity - fog/rain likely (raised to reduce false-positive fog detections)
     HUMIDITY_MODERATE_HIGH = 70  # Moderately high humidity
     HUMIDITY_MODERATE = 50  # Moderate humidity - comfortable
 
