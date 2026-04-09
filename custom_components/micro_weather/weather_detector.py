@@ -18,6 +18,9 @@ from .const import (
     CONF_ALTITUDE,
     CONF_DEWPOINT_SENSOR,
     CONF_HUMIDITY_SENSOR,
+    CONF_LIGHTNING_COUNT_SENSOR,
+    CONF_LIGHTNING_DISTANCE_SENSOR,
+    CONF_LIGHTNING_TIME_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
     CONF_RAIN_RATE_SENSOR,
@@ -38,6 +41,10 @@ from .const import (
     KEY_FORECAST,
     KEY_HUMIDITY,
     KEY_LAST_UPDATED,
+    KEY_LIGHTNING_COUNT,
+    KEY_LIGHTNING_DISTANCE,
+    KEY_LIGHTNING_DISTANCE_UNIT,
+    KEY_LIGHTNING_TIME,
     KEY_OUTDOOR_TEMP,
     KEY_PRECIPITATION,
     KEY_PRESSURE,
@@ -171,6 +178,9 @@ class WeatherDetector:
             KEY_SOLAR_LUX_INTERNAL: options.get(CONF_SOLAR_LUX_SENSOR),
             KEY_UV_INDEX: options.get(CONF_UV_INDEX_SENSOR),
             KEY_SUN: options.get(CONF_SUN_SENSOR),
+            KEY_LIGHTNING_COUNT: options.get(CONF_LIGHTNING_COUNT_SENSOR),
+            KEY_LIGHTNING_DISTANCE: options.get(CONF_LIGHTNING_DISTANCE_SENSOR),
+            KEY_LIGHTNING_TIME: options.get(CONF_LIGHTNING_TIME_SENSOR),
         }
 
     def get_weather_data(self) -> Dict[str, Any]:
@@ -377,9 +387,11 @@ class WeatherDetector:
                     continue
 
                 try:
-                    # Handle string sensors (rain state detection)
+                    # Handle string sensors (rain state detection, lightning time)
                     if sensor_key == KEY_RAIN_STATE:
                         sensor_data[sensor_key] = state.state.lower()
+                    elif sensor_key == KEY_LIGHTNING_TIME:
+                        sensor_data[sensor_key] = state.state
                     else:
                         sensor_data[sensor_key] = float(state.state)
 
@@ -647,5 +659,12 @@ class WeatherDetector:
             rain_rate = sensor_data.get(KEY_RAIN_RATE)
             if rain_rate is not None:
                 analysis_data[KEY_RAIN_RATE] = round(rain_rate / 25.4, 4)
+
+        # Convert lightning distance to miles if it was in km
+        lightning_dist_unit = sensor_data.get(KEY_LIGHTNING_DISTANCE_UNIT)
+        if lightning_dist_unit in ["km", "KM"]:
+            dist_km = sensor_data.get(KEY_LIGHTNING_DISTANCE)
+            if dist_km is not None:
+                analysis_data[KEY_LIGHTNING_DISTANCE] = round(dist_km / 1.60934, 1)
 
         return analysis_data
