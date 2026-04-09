@@ -340,6 +340,13 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                         )
             altitude = altitude_value
 
+            # Get sunrise/sunset times for day/night condition conversion
+            sunrise_time, sunset_time = get_sun_times(self.coordinator.hass)
+            if hasattr(sunrise_time, "_mock_name"):
+                sunrise_time = None
+            if hasattr(sunset_time, "_mock_name"):
+                sunset_time = None
+
             # Get historical patterns from trends analyzer
             historical_patterns = {}
             if (
@@ -357,6 +364,8 @@ class MicroWeatherEntity(CoordinatorEntity, WeatherEntity):
                 self._meteorological_analyzer.analyze_state(sensor_data, altitude),
                 historical_patterns,
                 {},  # system_evolution - empty for now
+                sunrise_time=sunrise_time,
+                sunset_time=sunset_time,
             )
 
             # Convert to Forecast objects

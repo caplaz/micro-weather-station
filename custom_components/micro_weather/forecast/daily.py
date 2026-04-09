@@ -18,6 +18,7 @@ import logging
 from typing import Any, Dict, List
 
 from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING_RAINY,
@@ -45,7 +46,7 @@ from ..meteorological_constants import (
     PrecipitationModelConstants,
     WindAdjustmentConstants,
 )
-from ..weather_utils import convert_to_kmh
+from ..weather_utils import convert_to_kmh, is_forecast_hour_daytime
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,6 +70,8 @@ class DailyForecastGenerator:
         meteorological_state: Dict[str, Any],
         historical_patterns: Dict[str, Any],
         system_evolution: Dict[str, Any],
+        sunrise_time=None,
+        sunset_time=None,
     ) -> List[Dict[str, Any]]:
         """Generate comprehensive 5-day daily forecast.
 
@@ -79,6 +82,8 @@ class DailyForecastGenerator:
             meteorological_state: Comprehensive meteorological analysis
             historical_patterns: Historical weather patterns
             system_evolution: Weather system evolution model
+            sunrise_time: Sunrise time for day/night conversion
+            sunset_time: Sunset time for day/night conversion
 
         Returns:
             List[Dict[str, Any]]: 5-day forecast with enhanced accuracy
@@ -117,6 +122,15 @@ class DailyForecastGenerator:
                 meteorological_state,
                 historical_patterns,
                 system_evolution,
+            )
+
+            # Apply day/night condition conversion (similar to hourly forecast)
+            forecast_condition = self._apply_day_night_conversion(
+                forecast_condition,
+                date,
+                sunrise_time,
+                sunset_time,
+                meteorological_state,
             )
 
             # Advanced precipitation forecasting using atmospheric analysis
@@ -221,7 +235,9 @@ class DailyForecastGenerator:
                     current_temp + temp_trend_per_hour * h for h in range(1, 24)
                 ]
                 hourly_max = (
-                    max(hourly_estimates) if hourly_estimates else forecast_temp
+                    max(hourly_estimates + [current_temp])
+                    if hourly_estimates
+                    else forecast_temp
                 )
                 forecast_temp = max(forecast_temp, hourly_max)
             except Exception as exc:
@@ -510,6 +526,64 @@ class DailyForecastGenerator:
                 forecast_condition = ATTR_CONDITION_RAINY
 
         return forecast_condition
+
+    def _apply_day_night_conversion(
+        self,
+        condition: str,
+        forecast_date,
+        sunrise_time,
+        sunset_time,
+        meteorological_state: Dict[str, Any],
+    ) -> str:
+        """Apply day/night condition conversions.
+
+        For daily forecasts, we use noon as the representative time for each day.
+        This converts sunny to clear night conditions when forecasting nighttime hours.
+
+        Args:
+            condition: Current condition
+            forecast_date: The date of the forecast day
+            sunrise_time: Sunrise time
+            sunset_time: Sunset time
+            meteorological_state: For cloud/storm checks
+
+        Returns:
+            str: Day/night appropriate condition
+        """
+        if sunrise_time and sunset_time:
+            noon = forecast_date.replace(hour=12, minute=0, second=0, microsecond=0)
+            is_daytime = is_forecast_hour_daytime(noon, sunrise_time, sunset_time)
+        else:
+            is_daytime = True
+
+        if is_daytime:
+            if condition == ATTR_CONDITION_CLEAR_NIGHT:
+                return ATTR_CONDITION_SUNNY
+        else:
+            if condition == ATTR_CONDITION_SUNNY:
+                return ATTR_CONDITION_CLEAR_NIGHT
+            elif condition == ATTR_CONDITION_PARTLYCLOUDY:
+                pressure_analysis = meteorological_state.get("pressure_analysis", {})
+                storm_prob = pressure_analysis.get("storm_probability", 0)
+                pressure_trend = pressure_analysis.get("current_trend", 0)
+
+                if not isinstance(pressure_trend, (int, float)):
+                    pressure_trend = 0.0
+                if not isinstance(storm_prob, (int, float)):
+                    storm_prob = 0.0
+
+                cloud_analysis = meteorological_state.get("cloud_analysis", {})
+                cloud_cover = cloud_analysis.get("cloud_cover", 50)
+
+                if (
+                    pressure_trend < -0.3
+                    or storm_prob > 40
+                    or (isinstance(cloud_cover, (int, float)) and cloud_cover >= 60)
+                ):
+                    return ATTR_CONDITION_CLOUDY
+                return ATTR_CONDITION_CLEAR_NIGHT
+
+        return condition
 
     def _calculate_seasonal_temperature_adjustment(self, day_index: int) -> float:
         """Calculate seasonal temperature adjustment for forecast days.

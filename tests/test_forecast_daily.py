@@ -1,8 +1,10 @@
 """Test the daily forecast generation functionality."""
 
+from datetime import datetime
 from unittest.mock import Mock
 
 from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING_RAINY,
@@ -16,6 +18,7 @@ import pytest
 
 from custom_components.micro_weather.const import KEY_HUMIDITY, KEY_TEMPERATURE
 from custom_components.micro_weather.forecast.daily import DailyForecastGenerator
+from custom_components.micro_weather.weather_utils import is_forecast_hour_daytime
 
 
 @pytest.fixture
@@ -1093,3 +1096,158 @@ class TestDailyForecastGenerator:
         assert (
             high_range > low_range
         ), f"High volatility range ({high_range}) should exceed low ({low_range})"
+
+
+class TestIssue35BugFixes:
+    """Test cases for GitHub Issue #35 bug fixes."""
+
+    def test_day0_max_temp_uses_hourly_trend_projection(self, daily_forecast_generator):
+        """Test that day-0 max temp uses hourly trend projection (Bug Fix #1).
+
+        When there's a positive temperature trend, the daily max should reflect
+        the projected high from the trend, not just the current temp.
+        """
+        current_temp = 70.0
+        temp_trend_per_hour = 0.5  # Rising trend
+
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+        }
+        historical_patterns = {
+            KEY_TEMPERATURE: {
+                "trend": temp_trend_per_hour,
+                "volatility": 3.0,
+            },
+        }
+        system_evolution = {
+            "confidence_levels": [0.8, 0.6, 0.7],
+        }
+
+        result = daily_forecast_generator.forecast_temperature(
+            0,  # Day 0
+            current_temp,
+            meteorological_state,
+            historical_patterns,
+            system_evolution,
+        )
+
+        hourly_estimates = [
+            current_temp + temp_trend_per_hour * h for h in range(1, 24)
+        ]
+        expected_max = max(hourly_estimates + [current_temp])
+
+        assert (
+            result >= expected_max
+        ), f"Day-0 temp ({result}) should be at least the hourly max ({expected_max}) when trend is positive"
+
+    def test_day0_max_temp_with_negative_trend(self, daily_forecast_generator):
+        """Test day-0 max temp with negative trend includes current temp in max calculation.
+
+        When trend is negative, the max should still consider the current temp as potential max.
+        """
+        current_temp = 70.0
+        temp_trend_per_hour = -0.5  # Falling trend
+
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+        }
+        historical_patterns = {
+            KEY_TEMPERATURE: {
+                "trend": temp_trend_per_hour,
+                "volatility": 3.0,
+            },
+        }
+        system_evolution = {
+            "confidence_levels": [0.8, 0.6, 0.7],
+        }
+
+        result = daily_forecast_generator.forecast_temperature(
+            0,  # Day 0
+            current_temp,
+            meteorological_state,
+            historical_patterns,
+            system_evolution,
+        )
+
+        hourly_estimates = [
+            current_temp + temp_trend_per_hour * h for h in range(1, 24)
+        ]
+        expected_max = max(hourly_estimates + [current_temp])
+
+        assert (
+            result == expected_max
+        ), f"Day-0 temp ({result}) should equal max of hourly estimates + current ({expected_max})"
+
+    def test_daily_forecast_day_night_conversion_applied(self, daily_forecast_generator):
+        """Test that daily forecast applies day/night condition conversion (Bug Fix #2).
+
+        The _apply_day_night_conversion method should convert sunny to clear_night
+        during nighttime hours and vice versa.
+        """
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "storm_probability": 10.0,
+                "current_trend": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+            "cloud_analysis": {"cloud_cover": 30.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
+        }
+
+        sunrise_time = datetime(2026, 4, 9, 6, 30, 0)
+        sunset_time = datetime(2026, 4, 9, 18, 45, 0)
+
+        nighttime_date = datetime(2026, 4, 9, 22, 0, 0)
+        is_night = not is_forecast_hour_daytime(nighttime_date, sunrise_time, sunset_time)
+        assert is_night, "10 PM should be nighttime"
+
+        result = daily_forecast_generator._apply_day_night_conversion(
+            ATTR_CONDITION_SUNNY,
+            nighttime_date,
+            sunrise_time,
+            sunset_time,
+            meteorological_state,
+        )
+
+        assert (
+            result == ATTR_CONDITION_CLEAR_NIGHT
+        ), f"Nighttime sunny should become clear_night, got {result}"
+
+    def test_daily_forecast_daytime_clear_night_becomes_sunny(
+        self, daily_forecast_generator
+    ):
+        """Test that daytime clear_night converts to sunny."""
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+            },
+            "cloud_analysis": {"cloud_cover": 30.0},
+        }
+
+        sunrise_time = datetime(2026, 4, 9, 6, 30, 0)
+        sunset_time = datetime(2026, 4, 9, 18, 45, 0)
+
+        daytime_date = datetime(2026, 4, 9, 12, 0, 0)
+
+        result = daily_forecast_generator._apply_day_night_conversion(
+            ATTR_CONDITION_CLEAR_NIGHT,
+            daytime_date,
+            sunrise_time,
+            sunset_time,
+            meteorological_state,
+        )
+
+        assert (
+            result == ATTR_CONDITION_SUNNY
+        ), f"Daytime clear_night should become sunny, got {result}"
