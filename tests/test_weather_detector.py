@@ -64,7 +64,9 @@ class TestWeatherDetector:
         assert detector.meteorological_analyzer is not None
         assert detector.daily_generator is not None
 
-    def test_detect_weather_with_psi_pressure(self, mock_hass, mock_options, mock_sensor_data):
+    def test_detect_weather_with_psi_pressure(
+        self, mock_hass, mock_options, mock_sensor_data
+    ):
         """Test weather detection with PSI pressure units."""
         mock_states = {}
         for sensor_key, value in mock_sensor_data.items():
@@ -99,7 +101,7 @@ class TestWeatherDetector:
         # get_weather_data uses:
         # KEY_PRESSURE: self._convert_pressure(sensor_data.get("pressure"), sensor_data.get(KEY_PRESSURE_UNIT))
         # If the sensor unit is PSI, it passes "psi" to _convert_pressure, which should convert to hPa.
-        
+
         # 1034.2 hPa
         assert abs(result["pressure"] - 1034.2) < 1.0
 
@@ -192,7 +194,9 @@ class TestWeatherDetector:
         result = detector.get_weather_data()
         assert result["condition"] == ATTR_CONDITION_POURING
 
-    def test_detect_gusty_wind_no_lightning(self, mock_hass, mock_options, mock_sensor_data):
+    def test_detect_gusty_wind_no_lightning(
+        self, mock_hass, mock_options, mock_sensor_data
+    ):
         """Test that gusty winds without extreme gusts do not trigger lightning."""
         # Regression test for false positive lightning with high gust factor
         mock_states = {}
@@ -221,15 +225,17 @@ class TestWeatherDetector:
                 state = Mock()
                 state.state = str(value)
                 mock_states[f"sensor.{sensor_key}"] = state
-        
+
         # Ensure mappings correct
-        mock_states["sensor.outdoor_temperature"] = mock_states.get("sensor.outdoor_temp", Mock(state="70.0"))
-        
+        mock_states["sensor.outdoor_temperature"] = mock_states.get(
+            "sensor.outdoor_temp", Mock(state="70.0")
+        )
+
         mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
 
         detector = WeatherDetector(mock_hass, mock_options)
         result = detector.get_weather_data()
-        
+
         # Should NOT be lightning
         assert result["condition"] != ATTR_CONDITION_LIGHTNING
         # Should likely be Cloudy or PartlyCloudy depending on solar, or Windy if wind speed high enough
@@ -237,7 +243,6 @@ class TestWeatherDetector:
         # Actually WindThresholds.LIGHT_BREEZE = 8.
         # So it's CALM/LIGHT AIR.
         # Solar defaults in mock_sensor_data might trigger sunny/cloudy.
-
 
     def test_detect_stormy_condition(self, mock_hass, mock_options, mock_sensor_data):
         """Test detection of stormy conditions (thunderstorm with precipitation)."""
@@ -1280,3 +1285,150 @@ class TestWeatherDetector:
         assert analysis_data["wind_speed"] == 10.0
         assert analysis_data["dewpoint"] == 68.0
         assert analysis_data["humidity"] == 65.0
+
+
+class TestLifecycleForecastArc:
+    """End-to-end arc tests verifying lifecycle-driven forecast conditions.
+
+    These tests exercise the full pipeline:
+    EvolutionModeler → lifecycle → DailyForecastGenerator.forecast_condition()
+
+    Sensor reads and condition determination are bypassed; only the forecast
+    generation path is exercised so these tests don't depend on core.py or
+    solar.py internals.
+    """
+
+    @pytest.fixture
+    def mock_hass(self):
+        from homeassistant.util.unit_system import METRIC_SYSTEM
+
+        hass = Mock(spec=HomeAssistant)
+        hass.states = Mock()
+        hass.config = Mock()
+        hass.config.units = METRIC_SYSTEM
+        return hass
+
+    @pytest.fixture
+    def mock_options(self):
+        return {"outdoor_temp_sensor": "sensor.outdoor_temperature"}
+
+    def _detector(self, mock_hass, mock_options):
+        return WeatherDetector(mock_hass, mock_options)
+
+    def _make_met_state(
+        self, current_trend, long_term_trend, storm_prob, stability=0.7
+    ):
+        return {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "current_trend": current_trend,
+                "long_term_trend": long_term_trend,
+                "storm_probability": storm_prob,
+            },
+            "atmospheric_stability": stability,
+            "weather_system": {"type": "transitional"},
+            "cloud_analysis": {"cloud_cover": 40.0},
+            "moisture_analysis": {"condensation_potential": 0.3},
+            "wind_pattern_analysis": {"direction_stability": 0.7},
+            "current_conditions": {"humidity": 60.0},
+        }
+
+    def _run_lifecycle_forecast(self, detector, met_state, current_condition):
+        """Compute lifecycle and return 5-day condition list."""
+        met_state["pressure_acceleration"] = 0.0
+        system_evolution = detector.evolution_modeler.model_system_evolution(
+            met_state, current_condition=current_condition
+        )
+        from custom_components.micro_weather.forecast.daily import (
+            DailyForecastGenerator,
+        )
+
+        generator = DailyForecastGenerator(detector.trends_analyzer)
+        conditions = []
+        for day_idx in range(5):
+            condition = generator.forecast_condition(
+                day_idx,
+                current_condition,
+                met_state,
+                {},
+                system_evolution,
+            )
+            conditions.append(condition)
+        return conditions
+
+    def test_stable_arc_preserves_current_condition(self, mock_hass, mock_options):
+        """Stable pressure → all 5 days stay at current condition."""
+        from homeassistant.components.weather import ATTR_CONDITION_SUNNY
+
+        detector = self._detector(mock_hass, mock_options)
+        met_state = self._make_met_state(
+            current_trend=0.05, long_term_trend=0.02, storm_prob=5.0
+        )
+        conditions = self._run_lifecycle_forecast(
+            detector, met_state, ATTR_CONDITION_SUNNY
+        )
+
+        assert all(
+            c == ATTR_CONDITION_SUNNY for c in conditions
+        ), f"Stable high-pressure scenario should stay sunny; got {conditions}"
+
+    def test_deteriorating_arc_leads_to_rain(self, mock_hass, mock_options):
+        """Strong falling pressure + elevated storm probability → frontal phase on day 0.
+
+        With storm_prob=50 and trend=-0.8:
+          hours_to_frontal = (70-50)/(0.8*5) = 5h → frontal peak at hours 5-17
+          Day 0 midpoint (h=12) falls inside the frontal phase → POURING/RAINY.
+        """
+        from homeassistant.components.weather import ATTR_CONDITION_SUNNY
+
+        detector = self._detector(mock_hass, mock_options)
+        met_state = self._make_met_state(
+            current_trend=-0.8, long_term_trend=-0.6, storm_prob=50.0
+        )
+        conditions = self._run_lifecycle_forecast(
+            detector, met_state, ATTR_CONDITION_SUNNY
+        )
+
+        rainy_conditions = {"rainy", "lightning-rainy", "pouring"}
+        assert any(
+            c in rainy_conditions for c in conditions
+        ), f"Deteriorating scenario should include precipitation; got {conditions}"
+
+    def test_improving_arc_leads_to_clearing(self, mock_hass, mock_options):
+        """Rising pressure → conditions improve toward sunny."""
+        from homeassistant.components.weather import (
+            ATTR_CONDITION_CLOUDY,
+            ATTR_CONDITION_PARTLYCLOUDY,
+            ATTR_CONDITION_SUNNY,
+        )
+
+        detector = self._detector(mock_hass, mock_options)
+        met_state = self._make_met_state(
+            current_trend=0.6, long_term_trend=0.5, storm_prob=20.0
+        )
+        conditions = self._run_lifecycle_forecast(
+            detector, met_state, ATTR_CONDITION_CLOUDY
+        )
+
+        fair_conditions = {ATTR_CONDITION_SUNNY, ATTR_CONDITION_PARTLYCLOUDY}
+        assert any(
+            c in fair_conditions for c in conditions
+        ), f"Improving scenario should include fair-weather days; got {conditions}"
+
+    def test_lifecycle_key_present_in_system_evolution(self, mock_hass, mock_options):
+        """model_system_evolution() always returns a lifecycle list."""
+        from homeassistant.components.weather import ATTR_CONDITION_CLOUDY
+
+        detector = self._detector(mock_hass, mock_options)
+        met_state = self._make_met_state(
+            current_trend=-0.5, long_term_trend=-0.3, storm_prob=10.0
+        )
+        met_state["pressure_acceleration"] = 0.0
+        system_evolution = detector.evolution_modeler.model_system_evolution(
+            met_state, current_condition=ATTR_CONDITION_CLOUDY
+        )
+
+        assert "lifecycle" in system_evolution
+        assert isinstance(system_evolution["lifecycle"], list)
+        assert len(system_evolution["lifecycle"]) > 0
+        assert system_evolution["lifecycle"][-1].end_hour >= 120.0
