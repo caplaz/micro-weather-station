@@ -15,6 +15,7 @@ Key improvements:
 
 from datetime import timedelta
 import logging
+import math
 from typing import Any, Dict, List
 
 from homeassistant.components.weather import (
@@ -47,6 +48,7 @@ from ..meteorological_constants import (
     WindAdjustmentConstants,
 )
 from ..weather_utils import convert_to_kmh, is_forecast_hour_daytime
+from .evolution import apply_confidence_clamping, find_lifecycle_phase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -266,12 +268,14 @@ class DailyForecastGenerator:
         day_variation = variation_amplitude * variation_pattern[day_idx]
         forecast_temp += day_variation
 
-        # Clamp unreasonable extrapolations
-        # Max reasonable change: ±30°F over 5 days in extreme conditions
-        max_change = 6.0 * (day_idx + 1)  # ±6°F per day maximum
-        forecast_temp = max(
-            current_temp - max_change, min(current_temp + max_change, forecast_temp)
-        )
+        # Clamp unreasonable extrapolations for days 1–4.
+        # Day 0 is already bounded by the hourly projection computed above,
+        # so clamping it further would suppress legitimate same-day trend peaks.
+        if day_idx > 0:
+            max_change = 6.0 * (day_idx + 1)  # ±6°F per day maximum
+            forecast_temp = max(
+                current_temp - max_change, min(current_temp + max_change, forecast_temp)
+            )
 
         return forecast_temp
 
@@ -312,178 +316,37 @@ class DailyForecastGenerator:
         historical_patterns: Dict[str, Any],
         system_evolution: Dict[str, Any],
     ) -> str:
-        """Forecast condition using pressure/humidity trend trajectory.
+        """Forecast condition using weather system lifecycle phases.
 
-        The key insight is that weather conditions follow predictable
-        trajectories based on pressure and humidity trends:
-        - Falling pressure + rising humidity → deteriorating conditions
-        - Rising pressure + falling humidity → improving conditions
-        - The rate of change predicts timing of system arrival
+        Maps the day's midpoint hour to a lifecycle phase and derives the
+        condition from that phase, then applies confidence-based clamping
+        so that distant uncertain days show safe middle-ground conditions.
 
         Args:
             day_idx: Day index (0-4)
-            current_condition: Current weather condition
+            current_condition: Current weather condition (used as fallback)
             meteorological_state: Meteorological state analysis
-            historical_patterns: Historical patterns with trends
-            system_evolution: System evolution model
+            historical_patterns: Historical weather patterns (kept for API compat)
+            system_evolution: Must contain a "lifecycle" key from EvolutionModeler
 
         Returns:
             str: Forecasted weather condition
         """
-        # Calculate trend-based trajectory score
-        # Negative = deteriorating, Positive = improving
-        trajectory_score = self._calculate_condition_trajectory(
-            meteorological_state, historical_patterns, day_idx
+        lifecycle = system_evolution.get("lifecycle", [])
+        slot_hour = (day_idx + 0.5) * 24.0  # midpoint of the day
+
+        phase = find_lifecycle_phase(lifecycle, slot_hour)
+        if phase is None:
+            # Graceful fallback: lifecycle not yet computed
+            return self._apply_storm_probability_overrides(
+                current_condition, day_idx, meteorological_state
+            )
+
+        confidence = phase.confidence * math.exp(-slot_hour / 72.0)
+        condition = apply_confidence_clamping(phase.condition, confidence)
+        return self._apply_storm_probability_overrides(
+            condition, day_idx, meteorological_state
         )
-
-        # Start with current condition, then evolve based on trajectory
-        forecast_condition = self._evolve_condition_by_trajectory(
-            current_condition, trajectory_score, day_idx
-        )
-
-        # Apply storm probability overrides (highest priority)
-        forecast_condition = self._apply_storm_probability_overrides(
-            forecast_condition, day_idx, meteorological_state
-        )
-
-        return forecast_condition
-
-    def _calculate_condition_trajectory(
-        self,
-        meteorological_state: Dict[str, Any],
-        historical_patterns: Dict[str, Any],
-        day_idx: int,
-    ) -> float:
-        """Calculate weather trajectory score from trends.
-
-        Combines pressure and humidity trends to predict condition evolution.
-        Score ranges from -100 (severe deterioration) to +100 (major improvement).
-
-        Key factors:
-        - Pressure trend: Falling = -20 to -50 per inHg/3h, Rising = +20 to +50
-        - Humidity trend: Rising = -10 to -30, Falling = +10 to +30
-        - Storm probability: Adds -20 to -60 for high probabilities
-
-        Args:
-            meteorological_state: Meteorological state analysis
-            historical_patterns: Historical patterns
-            day_idx: Day index for dampening
-
-        Returns:
-            float: Trajectory score (-100 to +100)
-        """
-        pressure_analysis = meteorological_state.get("pressure_analysis", {})
-        current_trend = pressure_analysis.get("current_trend", 0)
-        long_term_trend = pressure_analysis.get("long_term_trend", 0)
-        storm_probability = pressure_analysis.get("storm_probability", 0)
-
-        # Ensure numeric values
-        if not isinstance(current_trend, (int, float)):
-            current_trend = 0.0
-        if not isinstance(long_term_trend, (int, float)):
-            long_term_trend = 0.0
-        if not isinstance(storm_probability, (int, float)):
-            storm_probability = 0.0
-
-        # Pressure contribution: -1.0 inHg/3h trend = -40 score
-        pressure_score = current_trend * 40.0
-
-        # Long-term trend reinforcement (smaller weight)
-        pressure_score += long_term_trend * 20.0
-
-        # Get humidity trend from patterns
-        humidity_pattern = historical_patterns.get(KEY_HUMIDITY, {})
-        humidity_trend = humidity_pattern.get("trend", 0)
-        if not isinstance(humidity_trend, (int, float)):
-            humidity_trend = 0.0
-
-        # Humidity contribution: Rising humidity = deteriorating
-        humidity_score = -humidity_trend * 5.0  # °%/hour * 5
-
-        # Storm probability penalty
-        storm_penalty = 0.0
-        if storm_probability > 60:
-            storm_penalty = -(storm_probability - 40)  # -20 to -60
-
-        # Combine scores
-        total_score = pressure_score + humidity_score + storm_penalty
-
-        # Dampen for future days (less certain)
-        confidence = max(0.3, 1.0 - (day_idx * 0.15))
-        total_score *= confidence
-
-        return max(-100, min(100, total_score))
-
-    def _evolve_condition_by_trajectory(
-        self, current_condition: str, trajectory_score: float, day_idx: int
-    ) -> str:
-        """Evolve condition based on trajectory score.
-
-        Condition ladder (worst to best):
-        pouring → lightning-rainy → rainy → cloudy → partly-cloudy → sunny
-
-        Args:
-            current_condition: Starting condition
-            trajectory_score: -100 (deteriorating) to +100 (improving)
-            day_idx: Day index for step calculation
-
-        Returns:
-            str: Evolved condition
-        """
-        # Define condition ladder
-        condition_ladder = [
-            ATTR_CONDITION_POURING,
-            ATTR_CONDITION_LIGHTNING_RAINY,
-            ATTR_CONDITION_RAINY,
-            ATTR_CONDITION_CLOUDY,
-            ATTR_CONDITION_PARTLYCLOUDY,
-            ATTR_CONDITION_SUNNY,
-        ]
-
-        # Handle special conditions
-        if current_condition == ATTR_CONDITION_FOG:
-            # Fog typically clears during the day - evolve toward sunny over time
-            # Day 0: likely still foggy/cloudy, Day 1+: progressively clearer
-            fog_clearing_bonus = day_idx * 15  # +15 per day as fog clears
-            adjusted_score = trajectory_score + fog_clearing_bonus
-            if adjusted_score > 30:
-                return ATTR_CONDITION_SUNNY
-            elif adjusted_score > 10:
-                return ATTR_CONDITION_PARTLYCLOUDY
-            else:
-                return ATTR_CONDITION_CLOUDY
-
-        if current_condition == ATTR_CONDITION_SNOWY:
-            # Snow evolves based on trajectory - may continue, turn to rain, or clear
-            # Day 0-1: likely continues, Day 2+: may transition based on trajectory
-            snow_clearing_bonus = day_idx * 10  # +10 per day
-            adjusted_score = trajectory_score + snow_clearing_bonus
-            if adjusted_score > 40:
-                return ATTR_CONDITION_PARTLYCLOUDY  # Snow ended, clearing
-            elif adjusted_score > 20:
-                return ATTR_CONDITION_CLOUDY  # Snow ended, still cloudy
-            elif adjusted_score > 0:
-                return ATTR_CONDITION_RAINY  # Warming, snow turning to rain
-            else:
-                return ATTR_CONDITION_SNOWY  # Still cold, snow continues
-
-        # Find current position on ladder
-        try:
-            current_idx = condition_ladder.index(current_condition)
-        except ValueError:
-            current_idx = 3  # Default to cloudy if unknown
-
-        # Calculate steps to move (max 2 steps per day for realism)
-        # Score of ±50 = 1 step, ±100 = 2 steps
-        steps = int(trajectory_score / 50)
-        steps = max(-2, min(2, steps))  # Clamp to ±2
-
-        # Apply steps with day dampening (smaller steps for distant days)
-        if day_idx > 2:
-            steps = max(-1, min(1, steps))
-
-        new_idx = max(0, min(len(condition_ladder) - 1, current_idx + steps))
-        return condition_ladder[new_idx]
 
     def _apply_storm_probability_overrides(
         self,
@@ -551,8 +414,9 @@ class DailyForecastGenerator:
             str: Day/night appropriate condition
         """
         if sunrise_time and sunset_time:
-            noon = forecast_date.replace(hour=12, minute=0, second=0, microsecond=0)
-            is_daytime = is_forecast_hour_daytime(noon, sunrise_time, sunset_time)
+            is_daytime = is_forecast_hour_daytime(
+                forecast_date, sunrise_time, sunset_time
+            )
         else:
             is_daytime = True
 
