@@ -354,7 +354,7 @@ class TrendsAnalyzer:
         first_half = entries[:midpoint]
         second_half = entries[midpoint:]
 
-        def _slope(half: list) -> float:
+        def _slope(half: list[dict[str, Any]]) -> float:
             timestamps = [e["timestamp"] for e in half]
             values = [e["value"] for e in half]
             if isinstance(timestamps[0], (int, float)):
