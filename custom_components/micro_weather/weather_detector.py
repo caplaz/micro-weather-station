@@ -64,14 +64,12 @@ from .const import (
     KEY_WIND_GUST_UNIT,
     KEY_WIND_SPEED,
     KEY_WIND_SPEED_UNIT,
-    PRESSURE_HPA_UNIT,
     PRESSURE_HPA_UNITS,
-    PRESSURE_INHG_UNIT,
     PRESSURE_INHG_UNITS,
     PRESSURE_PSI_UNIT,
     PRESSURE_PSI_UNITS,
 )
-from .forecast import DailyForecastGenerator, MeteorologicalAnalyzer
+from .forecast import DailyForecastGenerator, EvolutionModeler, MeteorologicalAnalyzer
 from .weather_utils import (
     calculate_apparent_temperature,
     convert_altitude_to_meters,
@@ -162,6 +160,7 @@ class WeatherDetector:
             self.trends_analyzer,
         )
         self.daily_generator = DailyForecastGenerator(self.trends_analyzer)
+        self.evolution_modeler = EvolutionModeler()
 
         # Sensor entity IDs mapping
         self.sensors = {
@@ -246,15 +245,24 @@ class WeatherDetector:
             # Get historical patterns from trends analyzer
             historical_patterns = self.trends_analyzer.analyze_historical_patterns()
 
+            analysis_data = self._prepare_analysis_sensor_data(sensor_data)
+            meteorological_state = self.meteorological_analyzer.analyze_state(
+                analysis_data, altitude
+            )
+            meteorological_state["pressure_acceleration"] = (
+                self.trends_analyzer.compute_pressure_acceleration()
+            )
+            system_evolution = self.evolution_modeler.model_system_evolution(
+                meteorological_state, current_condition=condition
+            )
+
             forecast_data = self.daily_generator.generate_forecast(
                 condition,
                 self._prepare_forecast_sensor_data(sensor_data),
                 altitude,
-                self.meteorological_analyzer.analyze_state(
-                    self._prepare_analysis_sensor_data(sensor_data), altitude
-                ),
+                meteorological_state,
                 historical_patterns,
-                {},  # system_evolution - empty for now
+                system_evolution,
             )
             # Convert forecast temperatures from Fahrenheit to Celsius for HA compatibility
             for day_forecast in forecast_data:

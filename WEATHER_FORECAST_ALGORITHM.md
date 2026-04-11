@@ -11,13 +11,11 @@ The forecast system employs advanced meteorological modeling techniques, integra
 The forecasting subsystem is organized into specialized modules, each handling a specific aspect of weather prediction:
 
 1. **Meteorological Analysis** (`forecast/meteorological.py`): Comprehensive state analysis and atmospheric stability
-2. **Pattern Recognition** (`forecast/patterns.py`): Historical pattern analysis and seasonal factors
-3. **Evolution Modeling** (`forecast/evolution.py`): Weather system transition prediction
-4. **Astronomical Calculations** (`forecast/astronomical.py`): Solar position and diurnal cycles
-5. **Daily Forecast Generator** (`forecast/daily.py`): 5-day prediction generation
-6. **Hourly Forecast Generator** (`forecast/hourly.py`): 24-hour detailed predictions
+2. **Evolution Modeling** (`forecast/evolution.py`): Lifecycle-phase-based weather system transition prediction
+3. **Daily Forecast Generator** (`forecast/daily.py`): 5-day prediction generation
+4. **Hourly Forecast Generator** (`forecast/hourly.py`): 24-hour detailed predictions
 
-The main coordination is handled by `weather_forecast.py`, which integrates these specialized components to generate comprehensive forecasts.
+The main coordination is handled by `weather_detector.py` (via `WeatherDetector`) and `weather.py` (via `MicroWeatherEntity`), which integrate these components to generate comprehensive forecasts.
 
 ### Core Capabilities
 
@@ -85,42 +83,95 @@ forecast_temp = apply_uncertainty_dampening(forecast_temp, day_idx)
 - **Atmospheric Stability Dampening**: Stable systems show less temperature variation
 - **Distance-based Uncertainty**: Forecast accuracy decreases with time horizon
 
-#### Condition Forecasting
+#### Condition Forecasting — Lifecycle Phase Engine
 
-**Algorithm**: `_forecast_condition_comprehensive()`
+**Algorithm**: `DailyForecastGenerator.forecast_condition()` / `HourlyForecastGenerator.forecast_condition()`
 
-The condition prediction uses a hierarchical priority system with meteorological intelligence:
+Conditions are driven by a **weather system lifecycle** computed from the current pressure trend and its acceleration.  The old trajectory-score approach (which simply propagated the current snapshot forward) was replaced in v4.2 with an explicit lifecycle that models *when* a weather system arrives and departs.
 
-1. **Weather System Evolution** (Primary Driver)
+##### 1. Pressure Acceleration
 
-   ```python
-   evolution_path = system_evolution["evolution_path"]
-   forecast_condition = evolution_path[min(day_idx, len(evolution_path)-1)]
-   ```
+`TrendsAnalyzer.compute_pressure_acceleration()` splits the 48 h pressure ring-buffer in half, computes a linear trend slope for each half, and returns the difference (inHg/3 h²):
 
-2. **Pressure System Override**
+```python
+acceleration = slope_second_half - slope_first_half
+```
 
-   ```python
-   if storm_probability > 70:
-       return "lightning-rainy" or "pouring"
-   elif pressure_system == "low_pressure":
-       return "cloudy" or "rainy"
-   ```
+Positive acceleration means the rate of pressure change is speeding up; negative means it is slowing.
 
-3. **Cloud Cover Integration**
+##### 2. Lifecycle Computation
 
-   ```python
-   if cloud_cover < 20 and confidence > 0.7:
-       return "sunny"
-   elif cloud_cover > 75:
-       return "cloudy"
-   ```
+`EvolutionModeler.compute_lifecycle(trend, acceleration, storm_prob, current_condition)` returns an ordered list of `LifecyclePhase` objects.  Each phase carries:
 
-4. **Moisture Analysis Enhancement**
-   ```python
-   if condensation_potential > 0.7 and condition == "cloudy":
-       return "rainy"
-   ```
+| Field | Description |
+|-------|-------------|
+| `name` | Phase label (`stable`, `pre_frontal`, `frontal`, `post_frontal`, `clearing`, `stabilizing`) |
+| `start_hour` | Hours from now when the phase begins |
+| `end_hour` | Hours from now when the phase ends |
+| `condition` | HA weather condition string for this phase |
+| `confidence` | Model confidence 0–1 for this phase |
+
+Three scenario branches:
+
+- **Stable** (`|trend| < STABLE_THRESHOLD`): single phase covering 0–120 h, condition = current condition, confidence = 0.85.
+
+- **Deteriorating** (`trend < 0`):
+  - `hours_to_frontal = (STORM_THRESHOLD_SEVERE − storm_prob) / (|trend| × 5)`
+  - Phases: *stable* → *pre_frontal* → **frontal** → *post_frontal* → *clearing* → *stabilizing*
+  - `peak_duration`: 6 h if `|accel| > 0.1` (fast front), else 12 h
+  - Frontal condition severity: `rainy` / `pouring` / `lightning-rainy` based on storm probability
+
+- **Improving** (`trend > 0`):
+  - `hours_to_clear = storm_prob / (|trend| × 5)`
+  - Phases: *post_frontal* → *clearing* → **stabilizing** (SUNNY)
+  - `rebound_hours = max(12, 12 × (1 + |accel|))`
+
+All phases are contiguous and together span exactly 120 h (5 days).
+
+##### 3. Slot Mapping
+
+For each forecast slot (day `d` or hour `h`), the midpoint time is computed and matched against the lifecycle:
+
+```python
+# daily
+slot_hour = (day_idx + 0.5) * 24.0   # midpoint of the day
+
+# hourly
+slot_hour = float(hour_idx)
+
+phase = find_lifecycle_phase(lifecycle, slot_hour)
+```
+
+`find_lifecycle_phase` returns the phase where `start_hour ≤ slot_hour < end_hour`; if the slot is beyond the last phase, it returns the last phase.
+
+##### 4. Confidence Clamping
+
+`apply_confidence_clamping(condition, phase.confidence)` prevents the model from asserting extreme conditions when confidence is low:
+
+| Confidence | Allowed conditions |
+|---|---|
+| ≥ 0.6 | Any condition |
+| 0.4–0.59 | Any except `pouring` / `lightning-rainy` (→ `rainy`) |
+| < 0.4 | Only `cloudy` / `partlycloudy` |
+
+##### 5. Storm Probability Override (daily only)
+
+After lifecycle lookup, `_apply_storm_probability_overrides` overrides conditions for very high storm probabilities:
+
+```python
+if storm_probability >= STORM_THRESHOLD_SEVERE:   # 70%
+    condition = "lightning-rainy" or "pouring"
+elif storm_probability > STORM_THRESHOLD_MODERATE and pressure_system == "low_pressure":
+    if condition in fair_conditions:
+        condition = "rainy"
+```
+
+##### 6. Day/Night Conversion
+
+Both daily and hourly generators apply `_apply_day_night_conversion` last:
+- Nighttime `sunny` → `clear-night`
+- Nighttime `partlycloudy` → `clear-night` or `cloudy` based on cloud cover / storm probability
+- Daytime `clear-night` → `sunny`
 
 #### Precipitation Forecasting
 
@@ -226,35 +277,11 @@ diurnal_patterns = {
 
 #### Micro-Evolution Modeling
 
-**Algorithm**: `_model_hourly_weather_evolution()`
+**Algorithm**: `EvolutionModeler.model_system_evolution()`
 
-```python
-evolution_rate = 1.0 - atmospheric_stability
-stability_factor = atmospheric_stability
-micro_changes = calculate_micro_evolution_patterns(weather_system_type)
-```
+The lifecycle computed by `EvolutionModeler.compute_lifecycle()` (see *Condition Forecasting — Lifecycle Phase Engine* above) is stored under `micro_evolution["lifecycle"]` and passed to `HourlyForecastGenerator`.  Each hour index is looked up in the lifecycle, and the matching phase's condition is returned — after confidence clamping and day/night conversion.
 
-**Trajectory-Based Evolution (Version 4.0.0):**
-
-The forecast now uses trajectory scoring based on pressure and humidity trends:
-
-```python
-def _calculate_hourly_trajectory(meteorological_state, hour_idx):
-    """Calculate trajectory score for condition evolution."""
-    pressure_trend = pressure_analysis.get("current_trend", 0)
-    humidity_trend = humidity_trends.get("trend", 0)
-
-    # Trajectory score: negative = deteriorating, positive = improving
-    # Pressure trend projected forward by 6 hours
-    trajectory = pressure_trend * 6 + humidity_trend * 2
-
-    return trajectory  # Range: roughly -100 to +100
-```
-
-Conditions evolve along a ladder based on trajectory:
-
-- Trajectory < -30: Move toward deterioration (sunny → partlycloudy → cloudy → rainy)
-- Trajectory > 30: Move toward improvement (rainy → cloudy → partlycloudy → sunny)
+This replaced the trajectory-scoring approach (`_calculate_hourly_trajectory` + `_evolve_hourly_condition`) in v4.2.  The old approach re-computed a pressure-derivative score for every hour independently, which caused all 24 hours to reflect only the *current* moment's trend, not the *evolution* of the weather system over time.
 
 #### Hourly Temperature Forecasting
 
@@ -277,64 +304,23 @@ forecast_temp += natural_variation_with_dampening(hour_idx)
 
 #### Hourly Condition Forecasting
 
-**Algorithm**: `_forecast_hourly_condition_comprehensive()`
+**Algorithm**: `HourlyForecastGenerator.forecast_condition()`
+
+Since v4.2 the hourly condition is driven by the same lifecycle engine as the daily forecast:
 
 ```python
-forecast_condition = current_condition
+lifecycle = micro_evolution.get("lifecycle", [])
+phase = find_lifecycle_phase(lifecycle, float(hour_idx))
 
-# Daytime/nighttime astronomical adjustments
-if not is_daytime:
-    forecast_condition = convert_to_nighttime_condition(forecast_condition)
+if phase is None:
+    condition = current_condition          # graceful fallback
+else:
+    condition = apply_confidence_clamping(phase.condition, phase.confidence)
 
-# Diurnal condition variations (Version 3.0.0 Enhancement)
-forecast_condition = apply_diurnal_condition_variations(forecast_condition, astronomical_context)
-
-# Pressure-aware micro-evolution condition changes
-if should_apply_micro_change(hour_idx, change_probability):
-    forecast_condition = apply_progressive_condition_change(forecast_condition)
+return _apply_day_night_conversion(condition, is_daytime, meteorological_state)
 ```
 
-**Diurnal Condition Variations (Version 3.0.0):**
-
-The system now simulates realistic diurnal weather patterns throughout the 24-hour cycle:
-
-```python
-def apply_diurnal_condition_variations(condition, astronomical_context):
-    hour = astronomical_context["hour_of_day"]
-    is_daytime = astronomical_context["is_daytime"]
-
-    if is_daytime:
-        # Morning clearing trend (6-10 AM)
-        if 6 <= hour < 10 and condition == "cloudy":
-            return "partlycloudy"
-
-        # Afternoon stability with pressure influence (12-15 PM)
-        elif 12 <= hour < 15:
-            pressure_trend = get_pressure_trend()
-            if pressure_trend > 0.3 and condition == "cloudy":
-                return "partlycloudy"
-
-        # Late afternoon cloud increase (15-18 PM)
-        elif 15 <= hour < 18:
-            pressure_trend = get_pressure_trend()
-            if pressure_trend < -0.3 and condition == "sunny":
-                return "partlycloudy"
-
-        # Evening cloud increase (18-21 PM)
-        elif 18 <= hour < 21 and condition == "sunny":
-            return "partlycloudy"
-
-    else:  # Nighttime
-        # Late night clearing with rising pressure (22 PM - 3 AM)
-        if 22 <= hour or hour < 3:
-            pressure_trend = get_pressure_trend()
-            if pressure_trend > 0.5 and condition == "cloudy":
-                return "clear-night"
-
-    return condition
-```
-
-This ensures weather icons vary realistically throughout the day and night, even with stable meteorological conditions.
+When no lifecycle is available (e.g., on first startup before any pressure history is accumulated), the fallback returns the previous hour's condition with day/night conversion applied.
 
 #### Hourly Precipitation, Wind, and Humidity
 

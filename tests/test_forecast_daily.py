@@ -401,18 +401,19 @@ class TestDailyForecastGenerator:
         # Sunny should have larger range than cloudy
         assert range_sunny >= range_cloudy
 
-    def test_fog_condition_evolves_over_days(self, daily_forecast_generator):
-        """Test that fog condition evolves differently for each day.
+    def test_fog_condition_fallback_without_lifecycle(self, daily_forecast_generator):
+        """Test that fog condition uses graceful fallback when no lifecycle is provided.
 
-        Fog should progressively clear over multiple days, not remain static.
-        This tests the fix for the bug where fog returned the same condition
-        for all forecast days.
+        With the lifecycle-based approach, evolution only happens when a lifecycle
+        is present in system_evolution.  When system_evolution={} the method falls
+        back to storm-probability overrides, leaving fog unchanged for low storm probs.
+        The TestDailyForecastConditionLifecycle class covers lifecycle-driven evolution.
         """
         meteorological_state = {
             "pressure_analysis": {
                 "pressure_system": "normal",
                 "storm_probability": 10.0,
-                "current_trend": 0.0,  # Neutral trajectory
+                "current_trend": 0.0,
                 "long_term_trend": 0.0,
             },
             "atmospheric_stability": 0.7,
@@ -422,7 +423,6 @@ class TestDailyForecastGenerator:
         historical_patterns = {"humidity": {"trend": 0.0}}
         system_evolution = {}
 
-        # Get conditions for each day starting from fog
         conditions = []
         for day_idx in range(5):
             condition = daily_forecast_generator.forecast_condition(
@@ -434,43 +434,24 @@ class TestDailyForecastGenerator:
             )
             conditions.append(condition)
 
-        # Fog should evolve over days - not all the same
-        # Day 0 should be cloudy (trajectory 0), later days should improve
-        assert conditions[0] == ATTR_CONDITION_CLOUDY  # Day 0: trajectory ~0
-        # At least one later day should be different (clearer)
-        assert (
-            ATTR_CONDITION_PARTLYCLOUDY in conditions
-            or ATTR_CONDITION_SUNNY in conditions
-        )
-        # Last day should be clearer than first day (fog clears over time)
-        condition_order = [
-            ATTR_CONDITION_CLOUDY,
-            ATTR_CONDITION_PARTLYCLOUDY,
-            ATTR_CONDITION_SUNNY,
-        ]
-        first_day_idx = (
-            condition_order.index(conditions[0])
-            if conditions[0] in condition_order
-            else 0
-        )
-        last_day_idx = (
-            condition_order.index(conditions[4])
-            if conditions[4] in condition_order
-            else 0
-        )
-        assert last_day_idx >= first_day_idx, "Fog should clear over time, not worsen"
+        # Without a lifecycle, storm overrides don't fire at storm_prob=10,
+        # so the fallback returns the current condition unchanged for all days.
+        assert all(
+            c == ATTR_CONDITION_FOG for c in conditions
+        ), f"Fallback without lifecycle should preserve fog; got {conditions}"
 
-    def test_snowy_condition_evolves_over_days(self, daily_forecast_generator):
-        """Test that snowy condition evolves differently for each day.
+    def test_snowy_condition_fallback_without_lifecycle(self, daily_forecast_generator):
+        """Test that snowy condition uses graceful fallback when no lifecycle is provided.
 
-        Snow should progressively change over multiple days based on trajectory,
-        not remain static for all forecast days.
+        With the lifecycle-based approach, evolution only happens when a lifecycle is
+        present in system_evolution.  Without one the method falls back to storm-probability
+        overrides, leaving snowy unchanged when storm probability is low.
         """
         meteorological_state = {
             "pressure_analysis": {
                 "pressure_system": "normal",
                 "storm_probability": 10.0,
-                "current_trend": 0.0,  # Neutral trajectory
+                "current_trend": 0.0,
                 "long_term_trend": 0.0,
             },
             "atmospheric_stability": 0.7,
@@ -480,7 +461,6 @@ class TestDailyForecastGenerator:
         historical_patterns = {"humidity": {"trend": 0.0}}
         system_evolution = {}
 
-        # Get conditions for each day starting from snowy
         conditions = []
         for day_idx in range(5):
             condition = daily_forecast_generator.forecast_condition(
@@ -492,14 +472,11 @@ class TestDailyForecastGenerator:
             )
             conditions.append(condition)
 
-        # Snow should evolve over days - not all the same
-        # With neutral trajectory, early days stay snowy, later days transition
-        assert conditions[0] == ATTR_CONDITION_SNOWY  # Day 0: still snowing
-        # At least one later day should be different
-        unique_conditions = set(conditions)
-        assert (
-            len(unique_conditions) > 1
-        ), "Snow should evolve over 5 days, not stay static"
+        # Without a lifecycle, storm overrides don't fire at storm_prob=10,
+        # so the fallback returns the current condition unchanged for all days.
+        assert all(
+            c == ATTR_CONDITION_SNOWY for c in conditions
+        ), f"Fallback without lifecycle should preserve snowy; got {conditions}"
 
     def test_fog_clears_faster_with_improving_trajectory(
         self, daily_forecast_generator
@@ -1188,7 +1165,9 @@ class TestIssue35BugFixes:
             result == expected_max
         ), f"Day-0 temp ({result}) should equal max of hourly estimates + current ({expected_max})"
 
-    def test_daily_forecast_day_night_conversion_applied(self, daily_forecast_generator):
+    def test_daily_forecast_day_night_conversion_applied(
+        self, daily_forecast_generator
+    ):
         """Test that daily forecast applies day/night condition conversion (Bug Fix #2).
 
         The _apply_day_night_conversion method should convert sunny to clear_night
@@ -1209,7 +1188,9 @@ class TestIssue35BugFixes:
         sunset_time = datetime(2026, 4, 9, 18, 45, 0)
 
         nighttime_date = datetime(2026, 4, 9, 22, 0, 0)
-        is_night = not is_forecast_hour_daytime(nighttime_date, sunrise_time, sunset_time)
+        is_night = not is_forecast_hour_daytime(
+            nighttime_date, sunrise_time, sunset_time
+        )
         assert is_night, "10 PM should be nighttime"
 
         result = daily_forecast_generator._apply_day_night_conversion(
@@ -1251,3 +1232,111 @@ class TestIssue35BugFixes:
         assert (
             result == ATTR_CONDITION_SUNNY
         ), f"Daytime clear_night should become sunny, got {result}"
+
+
+class TestDailyForecastConditionLifecycle:
+    """Tests for lifecycle-based DailyForecastGenerator.forecast_condition()."""
+
+    import pytest
+
+    @pytest.fixture
+    def generator(self):
+        from custom_components.micro_weather.analysis.trends import TrendsAnalyzer
+        from custom_components.micro_weather.forecast.daily import (
+            DailyForecastGenerator,
+        )
+
+        return DailyForecastGenerator(TrendsAnalyzer({}))
+
+    def _make_evolution(self, lifecycle):
+        return {
+            "lifecycle": lifecycle,
+            "evolution_path": [],
+            "confidence_levels": [],
+            "transition_probabilities": {},
+        }
+
+    def _make_met_state(self, storm_prob=0, pressure_system="normal", trend=0.0):
+        return {
+            "pressure_analysis": {
+                "storm_probability": storm_prob,
+                "pressure_system": pressure_system,
+                "current_trend": trend,
+                "long_term_trend": trend,
+            },
+            "atmospheric_stability": 0.7,
+        }
+
+    def test_day0_uses_stable_phase_condition(self, generator):
+        """Day 0 slot (hour 12) returns the stable phase condition."""
+        from custom_components.micro_weather.forecast.evolution import LifecyclePhase
+
+        lifecycle = [LifecyclePhase("stable", 0.0, 120.0, ATTR_CONDITION_SUNNY, 0.85)]
+        result = generator.forecast_condition(
+            0,
+            ATTR_CONDITION_SUNNY,
+            self._make_met_state(),
+            {},
+            self._make_evolution(lifecycle),
+        )
+        assert result == ATTR_CONDITION_SUNNY
+
+    def test_deteriorating_arc_day_by_day(self, generator):
+        """Falling pressure: day 0 pre-frontal cloudy, day 1 post-frontal cloudy."""
+        from custom_components.micro_weather.forecast.evolution import LifecyclePhase
+
+        # Front arrives at hour 18, peak 6h, post_frontal 24h, clearing 24h
+        lifecycle = [
+            LifecyclePhase("pre_frontal", 0.0, 18.0, ATTR_CONDITION_CLOUDY, 0.80),
+            LifecyclePhase("frontal", 18.0, 24.0, ATTR_CONDITION_RAINY, 0.75),
+            LifecyclePhase("post_frontal", 24.0, 48.0, ATTR_CONDITION_CLOUDY, 0.65),
+            LifecyclePhase("clearing", 48.0, 72.0, ATTR_CONDITION_PARTLYCLOUDY, 0.55),
+            LifecyclePhase("stabilizing", 72.0, 120.0, ATTR_CONDITION_SUNNY, 0.45),
+        ]
+        met_state = self._make_met_state(storm_prob=5)
+        evolution = self._make_evolution(lifecycle)
+
+        # Day 0 midpoint = hour 12 → pre_frontal → cloudy
+        day0 = generator.forecast_condition(
+            0, ATTR_CONDITION_PARTLYCLOUDY, met_state, {}, evolution
+        )
+        assert day0 == ATTR_CONDITION_CLOUDY
+
+        # Day 1 midpoint = hour 36 → post_frontal → cloudy
+        day1 = generator.forecast_condition(
+            1, ATTR_CONDITION_PARTLYCLOUDY, met_state, {}, evolution
+        )
+        assert day1 == ATTR_CONDITION_CLOUDY
+
+    def test_empty_lifecycle_falls_back_to_current_condition(self, generator):
+        """Empty lifecycle returns current_condition (graceful fallback)."""
+        result = generator.forecast_condition(
+            0,
+            ATTR_CONDITION_CLOUDY,
+            self._make_met_state(),
+            {},
+            {
+                "lifecycle": [],
+                "evolution_path": [],
+                "confidence_levels": [],
+                "transition_probabilities": {},
+            },
+        )
+        assert result == ATTR_CONDITION_CLOUDY
+
+    def test_low_confidence_slots_clamped(self, generator):
+        """Phase with base confidence < 0.4 clamps extreme conditions to middle ground."""
+        from custom_components.micro_weather.forecast.evolution import LifecyclePhase
+
+        lifecycle = [
+            LifecyclePhase("uncertain", 0.0, 120.0, ATTR_CONDITION_SUNNY, 0.35)
+        ]
+        result = generator.forecast_condition(
+            4,
+            ATTR_CONDITION_SUNNY,
+            self._make_met_state(),
+            {},
+            self._make_evolution(lifecycle),
+        )
+        # confidence = 0.35 < 0.4 → SUNNY clamped to partlycloudy
+        assert result in (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY)
