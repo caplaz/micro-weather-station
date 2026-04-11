@@ -166,3 +166,50 @@ class TestTrendsAnalyzer:
         # Test with constant values (zero variance)
         trend_constant = analyzer.calculate_trend([1, 2, 3], [5, 5, 5])
         assert trend_constant == 0.0
+
+    def test_compute_pressure_acceleration_falling_fast(self):
+        """Acceleration is negative when pressure fall speeds up."""
+        history = {"pressure": deque(maxlen=192)}
+        base_time = datetime.now()
+        # First 6 readings: slow fall (-0.01/h), next 6: fast fall (-0.05/h)
+        for i in range(6):
+            history["pressure"].append(
+                {
+                    "timestamp": base_time - timedelta(hours=11 - i),
+                    "value": 30.0 - i * 0.01,
+                }
+            )
+        for i in range(6):
+            history["pressure"].append(
+                {
+                    "timestamp": base_time - timedelta(hours=5 - i),
+                    "value": 29.94 - i * 0.05,
+                }
+            )
+        analyzer = TrendsAnalyzer(history)
+        accel = analyzer.compute_pressure_acceleration()
+        assert accel < 0, f"Expected negative acceleration, got {accel}"
+
+    def test_compute_pressure_acceleration_stable(self):
+        """Acceleration is near zero for flat pressure."""
+        history = {"pressure": deque(maxlen=192)}
+        base_time = datetime.now()
+        for i in range(12):
+            history["pressure"].append(
+                {"timestamp": base_time - timedelta(hours=11 - i), "value": 29.92}
+            )
+        analyzer = TrendsAnalyzer(history)
+        accel = analyzer.compute_pressure_acceleration()
+        assert abs(accel) < 0.01, f"Expected near-zero acceleration, got {accel}"
+
+    def test_compute_pressure_acceleration_insufficient_data(self):
+        """Returns 0.0 when fewer than 4 readings are available."""
+        history = {"pressure": deque(maxlen=192)}
+        history["pressure"].append({"timestamp": datetime.now(), "value": 29.92})
+        analyzer = TrendsAnalyzer(history)
+        assert analyzer.compute_pressure_acceleration() == 0.0
+
+    def test_compute_pressure_acceleration_missing_key(self):
+        """Returns 0.0 when no pressure history exists."""
+        analyzer = TrendsAnalyzer({})
+        assert analyzer.compute_pressure_acceleration() == 0.0
