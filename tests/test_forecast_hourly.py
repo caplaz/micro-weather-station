@@ -380,97 +380,182 @@ class TestHourlyForecastGenerator:
         assert "urgency_factor" in result
         assert "confidence" in result
 
-    def test_fog_condition_evolves_over_hours(self, hourly_forecast_generator):
-        """Test that fog condition evolves differently for each hour.
+    def test_fog_condition_fallback_without_lifecycle(self, hourly_forecast_generator):
+        """Test forecast_condition() graceful fallback when no lifecycle is provided.
 
-        Fog should progressively clear as hours pass (sun burns off fog),
-        not remain static for all forecast hours.
+        Without a lifecycle in micro_evolution the method returns the current
+        condition unchanged (plus day/night conversion).
         """
-        # Get conditions for each hour starting from fog
+        astronomical_context = {
+            "is_daytime": True,
+            "solar_elevation": 45.0,
+            "hour_of_day": 10,
+        }
+        meteorological_state = {
+            "pressure_analysis": {"current_trend": 0.0, "storm_probability": 5.0},
+            "cloud_analysis": {"cloud_cover": 40.0},
+        }
+
         conditions = []
         for hour_idx in range(24):
-            condition = hourly_forecast_generator._evolve_hourly_condition(
-                ATTR_CONDITION_FOG, 0.0, hour_idx  # Neutral trajectory score
+            condition = hourly_forecast_generator.forecast_condition(
+                hour_idx,
+                ATTR_CONDITION_FOG,
+                astronomical_context,
+                meteorological_state,
+                {},
+                {},  # No lifecycle in micro_evolution
             )
             conditions.append(condition)
 
-        # Fog should evolve over hours - not all the same
-        unique_conditions = set(conditions)
-        assert (
-            len(unique_conditions) > 1
-        ), "Fog should evolve over 24 hours, not stay static"
+        # Without a lifecycle every hour falls back to current_condition (fog)
+        assert all(
+            c == ATTR_CONDITION_FOG for c in conditions
+        ), f"Fallback without lifecycle should preserve fog; got {conditions}"
 
-        # Early hours should be cloudier, later hours clearer
-        assert conditions[0] == ATTR_CONDITION_CLOUDY  # Hour 0: trajectory ~0
-        # By hour 15+, should be partly cloudy or sunny (fog clearing bonus = 45+)
-        assert conditions[15] in [ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_SUNNY]
-
-    def test_snowy_condition_evolves_over_hours(self, hourly_forecast_generator):
-        """Test that snowy condition evolves differently for each hour.
-
-        Snow should progressively change over hours based on trajectory,
-        not remain static for all forecast hours.
-        """
-        # Get conditions for each hour starting from snowy with neutral trajectory
-        conditions = []
-        for hour_idx in range(24):
-            condition = hourly_forecast_generator._evolve_hourly_condition(
-                ATTR_CONDITION_SNOWY, 0.0, hour_idx  # Neutral trajectory score
-            )
-            conditions.append(condition)
-
-        # Snow should evolve over hours - not all the same
-        unique_conditions = set(conditions)
-        assert (
-            len(unique_conditions) > 1
-        ), "Snow should evolve over 24 hours, not stay static"
-
-        # Early hours should still be snowy
-        assert conditions[0] == ATTR_CONDITION_SNOWY  # Hour 0: still snowing
-        # Later hours should transition (snow clearing bonus accumulates)
-        # By hour 24, score = 48, should be at least rainy or cloudy
-        assert conditions[23] in [
-            ATTR_CONDITION_RAINY,
-            ATTR_CONDITION_CLOUDY,
-            ATTR_CONDITION_PARTLYCLOUDY,
-        ]
-
-    def test_fog_clears_faster_with_improving_trajectory(
+    def test_snowy_condition_fallback_without_lifecycle(
         self, hourly_forecast_generator
     ):
-        """Test that fog clears faster when trajectory is improving."""
-        # With positive trajectory (improving conditions), fog should clear faster
-        conditions_improving = []
-        conditions_neutral = []
+        """Test that snowy condition is preserved in fallback without lifecycle."""
+        astronomical_context = {
+            "is_daytime": True,
+            "solar_elevation": 20.0,
+            "hour_of_day": 8,
+        }
+        meteorological_state = {
+            "pressure_analysis": {"current_trend": 0.0, "storm_probability": 5.0},
+            "cloud_analysis": {"cloud_cover": 40.0},
+        }
 
-        for hour_idx in range(12):
-            improving = hourly_forecast_generator._evolve_hourly_condition(
-                ATTR_CONDITION_FOG, 20.0, hour_idx  # Positive trajectory
+        conditions = []
+        for hour_idx in range(24):
+            condition = hourly_forecast_generator.forecast_condition(
+                hour_idx,
+                ATTR_CONDITION_SNOWY,
+                astronomical_context,
+                meteorological_state,
+                {},
+                {},
             )
-            neutral = hourly_forecast_generator._evolve_hourly_condition(
-                ATTR_CONDITION_FOG, 0.0, hour_idx  # Neutral trajectory
-            )
-            conditions_improving.append(improving)
-            conditions_neutral.append(neutral)
+            conditions.append(condition)
 
-        # Improving trajectory should reach sunny/partlycloudy earlier
-        _condition_order = [  # noqa: F841
-            ATTR_CONDITION_CLOUDY,
-            ATTR_CONDITION_PARTLYCLOUDY,
+        assert all(
+            c == ATTR_CONDITION_SNOWY for c in conditions
+        ), f"Fallback without lifecycle should preserve snowy; got {conditions}"
+
+
+class TestHourlyForecastConditionLifecycle:
+    """Tests for lifecycle-based HourlyForecastGenerator.forecast_condition()."""
+
+    @pytest.fixture
+    def generator(self, mock_analyzers):
+        return HourlyForecastGenerator(
+            mock_analyzers["atmospheric"],
+            mock_analyzers["solar"],
+            mock_analyzers["trends"],
+        )
+
+    def _daytime_ctx(self, hour_of_day=10):
+        return {
+            "is_daytime": True,
+            "solar_elevation": 45.0,
+            "hour_of_day": hour_of_day,
+        }
+
+    def _nighttime_ctx(self, hour_of_day=22):
+        return {
+            "is_daytime": False,
+            "solar_elevation": 0.0,
+            "hour_of_day": hour_of_day,
+        }
+
+    def _met_state(self):
+        return {
+            "pressure_analysis": {
+                "current_trend": 0.0,
+                "storm_probability": 5.0,
+            },
+            "cloud_analysis": {"cloud_cover": 30.0},
+        }
+
+    def _make_micro(self, lifecycle):
+        return {"lifecycle": lifecycle}
+
+    def test_hour0_uses_first_phase_condition(self, generator):
+        """Hour 0 should map to the first lifecycle phase."""
+        from homeassistant.components.weather import ATTR_CONDITION_RAINY
+
+        from custom_components.micro_weather.forecast.evolution import LifecyclePhase
+
+        lifecycle = [LifecyclePhase("frontal", 0.0, 24.0, ATTR_CONDITION_RAINY, 0.85)]
+        result = generator.forecast_condition(
+            0,
             ATTR_CONDITION_SUNNY,
+            self._daytime_ctx(),
+            self._met_state(),
+            {},
+            self._make_micro(lifecycle),
+        )
+        assert result == ATTR_CONDITION_RAINY
+
+    def test_lifecycle_phase_transition_at_hour_boundary(self, generator):
+        """Hour 10 maps to first phase, hour 15 maps to second phase."""
+        from homeassistant.components.weather import ATTR_CONDITION_RAINY
+
+        from custom_components.micro_weather.forecast.evolution import LifecyclePhase
+
+        lifecycle = [
+            LifecyclePhase("stable", 0.0, 12.0, ATTR_CONDITION_SUNNY, 0.9),
+            LifecyclePhase("frontal", 12.0, 24.0, ATTR_CONDITION_RAINY, 0.85),
         ]
+        result_early = generator.forecast_condition(
+            10,
+            ATTR_CONDITION_CLOUDY,
+            self._daytime_ctx(10),
+            self._met_state(),
+            {},
+            self._make_micro(lifecycle),
+        )
+        result_late = generator.forecast_condition(
+            15,
+            ATTR_CONDITION_CLOUDY,
+            self._daytime_ctx(15),
+            self._met_state(),
+            {},
+            self._make_micro(lifecycle),
+        )
+        assert result_early == ATTR_CONDITION_SUNNY
+        assert result_late == ATTR_CONDITION_RAINY
 
-        def get_best_idx(conditions):
-            for i, c in enumerate(conditions):
-                if c == ATTR_CONDITION_SUNNY:
-                    return i
-                if c == ATTR_CONDITION_PARTLYCLOUDY:
-                    return i
-            return len(conditions)
+    def test_day_night_conversion_applied_over_lifecycle(self, generator):
+        """Lifecycle conditions still go through day/night conversion."""
+        from custom_components.micro_weather.forecast.evolution import LifecyclePhase
 
-        # Improving should reach better conditions at same or earlier hour
-        improving_best = get_best_idx(conditions_improving)
-        neutral_best = get_best_idx(conditions_neutral)
-        assert (
-            improving_best <= neutral_best
-        ), "Improving trajectory should clear fog faster"
+        lifecycle = [LifecyclePhase("clear", 0.0, 24.0, ATTR_CONDITION_SUNNY, 0.9)]
+        result = generator.forecast_condition(
+            0,
+            ATTR_CONDITION_CLOUDY,
+            self._nighttime_ctx(),
+            self._met_state(),
+            {},
+            self._make_micro(lifecycle),
+        )
+        assert result == ATTR_CONDITION_CLEAR_NIGHT
+
+    def test_low_confidence_clamped_to_middle_ground(self, generator):
+        """Very low confidence should clamp pouring/sunny to cloudy/partlycloudy."""
+        from homeassistant.components.weather import ATTR_CONDITION_POURING
+
+        from custom_components.micro_weather.forecast.evolution import LifecyclePhase
+
+        # Use hour 23 with confidence 0.2 → effective confidence ≈ 0.2 * exp(-23/72) ≈ 0.14
+        lifecycle = [LifecyclePhase("intense", 0.0, 24.0, ATTR_CONDITION_POURING, 0.2)]
+        result = generator.forecast_condition(
+            23,
+            ATTR_CONDITION_CLOUDY,
+            self._daytime_ctx(),
+            self._met_state(),
+            {},
+            self._make_micro(lifecycle),
+        )
+        assert result in [ATTR_CONDITION_CLOUDY, ATTR_CONDITION_PARTLYCLOUDY]
