@@ -1325,11 +1325,11 @@ class TestDailyForecastConditionLifecycle:
         assert result == ATTR_CONDITION_CLOUDY
 
     def test_low_confidence_slots_clamped(self, generator):
-        """Day 4 (hour 108) with low base confidence gets clamped."""
+        """Phase with base confidence < 0.4 clamps extreme conditions to middle ground."""
         from custom_components.micro_weather.forecast.evolution import LifecyclePhase
 
         lifecycle = [
-            LifecyclePhase("stabilizing", 0.0, 120.0, ATTR_CONDITION_SUNNY, 0.45)
+            LifecyclePhase("uncertain", 0.0, 120.0, ATTR_CONDITION_SUNNY, 0.35)
         ]
         result = generator.forecast_condition(
             4,
@@ -1338,5 +1338,5 @@ class TestDailyForecastConditionLifecycle:
             {},
             self._make_evolution(lifecycle),
         )
-        # confidence = 0.45 * exp(-108/72) ≈ 0.10 → clamped to partlycloudy
+        # confidence = 0.35 < 0.4 → SUNNY clamped to partlycloudy
         assert result in (ATTR_CONDITION_PARTLYCLOUDY, ATTR_CONDITION_CLOUDY)

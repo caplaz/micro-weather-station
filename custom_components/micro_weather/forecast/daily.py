@@ -15,7 +15,6 @@ Key improvements:
 
 from datetime import timedelta
 import logging
-import math
 from typing import Any, Dict, List
 
 from homeassistant.components.weather import (
@@ -342,8 +341,7 @@ class DailyForecastGenerator:
                 current_condition, day_idx, meteorological_state
             )
 
-        confidence = phase.confidence * math.exp(-slot_hour / 72.0)
-        condition = apply_confidence_clamping(phase.condition, confidence)
+        condition = apply_confidence_clamping(phase.condition, phase.confidence)
         return self._apply_storm_probability_overrides(
             condition, day_idx, meteorological_state
         )

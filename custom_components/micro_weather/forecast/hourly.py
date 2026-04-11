@@ -403,9 +403,7 @@ class HourlyForecastGenerator:
             # Graceful fallback when lifecycle not yet computed
             condition = current_condition
         else:
-            # Confidence decays gently over the 24h window (τ = 72h)
-            confidence = phase.confidence * math.exp(-hour_idx / 72.0)
-            condition = apply_confidence_clamping(phase.condition, confidence)
+            condition = apply_confidence_clamping(phase.condition, phase.confidence)
 
         return self._apply_day_night_conversion(
             condition, is_daytime, meteorological_state
