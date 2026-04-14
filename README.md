@@ -405,7 +405,7 @@ For comprehensive information about the advanced forecasting algorithms, meteoro
 
 ### Weather-Based Lighting
 
-````yaml
+```yaml
 automation:
   - alias: "Cloudy Day Lights"
     trigger:
@@ -418,6 +418,7 @@ automation:
           entity_id: light.living_room
         data:
           brightness: 200
+```
 
 ### Storm Preparation
 
@@ -433,6 +434,8 @@ automation:
         data:
           message: "Storm detected! Secure outdoor items."
           title: "Weather Alert"
+
+```
 
 ### Smart Irrigation
 
@@ -452,7 +455,7 @@ automation:
       - service: switch.turn_on
         target:
           entity_id: switch.garden_sprinklers
-````
+```
 
 ## Temperature Alerts
 
