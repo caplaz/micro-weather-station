@@ -1,5 +1,36 @@
 # Changelog
 
+## 4.3.0 (2026-04-22)
+
+### New Features
+
+- **Trend-Based Lifecycle Forecast Engine**: A major overhaul of the forecasting pipeline using a new lifecycle-based evolution model.
+  - Replaced trajectory-based scoring with a robust `EvolutionModeler` for more realistic weather transitions.
+  - Implemented `LifecyclePhase` detection for precise hourly and daily forecast condition lookups.
+  - Added confidence clamping and improved atmospheric stability analysis for long-range predictions.
+  - Integrated pressure acceleration (`compute_pressure_acceleration`) into the trend analysis for better detection of rapid weather changes.
+- **Lightning Sensor Support**: Added native support for lightning detector sensors (e.g., Ecowitt WH57).
+  - Exposes lightning strike count and distance via specialized sensor entities.
+  - Integrates lightning detection into the core weather condition logic for improved storm alerts.
+
+### Improvements
+
+- **Documentation Overhaul**:
+  - Added `CLAUDE.md` to provide comprehensive project architecture, development commands, and testing guidance.
+  - Updated `WEATHER_FORECAST_ALGORITHM.md` with detailed specifications for the new lifecycle phase engine.
+  - Added design specs and implementation plans for the lifecycle forecast system.
+- **Enhanced Test Coverage**: Added end-to-end lifecycle arc tests to `test_weather_detector.py` ensuring high reliability of the new forecast engine.
+
+### Bug Fixes
+
+- **Forecast Anomalies**: Fixed GitHub Issue #35 regarding forecast anomalies such as incorrect maximum temperatures and nighttime condition mismatches.
+- **Code Quality**: Fixed type parameter list annotations in `compute_pressure_acceleration()` for better static analysis.
+- **Documentation Formatting**: Corrected automation examples and README formatting for better readability.
+
+### Acknowledgments
+
+- Special thanks to [@jacroe](https://github.com/jacroe) (Jacob Roeland), Mia, and [@mtheli](https://github.com/mtheli) for their valuable contributions to this release!
+
 ## 4.2.0 (2026-04-07)
 
 ### Improvements
