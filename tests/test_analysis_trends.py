@@ -213,3 +213,54 @@ class TestTrendsAnalyzer:
         """Returns 0.0 when no pressure history exists."""
         analyzer = TrendsAnalyzer({})
         assert analyzer.compute_pressure_acceleration() == 0.0
+
+    def test_analyze_pressure_trends_emits_classification_keys(self):
+        """Regression for #46: forecast engine reads current_trend /
+        long_term_trend / storm_probability / pressure_system, so
+        analyze_pressure_trends() must produce them (not only the raw
+        get_historical_trends statistics).
+        """
+        history = {"pressure": deque(maxlen=192)}
+        base_time = datetime.now()
+        # Steadily falling pressure: ~ -0.02 inHg/hour over 24h.
+        # History is stored oldest-first; the newest reading is the lowest.
+        for hours_ago in range(23, -1, -1):
+            history["pressure"].append(
+                {
+                    "timestamp": base_time - timedelta(hours=hours_ago),
+                    "value": 29.50 + hours_ago * 0.02,
+                }
+            )
+        analyzer = TrendsAnalyzer(history)
+        result = analyzer.analyze_pressure_trends()
+
+        for key in (
+            "current_trend",
+            "long_term_trend",
+            "pressure_system",
+            "storm_probability",
+        ):
+            assert key in result, f"missing classification key: {key}"
+
+        # Falling pressure -> negative 3h and 24h change (in hPa).
+        assert result["current_trend"] < 0
+        assert result["long_term_trend"] < 0
+        # ~ -0.02 inHg/h * 3h * 33.8639 ~= -2 hPa/3h
+        assert -4.0 < result["current_trend"] < -1.0
+        # Sustained fall + low pressure raises storm probability above zero.
+        assert result["storm_probability"] > 0
+        assert result["pressure_system"] == "low_pressure"
+
+    def test_analyze_pressure_trends_stable_is_near_zero(self):
+        """Flat pressure yields a ~zero current_trend so the lifecycle
+        engine correctly treats conditions as stable (no false fronts)."""
+        history = {"pressure": deque(maxlen=192)}
+        base_time = datetime.now()
+        for i in range(24):
+            history["pressure"].append(
+                {"timestamp": base_time - timedelta(hours=i), "value": 30.00}
+            )
+        analyzer = TrendsAnalyzer(history)
+        result = analyzer.analyze_pressure_trends()
+        assert abs(result["current_trend"]) < 0.2
+        assert result["storm_probability"] == 0
