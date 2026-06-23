@@ -1165,6 +1165,61 @@ class TestIssue35BugFixes:
             result == expected_max
         ), f"Day-0 temp ({result}) should equal max of hourly estimates + current ({expected_max})"
 
+    def test_day0_max_reflects_diurnal_peak_with_production_patterns(
+        self, daily_forecast_generator
+    ):
+        """Regression for #35 CASE 1: the day-0 high must not collapse to the
+        current temperature.
+
+        In production, ``analyze_historical_patterns()`` emits
+        ``patterns['temperature'] = {volatility, trend_strength, seasonal_factor}``
+        with **no** inner ``"trend"`` key, so the old code read a default of 0
+        and the day-0 high always equalled the current temperature. The day-0
+        high must instead reflect the recent diurnal peak (24h observed max)
+        and the real 24h trend available in ``meteorological_state``.
+        """
+        current_temp = 60.0  # cool morning reading
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+            # As produced by get_historical_trends("outdoor_temp", hours=24)
+            "temp_trends": {
+                "current": 60.0,
+                "average": 67.0,
+                "trend": 0.2,
+                "min": 58.0,
+                "max": 75.0,
+                "volatility": 5.0,
+            },
+        }
+        # Exactly the shape analyze_historical_patterns() emits (no "trend").
+        historical_patterns = {
+            "temperature": {
+                "volatility": 5.0,
+                "trend_strength": 0.2,
+                "seasonal_factor": 0.5,
+            },
+            "temperature_trend": 0.2,
+        }
+        system_evolution = {"confidence_levels": [0.8, 0.6, 0.7]}
+
+        result = daily_forecast_generator.forecast_temperature(
+            0,
+            current_temp,
+            meteorological_state,
+            historical_patterns,
+            system_evolution,
+        )
+
+        assert result >= 74.0, (
+            f"Day-0 high ({result}) should reflect the recent diurnal peak "
+            f"(~75°F), not collapse to the current temperature (60°F)"
+        )
+
     def test_daily_forecast_day_night_conversion_applied(
         self, daily_forecast_generator
     ):
