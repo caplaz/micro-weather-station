@@ -1,5 +1,26 @@
 # Changelog
 
+## 4.4.0 (2026-06-23)
+
+### Bug Fixes
+
+- **Static / Frozen Forecast** (closes #46): All forecast slots were repeating the current weather condition instead of evolving over time.
+
+  Root cause: `TrendsAnalyzer.analyze_pressure_trends()` was returning only the raw statistical output of `get_historical_trends()` and never emitted the four keys the forecast engine depends on (`current_trend`, `long_term_trend`, `pressure_system`, `storm_probability`). Because those keys were absent, `MeteorologicalAnalyzer` silently defaulted the trend to `0`, `EvolutionModeler.compute_lifecycle()` produced a single 120-hour "stable" phase, and every day/hour slot looked up the same condition.
+
+  Fix: `analyze_pressure_trends()` now computes the 3-hour and 24-hour pressure changes (converting stored inHg slope → hPa), classifies the pressure system by absolute hPa value, and derives storm probability from falling-pressure heuristics. The raw statistical fields are preserved via `{**long_trend, ...}` for backward compatibility.
+
+- **Day-0 Maximum Temperature Stuck at Current Temperature** (closes #35 CASE 1): The daily forecast always showed the current temperature as the day's high regardless of the diurnal cycle.
+
+  Root cause: `DailyForecastGenerator.forecast_temperature()` read the per-hour temperature trend from `historical_patterns["temperature"]["trend"]`, but `analyze_historical_patterns()` never emits that inner key — it only produces `volatility`, `trend_strength`, and `seasonal_factor`. The missing key silently defaulted to `0`, collapsing the hourly-max projection to the current temperature.
+
+  Fix: when the per-hour pattern trend is absent, the code falls back to the real 24-hour slope from `meteorological_state["temp_trends"]["trend"]`. Additionally, the day-0 high is now floored at the observed diurnal peak (`temp_trends["max"]`), so an early-morning current reading no longer suppresses the forecast high for the full day.
+
+### Testing
+
+- Added regression test `test_analyze_pressure_trends_emits_classification_keys` and `test_analyze_pressure_trends_stable_is_near_zero` in `tests/test_analysis_trends.py`.
+- Added regression test `test_day0_max_reflects_diurnal_peak_with_production_patterns` in `tests/test_forecast_daily.py` using the real production data shape (no synthetic `"trend"` key) that previously masked the bug.
+
 ## 4.3.0 (2026-04-22)
 
 ### New Features
