@@ -19,7 +19,11 @@ from custom_components.micro_weather import (
     async_unload_entry,
     async_update_options,
 )
-from custom_components.micro_weather.const import DOMAIN, KEY_CONDITION
+from custom_components.micro_weather.const import (
+    CONF_UPDATE_INTERVAL,
+    DOMAIN,
+    KEY_CONDITION,
+)
 
 
 @pytest.mark.integration
@@ -231,6 +235,66 @@ class TestCoordinatorIntegration:
             assert result == mock_weather_data
             mock_detector_class.assert_called_once_with(hass, mock_config_entry.options)
 
+    async def test_coordinator_reuses_detector_between_updates(
+        self, hass: HomeAssistant, mock_config_entry: MockConfigEntry
+    ):
+        """Coordinator must preserve one detector so trend history accumulates."""
+        mock_weather_data = {
+            "condition": ATTR_CONDITION_PARTLYCLOUDY,
+            "temperature": 23.5,
+            "humidity": 70.0,
+            "pressure": 1015.0,
+            "wind_speed": 3.2,
+            "forecast": [],
+        }
+
+        with patch(
+            "custom_components.micro_weather.weather_detector.WeatherDetector"
+        ) as mock_detector_class:
+            mock_detector = MagicMock()
+            mock_detector.get_weather_data.return_value = mock_weather_data
+            mock_detector_class.return_value = mock_detector
+
+            coordinator = MicroWeatherCoordinator(hass, mock_config_entry)
+
+            first = await coordinator._async_update_data()
+            second = await coordinator._async_update_data()
+
+            assert first == mock_weather_data
+            assert second == mock_weather_data
+            mock_detector_class.assert_called_once_with(hass, mock_config_entry.options)
+            assert mock_detector.get_weather_data.call_count == 2
+
+    async def test_coordinator_recreates_detector_when_options_change(
+        self, hass: HomeAssistant, mock_config_entry: MockConfigEntry
+    ):
+        """Changing options should rebuild the detector with the new sensors."""
+        with patch(
+            "custom_components.micro_weather.weather_detector.WeatherDetector"
+        ) as mock_detector_class:
+            first_detector = MagicMock()
+            first_detector.get_weather_data.return_value = {"condition": "cloudy"}
+            second_detector = MagicMock()
+            second_detector.get_weather_data.return_value = {"condition": "sunny"}
+            mock_detector_class.side_effect = [first_detector, second_detector]
+
+            coordinator = MicroWeatherCoordinator(hass, mock_config_entry)
+            await coordinator._async_update_data()
+
+            mock_config_entry.add_to_hass(hass)
+            hass.config_entries.async_update_entry(
+                mock_config_entry,
+                options={
+                    **mock_config_entry.options,
+                    "pressure_sensor": "sensor.new_pressure",
+                },
+            )
+            await coordinator._async_update_data()
+
+            assert mock_detector_class.call_count == 2
+            assert first_detector.get_weather_data.call_count == 1
+            assert second_detector.get_weather_data.call_count == 1
+
     async def test_coordinator_update_failure(
         self, hass: HomeAssistant, mock_config_entry: MockConfigEntry
     ):
@@ -258,5 +322,20 @@ class TestCoordinatorIntegration:
 
         assert coordinator.entry == mock_config_entry
         assert coordinator.name == DOMAIN
-        assert coordinator.update_interval is not None  # Should be set to 5 minutes
+        assert coordinator.update_interval is not None
         assert coordinator.hass == hass
+
+    async def test_coordinator_uses_configured_update_interval(
+        self, hass: HomeAssistant
+    ):
+        """Configured refresh interval should drive coordinator polling."""
+        config_entry = MockConfigEntry(
+            domain=DOMAIN,
+            data={},
+            options={CONF_UPDATE_INTERVAL: 1},
+            entry_id="one_minute_entry",
+        )
+
+        coordinator = MicroWeatherCoordinator(hass, config_entry)
+
+        assert coordinator.update_interval.total_seconds() == 60

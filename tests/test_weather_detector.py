@@ -64,6 +64,22 @@ class TestWeatherDetector:
         assert detector.meteorological_analyzer is not None
         assert detector.daily_generator is not None
 
+    def test_history_buffer_covers_48_hours_at_one_minute_interval(
+        self, mock_hass, mock_options
+    ):
+        """A 1-minute refresh interval still needs a full 48h trend buffer."""
+        detector = WeatherDetector(
+            mock_hass,
+            {
+                **mock_options,
+                "update_interval": 1,
+            },
+        )
+
+        assert detector._history_maxlen >= 48 * 60
+        for history in detector.trends_analyzer._sensor_history.values():
+            assert history.maxlen >= 48 * 60
+
     def test_detect_weather_with_psi_pressure(
         self, mock_hass, mock_options, mock_sensor_data
     ):
