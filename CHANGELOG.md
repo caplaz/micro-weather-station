@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.4.1 (2026-06-25)
+
+### Bug Fixes
+
+- **Forecast still static after 4.4.0** (follow-up to #46): The fix in 4.4.0 corrected `analyze_pressure_trends()` to emit the classification keys the forecast engine needs, but pressure history never accumulated because `MicroWeatherCoordinator._async_update_data()` was creating a fresh `WeatherDetector` on every update cycle — resetting all `TrendsAnalyzer` deques to empty on each call.
+
+  Fix: The coordinator now caches the detector instance and reuses it across cycles, only rebuilding it when `entry.options` changes (e.g. the user reconfigures sensors). The history deque size is also derived from the configured update interval so 48 hours of readings are retained regardless of polling frequency (2880 slots at 1-minute, 576 at 5-minute — previously hardcoded to 192 regardless of interval).
+
+- **Coordinator ignoring configured update interval**: The polling interval was hardcoded to 5 minutes regardless of the user-configured value. The coordinator now reads `CONF_UPDATE_INTERVAL` from entry options/data at startup.
+
 ## 4.4.0 (2026-06-23)
 
 ### Bug Fixes
