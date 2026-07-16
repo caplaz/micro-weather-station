@@ -1,5 +1,19 @@
 # Changelog
 
+## 4.4.2 (2026-07-16)
+
+### Bug Fixes
+
+- **Daily forecast missing / stuck loading** (closes #49): Forecast generation failed on every update cycle with `type object 'TrendConstants' has no attribute 'SEASONAL_FACTORS'`, leaving the daily forecast empty (the hourly forecast was unaffected).
+
+  Root cause: `TrendConstants` is a frozen dataclass, and `SEASONAL_FACTORS` was declared with `field(default_factory=...)`. Dataclass fields with a `default_factory` only exist on instances — the attribute is removed from the class itself — but `TrendsAnalyzer.calculate_seasonal_factor()` reads it at class level, raising `AttributeError`. The bug was latent for a long time: the seasonal-factor path only runs once temperature trend history holds 2+ samples, and prior to 4.4.1 the detector (and its history) was recreated empty on every update cycle, so the path never executed. The 4.4.1 persistent-detector fix let history accumulate and exposed it — which is also why re-submitting the integration settings appeared to fix the issue for a few minutes (rebuilding the detector reset the history) before it broke again.
+
+  Fix: `SEASONAL_FACTORS` is now declared as a `ClassVar` dict, keeping it accessible as a class attribute like every other constant in `meteorological_constants.py`.
+
+### Testing
+
+- Added regression tests `test_calculate_seasonal_factor_returns_month_value` and `test_analyze_historical_patterns_with_accumulated_history` in `tests/test_analysis_trends.py`, exercising the pattern-analysis path with accumulated history (2+ samples) that production reaches after two update cycles.
+
 ## 4.4.1 (2026-06-25)
 
 ### Bug Fixes

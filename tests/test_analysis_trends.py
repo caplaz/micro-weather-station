@@ -264,3 +264,23 @@ class TestTrendsAnalyzer:
         result = analyzer.analyze_pressure_trends()
         assert abs(result["current_trend"]) < 0.2
         assert result["storm_probability"] == 0
+
+    def test_calculate_seasonal_factor_returns_month_value(self, analyzer):
+        """Regression test for issue #49: SEASONAL_FACTORS must be readable
+        as a class attribute on TrendConstants; accessing it raised
+        AttributeError and killed daily forecast generation."""
+        from custom_components.micro_weather.meteorological_constants import (
+            TrendConstants,
+        )
+
+        factor = analyzer.calculate_seasonal_factor()
+        assert factor == TrendConstants.SEASONAL_FACTORS[datetime.now().month]
+        assert 0.0 < factor <= 1.0
+
+    def test_analyze_historical_patterns_with_accumulated_history(self, analyzer):
+        """Regression test for issue #49: once the persistent detector has
+        2+ temperature samples, analyze_historical_patterns() takes the
+        seasonal-factor path and must not raise."""
+        patterns = analyzer.analyze_historical_patterns()
+        assert "temperature" in patterns
+        assert 0.0 < patterns["temperature"]["seasonal_factor"] <= 1.0
