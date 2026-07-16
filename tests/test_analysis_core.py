@@ -507,6 +507,30 @@ class TestWeatherConditionAnalyzer:
 
         assert result == ATTR_CONDITION_CLOUDY
 
+    def test_zero_solar_readings_without_elevation_remain_cloudy(self, analyzers):
+        """Configured zero solar readings use the daytime cloud analysis."""
+        sensor_data = {
+            "outdoor_temp": 56.1,
+            "humidity": 43.0,
+            "dewpoint": 33.98,
+            "pressure": 29.78,
+            "wind_speed": 12.3,
+            "wind_gust": 17.5,
+            "rain_rate": 0.0,
+            "rain_state": "off",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+        }
+
+        core = analyzers["core"]
+        sensors = core._extract_sensors(sensor_data)
+        params = core._calculate_parameters(sensors, 0.0)
+
+        result = core._determine_daytime_condition(sensors, params)
+
+        assert result == ATTR_CONDITION_CLOUDY
+
     def test_lightning_sensor_dry(self, analyzers):
         """Test lightning detection from hardware sensor without rain."""
         sensor_data = {
