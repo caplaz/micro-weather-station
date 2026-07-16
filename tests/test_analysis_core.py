@@ -4,6 +4,7 @@ from collections import deque
 from datetime import datetime, timedelta
 
 from homeassistant.components.weather import (
+    ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING,
@@ -507,8 +508,8 @@ class TestWeatherConditionAnalyzer:
 
         assert result == ATTR_CONDITION_CLOUDY
 
-    def test_zero_solar_readings_without_elevation_remain_cloudy(self, analyzers):
-        """Configured zero solar readings use the daytime cloud analysis."""
+    def test_zero_solar_readings_without_elevation_are_clear_night(self, analyzers):
+        """Configured zero solar readings without elevation use the nighttime path."""
         sensor_data = {
             "outdoor_temp": 56.1,
             "humidity": 43.0,
@@ -523,13 +524,9 @@ class TestWeatherConditionAnalyzer:
             "uv_index": 0.0,
         }
 
-        core = analyzers["core"]
-        sensors = core._extract_sensors(sensor_data)
-        params = core._calculate_parameters(sensors, 0.0)
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
 
-        result = core._determine_daytime_condition(sensors, params)
-
-        assert result == ATTR_CONDITION_CLOUDY
+        assert result == ATTR_CONDITION_CLEAR_NIGHT
 
     def test_lightning_sensor_dry(self, analyzers):
         """Test lightning detection from hardware sensor without rain."""

@@ -723,18 +723,27 @@ class WeatherConditionAnalyzer:
 
         # Get solar elevation with fallback
         solar_elevation = sensors["solar_elevation"]
+        has_solar_data = (
+            sensors["solar_radiation"] > 0
+            or sensors["solar_lux"] > 0
+            or sensors["uv_index"] > 0
+        )
 
         if solar_elevation is None:
-            # Estimate solar elevation based on radiation intensity
-            # Higher radiation = higher sun typically
-            if sensors["solar_radiation"] > 600:
-                solar_elevation = 60.0  # High sun
-            elif sensors["solar_radiation"] > 300:
-                solar_elevation = 45.0  # Mid-day
-            elif sensors["solar_radiation"] > 100:
-                solar_elevation = 25.0  # Morning/afternoon
+            if has_solar_data:
+                # Estimate solar elevation based on radiation intensity
+                # Higher radiation = higher sun typically
+                if sensors["solar_radiation"] > 600:
+                    solar_elevation = 60.0  # High sun
+                elif sensors["solar_radiation"] > 300:
+                    solar_elevation = 45.0  # Mid-day
+                elif sensors["solar_radiation"] > 100:
+                    solar_elevation = 25.0  # Morning/afternoon
+                else:
+                    solar_elevation = 15.0  # Early morning/late afternoon
             else:
-                solar_elevation = 15.0  # Early morning/late afternoon
+                # Fallback to atmospheric analysis
+                return self._atmospheric_fallback_condition(sensors, params)
 
         # Analyze pressure trends for cloud prediction
         pressure_trends = self.trends.analyze_pressure_trends(
