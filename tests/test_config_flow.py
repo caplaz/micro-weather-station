@@ -40,6 +40,22 @@ class TestConfigFlow:
         assert result["type"] == "form"
         assert result["errors"] == {}
 
+    async def test_initial_rain_rate_selector_accepts_both_precipitation_classes(
+        self, hass: HomeAssistant
+    ):
+        """Test initial rain-rate selector supports both precipitation classes."""
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        result = await flow.async_step_user()
+        rain_rate_selector = result["data_schema"].schema[CONF_RAIN_RATE_SENSOR]
+
+        assert rain_rate_selector.config["domain"] == ["sensor"]
+        assert rain_rate_selector.config["device_class"] == [
+            "precipitation_intensity",
+            "precipitation",
+        ]
+
     async def test_form_missing_required_sensor(self, hass: HomeAssistant):
         """Test form with missing required outdoor temp sensor."""
         # Create flow directly
@@ -543,6 +559,13 @@ class TestOptionsFlow:
         # Configure rain sensors
         result = await flow.async_step_init({"next_step_id": "rain"})
         assert result["type"] == "form"
+        rain_rate_selector = result["data_schema"].schema[CONF_RAIN_RATE_SENSOR]
+
+        assert rain_rate_selector.config["domain"] == ["sensor"]
+        assert rain_rate_selector.config["device_class"] == [
+            "precipitation_intensity",
+            "precipitation",
+        ]
 
         result = await flow.async_step_rain(
             {
