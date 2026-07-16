@@ -19,9 +19,11 @@ changes.
 
 ## Design
 
-`WeatherConditionAnalyzer._determine_daytime_condition` will use its existing
-atmospheric fallback whenever none of radiation, lux, or UV has a positive
-reading. This check occurs before solar elevation is used, so an optional
+`WeatherConditionAnalyzer._extract_sensors` will record whether any solar
+measurement is available from the *raw* input before its numeric values are
+normalized. `WeatherConditionAnalyzer._determine_daytime_condition` will use
+its existing atmospheric fallback only when no radiation, lux, or UV value is
+available. This check occurs before solar elevation is used, so an optional
 `sun.sun` entity provides time-of-day information only; it does not turn
 missing measurement sources into zero-light measurements.
 
@@ -29,10 +31,11 @@ Real zero readings remain unchanged: the solar analyzer continues to map a
 configured sensor reporting zero radiation/lux/UV to complete cloud cover.
 
 The regression test will construct a clear, high-pressure daytime sample with
-a valid solar elevation and no solar inputs, and assert `sunny`. A companion
-test keeps the all-zero solar-analyzer behavior at 100% coverage. The
-date-sensitive low-radiation test will call the clear-sky calculation through a
-fixed date, eliminating calendar-dependent assertion drift without modifying
+a valid solar elevation and no solar keys, and assert `sunny`. A companion core
+test will provide all three solar keys with values of zero and assert `cloudy`,
+proving that a real zero reading is not treated as an absent sensor. The
+date-sensitive low-radiation test will patch the solar module clock to a fixed
+date, eliminating calendar-dependent assertion drift without modifying
 production calculations.
 
 ## Error handling and compatibility
