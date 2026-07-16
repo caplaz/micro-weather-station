@@ -4,7 +4,6 @@ from collections import deque
 from datetime import datetime, timedelta
 
 from homeassistant.components.weather import (
-    ATTR_CONDITION_CLEAR_NIGHT,
     ATTR_CONDITION_CLOUDY,
     ATTR_CONDITION_FOG,
     ATTR_CONDITION_LIGHTNING,
@@ -481,25 +480,32 @@ class TestWeatherConditionAnalyzer:
             "wind_gust": 17.5,  # 28.1 km/h
             "rain_rate": 0.0,
             "rain_state": "off",
-            # No solar sensors — all zero
-            "solar_radiation": 0.0,
-            "solar_lux": 0.0,
-            "uv_index": 0.0,
             # solar_elevation is always available via sun.sun
             "solar_elevation": 34.22,
         }
         result = analyzers["core"].determine_condition(sensor_data, 0.0)
-        assert result != "clear-night", (
-            f"Got 'clear-night' at solar_elevation=34.22° with no solar sensors — "
-            f"is_daytime fallback to solar_elevation is broken. Got: {result}"
-        )
-        # With elevation > 0 and no sensors, condition should be daytime
-        assert result in {
-            ATTR_CONDITION_SUNNY,
-            ATTR_CONDITION_PARTLYCLOUDY,
-            ATTR_CONDITION_CLOUDY,
-            ATTR_CONDITION_WINDY,
-        }, f"Expected a daytime condition, got: {result}"
+        assert result == ATTR_CONDITION_SUNNY
+
+    def test_zero_solar_sensor_readings_remain_cloudy(self, analyzers):
+        """Real zero solar readings indicate overcast daytime conditions."""
+        sensor_data = {
+            "outdoor_temp": 56.1,
+            "humidity": 43.0,
+            "dewpoint": 33.98,
+            "pressure": 29.78,
+            "wind_speed": 12.3,
+            "wind_gust": 17.5,
+            "rain_rate": 0.0,
+            "rain_state": "off",
+            "solar_radiation": 0.0,
+            "solar_lux": 0.0,
+            "uv_index": 0.0,
+            "solar_elevation": 34.22,
+        }
+
+        result = analyzers["core"].determine_condition(sensor_data, 0.0)
+
+        assert result == ATTR_CONDITION_CLOUDY
 
     def test_lightning_sensor_dry(self, analyzers):
         """Test lightning detection from hardware sensor without rain."""
