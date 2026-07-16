@@ -152,6 +152,10 @@ class WeatherConditionAnalyzer:
         # Extract lightning sensor data (None means sensor not configured)
         lightning_count_raw = sensor_data.get(KEY_LIGHTNING_COUNT)
         lightning_distance_raw = sensor_data.get(KEY_LIGHTNING_DISTANCE)
+        has_solar_measurements = any(
+            sensor_data.get(key) is not None
+            for key in (KEY_SOLAR_RADIATION, KEY_SOLAR_LUX_INTERNAL, KEY_UV_INDEX)
+        )
 
         return {
             "rain_rate": rain_rate,
@@ -161,6 +165,7 @@ class WeatherConditionAnalyzer:
             "solar_radiation": float(sensor_data.get(KEY_SOLAR_RADIATION) or 0.0),
             "solar_lux": float(sensor_data.get(KEY_SOLAR_LUX_INTERNAL) or 0.0),
             "uv_index": float(sensor_data.get(KEY_UV_INDEX) or 0.0),
+            "has_solar_measurements": has_solar_measurements,
             "outdoor_temp": float(sensor_data.get(KEY_OUTDOOR_TEMP) or 70.0),
             "humidity": float(sensor_data.get(KEY_HUMIDITY) or 50.0),
             "pressure": float(sensor_data.get(KEY_PRESSURE) or 29.92),
@@ -713,6 +718,9 @@ class WeatherConditionAnalyzer:
         Returns:
             Daytime weather condition string (sunny, partlycloudy, cloudy, windy)
         """
+        if not sensors["has_solar_measurements"]:
+            return self._atmospheric_fallback_condition(sensors, params)
+
         # Get solar elevation with fallback
         solar_elevation = sensors["solar_elevation"]
         has_solar_data = (

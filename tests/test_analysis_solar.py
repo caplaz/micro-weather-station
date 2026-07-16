@@ -2,6 +2,7 @@
 
 from collections import deque
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 
@@ -74,40 +75,48 @@ class TestSolarAnalyzer:
 
     def test_analyze_cloud_cover_low_solar_radiation_fallback(self, analyzer):
         """Test cloud cover analysis with improved low solar radiation logic."""
-        # Clear any existing history
-        analyzer._sensor_history["cloud_cover"] = []
+        with patch(
+            "custom_components.micro_weather.analysis.solar.datetime"
+        ) as mock_datetime:
+            mock_datetime.now.return_value = datetime(2024, 1, 15)
 
-        # Test very low solar values (heavy overcast)
-        cloud_cover_heavy = analyzer.analyze_cloud_cover(20.0, 3000.0, 0.0, 15.0)
-        assert cloud_cover_heavy == pytest.approx(
-            74.1, abs=0.5
-        )  # Weighted calculation: solar(78.8)*0.8 + lux(73.5)*0.15
+            # Clear history so frozen time does not treat fixture readings as future data.
+            analyzer._sensor_history["cloud_cover"] = []
+            analyzer._sensor_history["solar_radiation"] = []
 
-        # Clear history for next test
-        analyzer._sensor_history["cloud_cover"] = []
+            # Test very low solar values (heavy overcast)
+            cloud_cover_heavy = analyzer.analyze_cloud_cover(20.0, 3000.0, 0.0, 15.0)
+            assert cloud_cover_heavy == pytest.approx(
+                74.4, abs=0.5
+            )  # Weighted calculation: solar(78.8)*0.8 + lux(73.5)*0.15
 
-        # Test moderately low solar values (mostly cloudy)
-        cloud_cover_mostly = analyzer.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
-        assert cloud_cover_mostly == pytest.approx(
-            22.0, abs=1.0
-        )  # Weighted calculation with minor variations due to air mass corrections
+            # Clear history for next test
+            analyzer._sensor_history["cloud_cover"] = []
 
-        # Clear history for next test
-        analyzer._sensor_history["cloud_cover"] = []
+            # Test moderately low solar values (mostly cloudy)
+            cloud_cover_mostly = analyzer.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
+            assert cloud_cover_mostly == pytest.approx(
+                22.0, abs=1.0
+            )  # Weighted calculation with minor variations due to air mass corrections
 
-        # Test borderline low solar values (partly cloudy fallback)
-        cloud_cover_fallback = analyzer.analyze_cloud_cover(150.0, 15000.0, 0.8, 20.0)
-        assert cloud_cover_fallback == pytest.approx(
-            8.7, abs=1.0
-        )  # Weighted calculation with air mass corrections
+            # Clear history for next test
+            analyzer._sensor_history["cloud_cover"] = []
 
-        # Test that higher values don't trigger fallback
-        cloud_cover_normal = analyzer.analyze_cloud_cover(250.0, 25000.0, 2.0, 30.0)
-        assert (
-            cloud_cover_normal != 40.0
-            and cloud_cover_normal != 70.0
-            and cloud_cover_normal != 85.0
-        )  # Should be calculated normally
+            # Test borderline low solar values (partly cloudy fallback)
+            cloud_cover_fallback = analyzer.analyze_cloud_cover(
+                150.0, 15000.0, 0.8, 20.0
+            )
+            assert cloud_cover_fallback == pytest.approx(
+                8.7, abs=1.0
+            )  # Weighted calculation with air mass corrections
+
+            # Test that higher values don't trigger fallback
+            cloud_cover_normal = analyzer.analyze_cloud_cover(250.0, 25000.0, 2.0, 30.0)
+            assert (
+                cloud_cover_normal != 40.0
+                and cloud_cover_normal != 70.0
+                and cloud_cover_normal != 85.0
+            )  # Should be calculated normally
 
     def test_analyze_cloud_cover_elevation_effects(self, analyzer):
         """Test cloud cover analysis with different solar elevations."""
