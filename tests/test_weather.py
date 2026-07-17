@@ -376,10 +376,11 @@ class TestMicroWeatherEntity:
         assert result is None
 
     async def test_async_forecast_daily_no_forecast(self, weather_entity, coordinator):
-        """Test daily forecast when no forecast data."""
+        """Test daily fallback when detector forecast data is missing."""
         coordinator.data = {KEY_TEMPERATURE: 20}
         result = await weather_entity.async_forecast_daily()
-        assert result is None
+        assert result is not None
+        assert len(result) == 5
 
     async def test_async_forecast_daily_with_data(self, weather_entity, coordinator):
         """Test daily forecast with forecast data."""
@@ -1765,20 +1766,20 @@ class TestMicroWeatherEntity:
 
     async def test_daily_forecast_with_missing_data(self, weather_entity, coordinator):
         """Test daily forecast when forecast data is missing or incomplete."""
-        # Test with no forecast data
+        # With no detector forecast, build a usable local fallback from the
+        # required temperature sensor and defaults for optional sensors.
         coordinator.data = {
             "temperature": 20.0,
             "condition": ATTR_CONDITION_SUNNY,
         }
 
         result = await weather_entity.async_forecast_daily()
-        assert result is None
+        assert result is not None
+        assert len(result) == 5
 
-        # Test with empty forecast list: an empty list means detector-side
-        # generation failed, so the entity must NOT return [] verbatim
-        # (the #49 dead-end — the card spins forever on an empty list).
-        # It falls through to local generation, which yields None with this
-        # bare mock coordinator.
+        # An empty detector-side forecast must fall through to a usable local
+        # forecast, even though the optional humidity/pressure/wind sensors
+        # are absent. Returning None here leaves the card without recovery.
         coordinator.data = {
             "temperature": 20.0,
             "condition": ATTR_CONDITION_SUNNY,
@@ -1786,7 +1787,8 @@ class TestMicroWeatherEntity:
         }
 
         result = await weather_entity.async_forecast_daily()
-        assert result != []
+        assert result is not None
+        assert len(result) == 5
 
         # Test with incomplete forecast data
         coordinator.data = {

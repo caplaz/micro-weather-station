@@ -97,9 +97,9 @@ class DailyForecastGenerator:
             or sensor_data.get(KEY_OUTDOOR_TEMP)
             or ForecastConstants.DEFAULT_TEMPERATURE
         )
-        current_humidity = sensor_data.get(
-            KEY_HUMIDITY, ForecastConstants.DEFAULT_HUMIDITY
-        )
+        current_humidity = sensor_data.get(KEY_HUMIDITY)
+        if not isinstance(current_humidity, (int, float)):
+            current_humidity = ForecastConstants.DEFAULT_HUMIDITY
         current_wind = sensor_data.get(
             KEY_WIND_SPEED, ForecastConstants.DEFAULT_WIND_SPEED
         )

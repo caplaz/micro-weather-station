@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 4.5.0 (2026-07-17)
 
 ### Bug Fixes — condition detection (issue #51)
 
@@ -18,7 +18,7 @@
 - **Pressure-trend unit incoherence** (follow-up to #46): `current_trend` has been produced in hPa/3h since 4.4.0, but the lifecycle engine's thresholds (`PressureTrendConstants`, labeled inHg/3h) and inline literals in evolution/daily/hourly were never converted — `STABLE_THRESHOLD=0.2` treated a barely-detectable 0.2 hPa/3h drift as an active system, fabricating frontal passages (and their rain) from noise. All thresholds are retuned to hPa/3h per WMO practice (stable < 1.0 hPa/3h; front 2–4+), and `compute_pressure_acceleration()` now returns hPa/h to share the unit regime.
 - **Startup noise fabricated storms**: a regression slope fit to minutes of data extrapolated sensor noise into storm-grade 3h/24h pressure changes right after a restart/reconfigure. Trends now require a ≥30-minute observation span, extrapolated changes are clamped to plausible synoptic rates (±15 hPa/3h, ±40 hPa/24h), and storm probability is scaled down until ~6h of history exists.
 - **Storm override painted all 5 days**: a storm probability measured *now* forced lightning-rainy/pouring onto every forecast day; it now decays with forecast distance.
-- **Daily forecast dead-ended on empty data** (follow-up to #49): the weather entity returned a detector-side empty forecast list verbatim, so its own local fallback generator was unreachable — the daily card spun forever. An empty list now falls through to local generation.
+- **Daily forecast dead-ended on empty data** (follow-up to #49): the weather entity returned a detector-side empty forecast list verbatim, so its own local fallback generator was unreachable — the daily card spun forever. Empty or missing detector forecasts now fall through to local generation, which supplies defaults for absent optional sensors.
 - **Hourly forecast unit mixing**: the entity-side forecast paths fed metric coordinator data (°C/hPa/km-h) into the imperial analysis pipeline, converting only temperature — hourly wind was treated as mph and converted to km/h again (~1.6× too high). Pressure and wind are now converted too.
 - **Dead pattern keys**: `analyze_historical_patterns()` never emitted the `humidity`/`wind` keys the daily generator reads, so their trend influence silently defaulted to zero (same defect class as #35/#46). The keys are now produced.
 - **Unreachable pressure-volatility thresholds**: `TrendConstants.VOLATILITY_ACTIVE/MODERATE` were hPa-scale values compared against an inHg stdev — `cycle_type` was permanently "stable". Retuned to inHg.
