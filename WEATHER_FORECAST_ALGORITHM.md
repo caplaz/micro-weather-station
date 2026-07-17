@@ -91,7 +91,7 @@ Conditions are driven by a **weather system lifecycle** computed from the curren
 
 ##### 1. Pressure Acceleration
 
-`TrendsAnalyzer.compute_pressure_acceleration()` splits the 48 h pressure ring-buffer in half, computes a linear trend slope for each half, and returns the difference (inHg/3 h²):
+`TrendsAnalyzer.compute_pressure_acceleration()` splits the 48 h pressure ring-buffer in half, computes a linear trend slope for each half, and returns the difference converted to **hPa/h** (matching the hPa unit regime of all trend thresholds):
 
 ```python
 acceleration = slope_second_half - slope_first_half
@@ -113,12 +113,12 @@ Positive acceleration means the rate of pressure change is speeding up; negative
 
 Three scenario branches:
 
-- **Stable** (`|trend| < STABLE_THRESHOLD`): single phase covering 0–120 h, condition = current condition, confidence = 0.85.
+- **Stable** (`|trend| < STABLE_THRESHOLD`, 1.0 hPa/3h — WMO "steady barometer"): single phase covering 0–120 h, condition = current condition, confidence = 0.85. All trend values in the lifecycle engine are **hPa/3h** as produced by `analyze_pressure_trends()` (see #46).
 
 - **Deteriorating** (`trend < 0`):
   - `hours_to_frontal = (STORM_THRESHOLD_SEVERE − storm_prob) / (|trend| × 5)`
   - Phases: *stable* → *pre_frontal* → **frontal** → *post_frontal* → *clearing* → *stabilizing*
-  - `peak_duration`: 6 h if `|accel| > 0.1` (fast front), else 12 h
+  - `peak_duration`: 6 h if `|accel| > 0.2` hPa/h (fast front), else 12 h
   - Frontal condition severity: `rainy` / `pouring` / `lightning-rainy` based on storm probability
 
 - **Improving** (`trend > 0`):

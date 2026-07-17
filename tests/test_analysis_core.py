@@ -256,6 +256,11 @@ class TestWeatherConditionAnalyzer:
             "pressure": 29.80,
             "solar_elevation": 45.0,
         }
+        # Independent scenario: reset hysteresis state carried over from the
+        # windy/sunny scenario above so the rate limiter does not cap this
+        # sky-state change mid-transition.
+        analyzers["solar"]._condition_history = []
+        analyzers["solar"]._sensor_history["cloud_cover"] = deque()
         condition = analyzers["core"].determine_condition(
             sensor_data_cloudy_moderate_wind, 0.0
         )

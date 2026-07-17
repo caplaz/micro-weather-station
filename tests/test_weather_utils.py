@@ -2,8 +2,13 @@
 
 from datetime import datetime, timezone
 
+from custom_components.micro_weather.const import PRESSURE_PSI_UNIT
 from custom_components.micro_weather.weather_utils import (
+    calculate_apparent_temperature,
+    calculate_heat_index,
+    calculate_wind_chill,
     convert_altitude_to_meters,
+    convert_ms_to_mph,
     convert_precipitation_rate,
     convert_to_celsius,
     convert_to_fahrenheit,
@@ -11,16 +16,7 @@ from custom_components.micro_weather.weather_utils import (
     convert_to_inhg,
     convert_to_kmh,
     convert_to_mph,
-    convert_ms_to_mph,
     is_forecast_hour_daytime,
-    calculate_heat_index,
-    calculate_wind_chill,
-    calculate_apparent_temperature,
-)
-from custom_components.micro_weather.const import (
-    PRESSURE_HPA_UNIT,
-    PRESSURE_INHG_UNIT,
-    PRESSURE_PSI_UNIT,
 )
 
 
@@ -145,7 +141,9 @@ class TestWeatherUtils:
     def test_convert_ms_to_mph(self):
         """Test meters per second to miles per hour conversion."""
         # Test common wind speeds
-        assert abs(convert_ms_to_mph(1.0) - 2.2) < 0.1  # 1 m/s approx 2.237 mph, rounded to 2.2
+        assert (
+            abs(convert_ms_to_mph(1.0) - 2.2) < 0.1
+        )  # 1 m/s approx 2.237 mph, rounded to 2.2
         assert abs(convert_ms_to_mph(10.0) - 22.4) < 0.1
 
         # Test None input
@@ -155,13 +153,13 @@ class TestWeatherUtils:
         """Test PSI to hPa conversion."""
         # Test standard pressure (1 atm ≈ 14.696 PSI ≈ 1013.25 hPa)
         assert abs(convert_to_hpa(14.696, unit=PRESSURE_PSI_UNIT) - 1013.3) < 0.5
-        
+
         # Test user's case: 15 PSI -> ~1034 hPa
         assert abs(convert_to_hpa(15.0, unit=PRESSURE_PSI_UNIT) - 1034.2) < 0.5
-        
+
         # Test None input
         assert convert_to_hpa(None, unit=PRESSURE_PSI_UNIT) is None
-        
+
         # Test 0 PSI
         assert convert_to_hpa(0.0, unit=PRESSURE_PSI_UNIT) == 0.0
 
@@ -169,13 +167,13 @@ class TestWeatherUtils:
         """Test PSI to inHg conversion."""
         # Test standard pressure (1 atm ≈ 14.696 PSI ≈ 29.92 inHg)
         assert abs(convert_to_inhg(14.696, unit=PRESSURE_PSI_UNIT) - 29.92) < 0.1
-        
+
         # Test user's case: 15 PSI -> ~30.54 inHg
         assert abs(convert_to_inhg(15.0, unit=PRESSURE_PSI_UNIT) - 30.54) < 0.1
-        
+
         # Test None input
         assert convert_to_inhg(None, unit=PRESSURE_PSI_UNIT) is None
-        
+
         # Test 0 PSI
         assert convert_to_inhg(0.0, unit=PRESSURE_PSI_UNIT) == 0.0
 
@@ -309,6 +307,7 @@ class TestWeatherUtils:
         # Test 4: Forecast 8 AM Tomorrow (Should be Day)
         # Note: This technically falls into the "next cycle" which might be tricky depending on how we define "daytime" relative to *these specific* sun times.
         # But based on the logic `forecast_time >= sunrise_time`, it should be True.
+
     def test_calculate_heat_index(self):
         """Test Heat Index calculation."""
         # Test below threshold (return temp)
@@ -337,7 +336,7 @@ class TestWeatherUtils:
         """Test Wind Chill calculation."""
         # Test above threshold (return temp)
         assert calculate_wind_chill(55.0, 10.0) == 55.0  # Temp too high
-        assert calculate_wind_chill(30.0, 2.0) == 30.0   # Wind too low
+        assert calculate_wind_chill(30.0, 2.0) == 30.0  # Wind too low
 
         # Test valid wind chill
         # 30F, 10mph -> ~21F
@@ -392,7 +391,9 @@ class TestWeatherUtils:
             35.0, 50.0, 10.0, temp_unit="C", wind_unit="km/h"
         )
         assert 40.0 <= hi_c <= 43.0
-        
+
         # Test unit string normalization
-        assert calculate_apparent_temperature(20.0, 50.0, 5.0, temp_unit="celsius") == 20.0
+        assert (
+            calculate_apparent_temperature(20.0, 50.0, 5.0, temp_unit="celsius") == 20.0
+        )
         assert calculate_apparent_temperature(20.0, 50.0, 5.0, temp_unit="°C") == 20.0

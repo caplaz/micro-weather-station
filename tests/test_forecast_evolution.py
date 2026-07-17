@@ -264,7 +264,7 @@ class TestComputeLifecycle:
 
     def test_falling_trend_produces_deteriorating_arc(self, modeler):
         lifecycle = modeler.compute_lifecycle(
-            trend=-0.5,
+            trend=-2.0,  # hPa/3h — genuine frontal-scale fall
             acceleration=0.0,
             storm_prob=10.0,
             current_condition=ATTR_CONDITION_SUNNY,
@@ -277,7 +277,7 @@ class TestComputeLifecycle:
 
     def test_rising_trend_produces_improving_arc(self, modeler):
         lifecycle = modeler.compute_lifecycle(
-            trend=0.5,
+            trend=2.0,  # hPa/3h — genuine post-frontal rise
             acceleration=0.0,
             storm_prob=30.0,
             current_condition=ATTR_CONDITION_CLOUDY,
@@ -288,7 +288,7 @@ class TestComputeLifecycle:
         assert names.index("clearing") < names.index("stabilizing")
 
     def test_lifecycle_covers_120_hours(self, modeler):
-        for trend, storm_prob in [(-0.5, 0.0), (0.5, 40.0), (0.0, 0.0)]:
+        for trend, storm_prob in [(-2.0, 0.0), (2.0, 40.0), (0.0, 0.0)]:
             lifecycle = modeler.compute_lifecycle(
                 trend=trend,
                 acceleration=0.0,
@@ -299,7 +299,7 @@ class TestComputeLifecycle:
 
     def test_phases_are_contiguous(self, modeler):
         lifecycle = modeler.compute_lifecycle(
-            trend=-0.6,
+            trend=-1.8,  # hPa/3h
             acceleration=-0.05,
             storm_prob=5.0,
             current_condition=ATTR_CONDITION_SUNNY,
@@ -326,3 +326,37 @@ class TestComputeLifecycle:
         assert "lifecycle" in result
         assert isinstance(result["lifecycle"], list)
         assert len(result["lifecycle"]) > 0
+
+
+class TestPressureTrendUnitCoherence:
+    """Regression tests: current_trend is produced in hPa/3h (see #46), so
+    every threshold consumer must be tuned for hPa/3h magnitudes. A benign
+    diurnal wobble (|trend| < ~1 hPa/3h) must not fabricate frontal
+    passages, while a genuine front (2+ hPa/3h) must produce one."""
+
+    def test_benign_wobble_stays_stable(self):
+        from custom_components.micro_weather.forecast.evolution import EvolutionModeler
+
+        modeler = EvolutionModeler()
+        lifecycle = modeler.compute_lifecycle(
+            trend=-0.5,  # hPa/3h — ordinary diurnal variation
+            acceleration=0.0,
+            storm_prob=0.0,
+            current_condition="sunny",
+        )
+        assert len(lifecycle) == 1
+        assert lifecycle[0].name == "stable"
+        assert lifecycle[0].condition == "sunny"
+
+    def test_genuine_front_deteriorates(self):
+        from custom_components.micro_weather.forecast.evolution import EvolutionModeler
+
+        modeler = EvolutionModeler()
+        lifecycle = modeler.compute_lifecycle(
+            trend=-2.5,  # hPa/3h — a real approaching system
+            acceleration=0.0,
+            storm_prob=30.0,
+            current_condition="partlycloudy",
+        )
+        phase_names = [phase.name for phase in lifecycle]
+        assert "frontal" in phase_names

@@ -573,8 +573,9 @@ class TestMeteorologicalAnalyzer:
             600.0, 65000.0, 4.0, sensor_data, pressure_analysis
         )
 
-        # Should use fallback cloud cover calculation (50.0) + pressure trend adjustment (-0.5 < 0.1, so +40)
-        assert result["cloud_cover"] == 90.0  # 50.0 + 40.0
+        # Should use fallback cloud cover (50.0). Pressure trend influence is
+        # applied inside analyze_cloud_cover, never added again here.
+        assert result["cloud_cover"] == 50.0
 
     def test_analyze_cloud_cover_with_exception(self, mock_analyzers):
         """Test cloud cover analysis when solar analyzer raises exception."""
@@ -602,8 +603,9 @@ class TestMeteorologicalAnalyzer:
             600.0, 65000.0, 4.0, sensor_data, pressure_analysis
         )
 
-        # Should use fallback cloud cover calculation based on solar radiation (600 > 400, so 40.0) + pressure trend adjustment (-0.5 < 0.1, so +40)
-        assert result["cloud_cover"] == 80.0  # 40.0 + 40.0
+        # Should use fallback cloud cover based on solar radiation
+        # (600 > 400, so 40.0) with no second pressure adjustment.
+        assert result["cloud_cover"] == 40.0
 
     def test_analyze_cloud_cover_with_invalid_pressure_trend(
         self, meteorological_analyzer
@@ -617,23 +619,21 @@ class TestMeteorologicalAnalyzer:
             "solar_elevation": 30.0,
         }
 
-        # Test with string pressure trend
+        # Test with string pressure trend — the mocked analyze_cloud_cover
+        # value (40.0) must pass through untouched; an invalid trend must
+        # not manufacture a cloud-cover increase.
         pressure_analysis = {"current_trend": "invalid_string"}
         result = meteorological_analyzer._analyze_cloud_cover_comprehensive(
             600.0, 65000.0, 4.0, sensor_data, pressure_analysis
         )
-        assert (
-            result["cloud_cover"] == 80.0
-        )  # 40.0 + 40.0 (pressure trend defaults to 0.0, which triggers slow fall increase)
+        assert result["cloud_cover"] == 40.0
 
         # Test with None pressure trend
         pressure_analysis = {"current_trend": None}
         result = meteorological_analyzer._analyze_cloud_cover_comprehensive(
             600.0, 65000.0, 4.0, sensor_data, pressure_analysis
         )
-        assert (
-            result["cloud_cover"] == 80.0
-        )  # 40.0 + 40.0 (pressure trend defaults to 0.0, which triggers slow fall increase)
+        assert result["cloud_cover"] == 40.0
 
     def test_analyze_moisture_transport_with_invalid_data(
         self, meteorological_analyzer
@@ -794,32 +794,32 @@ class TestMeteorologicalAnalyzer:
         )
         assert result["cloud_cover"] == 90.0
 
-    def test_analyze_cloud_cover_pressure_trend_branches(self, meteorological_analyzer):
-        """Test cloud cover pressure trend adjustment branches."""
+    def test_analyze_cloud_cover_no_double_pressure_adjustment(
+        self, meteorological_analyzer, mock_analyzers
+    ):
+        """Pressure trends are applied once, inside analyze_cloud_cover.
+
+        _analyze_cloud_cover_comprehensive used to apply a second adjustment
+        on top (with the opposite sign convention), double-counting the
+        pressure trend. The mocked analyze_cloud_cover value must pass
+        through unchanged regardless of trend direction — and the trend must
+        be forwarded to analyze_cloud_cover so it is applied there.
+        """
         sensor_data = {"solar_elevation": 30.0}
 
-        # Test rapid falling pressure (< -0.5)
-        pressure_analysis = {"current_trend": -1.0}
-        result = meteorological_analyzer._analyze_cloud_cover_comprehensive(
-            600.0, 65000.0, 4.0, {"solar_elevation": 30.0}, pressure_analysis
-        )
-        # 40.0 + 60.0 = 100.0, but capped at MAX_CLOUD_COVER (95.0)
-        assert result["cloud_cover"] == 95.0
+        for trend in (-1.0, -0.3, 0.0, 1.0):
+            pressure_analysis = {"current_trend": trend}
+            result = meteorological_analyzer._analyze_cloud_cover_comprehensive(
+                600.0, 65000.0, 4.0, sensor_data, pressure_analysis
+            )
+            assert result["cloud_cover"] == 40.0, f"trend={trend}"
 
-        # Test slow falling pressure (-0.5 to 0.1) - already covered
-        pressure_analysis = {"current_trend": -0.3}
-        result = meteorological_analyzer._analyze_cloud_cover_comprehensive(
-            600.0, 65000.0, 4.0, sensor_data, pressure_analysis
-        )
-        assert result["cloud_cover"] == 80.0  # 40.0 + 40.0
-
-        # Test rising pressure (> DIRECTION_RISING_MODERATE)
-        pressure_analysis = {"current_trend": 1.0}
-        result = meteorological_analyzer._analyze_cloud_cover_comprehensive(
-            600.0, 65000.0, 4.0, sensor_data, pressure_analysis
-        )
-        # 40.0 - 40.0 = 0.0, but capped at MIN_CLOUD_COVER (5.0)
-        assert result["cloud_cover"] == 5.0
+        # The pressure analysis dict is forwarded to the solar analyzer.
+        _, call_kwargs = mock_analyzers["solar"].analyze_cloud_cover.call_args
+        call_args = mock_analyzers["solar"].analyze_cloud_cover.call_args[0]
+        assert {"current_trend": 1.0} in list(call_args) or call_kwargs.get(
+            "pressure_trends"
+        ) == {"current_trend": 1.0}
 
     def test_analyze_moisture_transport_all_branches(self, meteorological_analyzer):
         """Test moisture transport analysis covering all branches."""
@@ -855,3 +855,66 @@ class TestMeteorologicalAnalyzer:
             70.0, {"trend": 0.5}, {"direction_stability": 0.8}, 5.0
         )
         assert result["trend_direction"] == "stable"
+
+
+class TestAnalyzeStateSharedHistory:
+    """Regression tests for issue #51: forecast-path analyze_state() must not
+    corrupt the shared solar analyzer state."""
+
+    def _build_real_analyzer(self):
+        from collections import deque
+        from datetime import datetime
+
+        from custom_components.micro_weather.analysis.atmospheric import (
+            AtmosphericAnalyzer,
+        )
+        from custom_components.micro_weather.analysis.core import (
+            WeatherConditionAnalyzer,
+        )
+        from custom_components.micro_weather.analysis.solar import SolarAnalyzer
+        from custom_components.micro_weather.analysis.trends import TrendsAnalyzer
+
+        history = {
+            "pressure": deque(maxlen=192),
+            "cloud_cover": deque(maxlen=50),
+        }
+        history["cloud_cover"].append({"timestamp": datetime.now(), "value": 12.0})
+        trends = TrendsAnalyzer(history)
+        atmospheric = AtmosphericAnalyzer(history, trends)
+        solar = SolarAnalyzer(history, 1000.0)
+        core = WeatherConditionAnalyzer(atmospheric, solar, trends)
+        analyzer = MeteorologicalAnalyzer(atmospheric, core, solar, trends)
+        return analyzer, history
+
+    def test_analyze_state_without_solar_data_does_not_pollute_history(self):
+        """Calling analyze_state with no solar readings (the weather.py
+        hourly forecast path) must not append junk cloud-cover entries to
+        the shared history."""
+        analyzer, history = self._build_real_analyzer()
+
+        state = analyzer.analyze_state(
+            {"temperature": 70.0, "humidity": 50.0, "pressure": 29.92}, 0.0
+        )
+
+        values = [entry["value"] for entry in history["cloud_cover"]]
+        assert values == [12.0], f"history was polluted: {values}"
+        # And the state should reuse the last known cover, not invent 100%.
+        assert state["cloud_analysis"]["cloud_cover"] == pytest.approx(12.0, abs=30)
+
+    def test_analyze_state_with_solar_data_does_not_append_history(self):
+        """Even with real solar data, the forecast path must leave history
+        writes to the detection path."""
+        analyzer, history = self._build_real_analyzer()
+
+        analyzer.analyze_state(
+            {
+                "temperature": 70.0,
+                "humidity": 50.0,
+                "pressure": 29.92,
+                "solar_radiation": 500.0,
+                "solar_elevation": 45.0,
+            },
+            0.0,
+        )
+
+        assert len(history["cloud_cover"]) == 1

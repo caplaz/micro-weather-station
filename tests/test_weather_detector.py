@@ -1391,15 +1391,15 @@ class TestLifecycleForecastArc:
     def test_deteriorating_arc_leads_to_rain(self, mock_hass, mock_options):
         """Strong falling pressure + elevated storm probability → frontal phase on day 0.
 
-        With storm_prob=50 and trend=-0.8:
-          hours_to_frontal = (70-50)/(0.8*5) = 5h → frontal peak at hours 5-17
+        With storm_prob=50 and trend=-2.4 hPa/3h:
+          hours_to_frontal = (70-50)/(2.4*5) ≈ 1.7h → frontal peak at ~2-14h
           Day 0 midpoint (h=12) falls inside the frontal phase → POURING/RAINY.
         """
         from homeassistant.components.weather import ATTR_CONDITION_SUNNY
 
         detector = self._detector(mock_hass, mock_options)
         met_state = self._make_met_state(
-            current_trend=-0.8, long_term_trend=-0.6, storm_prob=50.0
+            current_trend=-2.4, long_term_trend=-8.0, storm_prob=50.0
         )
         conditions = self._run_lifecycle_forecast(
             detector, met_state, ATTR_CONDITION_SUNNY
@@ -1420,7 +1420,7 @@ class TestLifecycleForecastArc:
 
         detector = self._detector(mock_hass, mock_options)
         met_state = self._make_met_state(
-            current_trend=0.6, long_term_trend=0.5, storm_prob=20.0
+            current_trend=2.0, long_term_trend=6.0, storm_prob=20.0
         )
         conditions = self._run_lifecycle_forecast(
             detector, met_state, ATTR_CONDITION_CLOUDY

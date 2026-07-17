@@ -1,12 +1,10 @@
 """Test solar radiation validation logic."""
+
 import logging
-from unittest.mock import MagicMock
 
 import pytest
+
 from custom_components.micro_weather.analysis.solar import SolarAnalyzer
-from custom_components.micro_weather.meteorological_constants import (
-    SolarAnalysisConstants,
-)
 
 
 class TestSolarValidation:
@@ -25,7 +23,7 @@ class TestSolarValidation:
         # Threshold is 1.10
         # Should NOT warn
         caplog.set_level(logging.WARNING)
-        
+
         analyzer._calculate_cloud_cover_from_solar(
             avg_solar_radiation=105.0,
             solar_lux=50000.0,
@@ -33,7 +31,7 @@ class TestSolarValidation:
             max_solar_radiation=100.0,
             solar_elevation=45.0,
         )
-        
+
         assert "Solar radiation exceeds clear-sky max" not in caplog.text
 
     def test_validation_suppresses_warning_for_small_absolute_excess(
@@ -45,7 +43,7 @@ class TestSolarValidation:
         # Abs Diff: 10.0 (Threshold 20.0) -> False
         # Should NOT warn
         caplog.set_level(logging.WARNING)
-        
+
         analyzer._calculate_cloud_cover_from_solar(
             avg_solar_radiation=60.0,
             solar_lux=30000.0,
@@ -53,7 +51,7 @@ class TestSolarValidation:
             max_solar_radiation=50.0,
             solar_elevation=20.0,
         )
-        
+
         assert "Solar radiation exceeds clear-sky max" not in caplog.text
 
     def test_validation_triggers_warning_for_large_excess(self, analyzer, caplog):
@@ -63,7 +61,7 @@ class TestSolarValidation:
         # Abs Diff: 50.0 > 20.0 (True)
         # Should WARN
         caplog.set_level(logging.WARNING)
-        
+
         analyzer._calculate_cloud_cover_from_solar(
             avg_solar_radiation=150.0,
             solar_lux=80000.0,
@@ -71,6 +69,6 @@ class TestSolarValidation:
             max_solar_radiation=100.0,
             solar_elevation=45.0,
         )
-        
+
         assert "Solar radiation" in caplog.text
         assert "exceeds clear-sky max" in caplog.text

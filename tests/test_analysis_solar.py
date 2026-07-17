@@ -84,31 +84,28 @@ class TestSolarAnalyzer:
             analyzer._sensor_history["cloud_cover"] = []
             analyzer._sensor_history["solar_radiation"] = []
 
-            # Test very low solar values (heavy overcast)
+            # Test very low solar values (heavy overcast).
+            # 20 W/m² is ~16% of the ~126 W/m² clear-sky max at 15° elevation.
             cloud_cover_heavy = analyzer.analyze_cloud_cover(20.0, 3000.0, 0.0, 15.0)
-            assert cloud_cover_heavy == pytest.approx(
-                74.4, abs=0.5
-            )  # Weighted calculation: solar(78.8)*0.8 + lux(73.5)*0.15
+            assert cloud_cover_heavy == pytest.approx(83.4, abs=1.0)
 
             # Clear history for next test
             analyzer._sensor_history["cloud_cover"] = []
 
-            # Test moderately low solar values (mostly cloudy)
+            # Test moderately low solar values (partly cloudy).
+            # 75 W/m² is ~60% of clear-sky at 15° elevation.
             cloud_cover_mostly = analyzer.analyze_cloud_cover(75.0, 7500.0, 0.5, 15.0)
-            assert cloud_cover_mostly == pytest.approx(
-                22.0, abs=1.0
-            )  # Weighted calculation with minor variations due to air mass corrections
+            assert cloud_cover_mostly == pytest.approx(41.9, abs=1.5)
 
             # Clear history for next test
             analyzer._sensor_history["cloud_cover"] = []
 
-            # Test borderline low solar values (partly cloudy fallback)
+            # Test borderline low solar values.
+            # 150 W/m² is ~71% of clear-sky at 20° elevation.
             cloud_cover_fallback = analyzer.analyze_cloud_cover(
                 150.0, 15000.0, 0.8, 20.0
             )
-            assert cloud_cover_fallback == pytest.approx(
-                8.7, abs=1.0
-            )  # Weighted calculation with air mass corrections
+            assert cloud_cover_fallback == pytest.approx(31.0, abs=1.5)
 
             # Test that higher values don't trigger fallback
             cloud_cover_normal = analyzer.analyze_cloud_cover(250.0, 25000.0, 2.0, 30.0)
@@ -658,3 +655,86 @@ class TestSolarAnalyzer:
             if entry["timestamp"] > base_time - timedelta(hours=24)
         ]
         assert len(recent_entries) > 0
+
+    def test_hysteresis_gradual_buildup_eventually_flips_condition(self, analyzer):
+        """Regression test for issue #51: gradual cloud build-up must not
+        ratchet the comparison baseline. Before the fix, rejected proposals
+        stored the old condition with the new cloud cover, so any change
+        slower than the per-step threshold kept 'sunny' forever."""
+        condition = None
+        cover = 20.0
+        while cover <= 88.0:
+            proposed = analyzer.map_cloud_cover_to_condition(cover)
+            condition = analyzer.apply_condition_hysteresis(proposed, cover)
+            cover += 4.0
+        assert condition == "cloudy"
+
+    def test_hysteresis_gradual_clearing_eventually_flips_condition(self, analyzer):
+        """Reverse of the ratchet: a stale 'cloudy' must clear as cover
+        drifts down gradually."""
+        condition = None
+        cover = 85.0
+        while cover >= 12.0:
+            proposed = analyzer.map_cloud_cover_to_condition(cover)
+            condition = analyzer.apply_condition_hysteresis(proposed, cover)
+            cover -= 4.0
+        assert condition == "sunny"
+
+    def test_analyze_cloud_cover_update_history_flag(self):
+        """Forecast paths must be able to compute cloud cover without
+        polluting the shared history (issue #51: hourly forecast rendering
+        stored ~100%% junk readings every call)."""
+        history = {"solar_radiation": deque(maxlen=50)}
+        analyzer = SolarAnalyzer(history, 1000.0)
+
+        analyzer.analyze_cloud_cover(0.0, 0.0, 0.0, 45.0, None, update_history=False)
+        assert "cloud_cover" not in history or len(history["cloud_cover"]) == 0
+
+        analyzer.analyze_cloud_cover(500.0, 0.0, 0.0, 45.0, None)
+        assert len(history["cloud_cover"]) == 1
+
+    def test_clear_day_radiation_only_sensor_has_no_lux_bias(self, analyzer):
+        """A station with a radiation sensor but no lux sensor must not get
+        a constant cloud-cover floor from the missing sensor (the lux term
+        used to read 100%% cloud and contribute at 0.15 weight)."""
+        max_rad = analyzer._calculate_clear_sky_max_radiation(45.0)
+        cloud_cover = analyzer._calculate_cloud_cover_from_solar(
+            max_rad, 0.0, 0.0, max_rad, 45.0
+        )
+        assert cloud_cover < 5.0
+
+    def test_pressure_trend_cloud_adjustment_signs(self, analyzer):
+        """Falling pressure (approaching system) must INCREASE the cloud
+        estimate; rising pressure (clearing) must DECREASE it. The signs
+        were inverted (positive = cloudier per the method contract)."""
+        falling = analyzer._calculate_pressure_trend_cloud_adjustment(
+            {
+                "current_trend": -2.0,
+                "long_term_trend": -6.0,
+                "pressure_system": "normal",
+            }
+        )
+        rising = analyzer._calculate_pressure_trend_cloud_adjustment(
+            {
+                "current_trend": 2.0,
+                "long_term_trend": 6.0,
+                "pressure_system": "normal",
+            }
+        )
+        assert falling > 0, f"falling pressure produced {falling:+.1f} (clearer?)"
+        assert rising < 0, f"rising pressure produced {rising:+.1f} (cloudier?)"
+
+    def test_clear_sky_model_matches_zenith_calibration(self, analyzer):
+        """zenith_max_radiation is what the sensor reads at zenith on a clear
+        day (through one air mass). The model must not attenuate it by a full
+        additional air mass — at zenith the prediction should equal the
+        calibration value (within the ±3.3%% solar-constant variation)."""
+        zenith_prediction = analyzer._calculate_clear_sky_max_radiation(90.0)
+        assert 950.0 <= zenith_prediction <= 1050.0
+
+    def test_clear_sky_model_realistic_at_mid_elevation(self, analyzer):
+        """At 45° elevation, real clear-sky GHI is ~600-700 W/m² for a
+        1000 W/m² zenith calibration. The double-extinction bug predicted
+        ~467, making genuinely clear days read as 'sensor exceeds model'."""
+        prediction = analyzer._calculate_clear_sky_max_radiation(45.0)
+        assert 570.0 <= prediction <= 720.0

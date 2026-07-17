@@ -60,13 +60,13 @@ class TestMicroWeatherEntity:
         # Ensure it does NOT have atmospheric_analyzer attribute or it's falsy
         if hasattr(coordinator, "atmospheric_analyzer"):
             del coordinator.atmospheric_analyzer
-        
+
         # Configure the config entry options for the fallback logic
         config_entry.options = {"zenith_max_radiation": 1000.0}
-        
+
         # Initialize entity
         entity = MicroWeatherEntity(coordinator, config_entry)
-        
+
         # Verify fallback analyzers were created
         assert hasattr(entity, "_meteorological_analyzer")
         assert hasattr(entity, "_daily_generator")
@@ -78,58 +78,65 @@ class TestMicroWeatherEntity:
         coordinator.data = None
         assert weather_entity.extra_state_attributes is None
 
-    async def test_async_forecast_hourly_mock_data_handling(self, weather_entity, coordinator):
+    async def test_async_forecast_hourly_mock_data_handling(
+        self, weather_entity, coordinator
+    ):
         """Test handling of MagicMock objects in data to cover lines 407, 421, 423."""
         # Create a mock with _mock_name to trigger the specific checks
         mock_value = MagicMock()
         mock_value._mock_name = "mock_sensor"
-        
+
         coordinator.data = {
             KEY_TEMPERATURE: 20.0,
             KEY_HUMIDITY: mock_value,  # This should trigger line 407
             KEY_PRESSURE: 1013.25,
         }
-        
+
         # Mock get_sun_times to return mocks with _mock_name to trigger 421, 423
         mock_sunrise = MagicMock()
         mock_sunrise._mock_name = "mock_sunrise"
         mock_sunset = MagicMock()
         mock_sunset._mock_name = "mock_sunset"
-        
-        with patch("custom_components.micro_weather.weather.get_sun_times", return_value=(mock_sunrise, mock_sunset)):
-             # Mock the generator to avoid errors with None data
+
+        with patch(
+            "custom_components.micro_weather.weather.get_sun_times",
+            return_value=(mock_sunrise, mock_sunset),
+        ):
+            # Mock the generator to avoid errors with None data
             weather_entity._hourly_generator = MagicMock()
             weather_entity._hourly_generator.generate_forecast.return_value = []
-            
+
             await weather_entity.async_forecast_hourly()
-            
+
             # Lines 407, 421, 423 should have been executed
 
-    async def test_async_forecast_hourly_with_altitude_options(self, weather_entity, coordinator):
+    async def test_async_forecast_hourly_with_altitude_options(
+        self, weather_entity, coordinator
+    ):
         """Test hourly forecast with explicit altitude in options (Line 435)."""
         coordinator.data = {KEY_TEMPERATURE: 20.0}
-        
+
         # Setup config entry options to be a real dict (no _mock_name) with altitude
         pass_options = {"altitude": 100.0}
-        
+
         # We need to ensure coordinator.entry.options returns this dict
         # and hasattr(options, "_mock_name") is False.
         # MagicMock options usually have _mock_name.
-        
+
         # Create a real object structure for entry
         class MockEntry:
             def __init__(self):
                 self.options = pass_options
                 self.entry_id = "test"
-        
+
         coordinator.entry = MockEntry()
-        
+
         # Mock generator
         weather_entity._hourly_generator = MagicMock()
         weather_entity._hourly_generator.generate_forecast.return_value = []
-        
+
         await weather_entity.async_forecast_hourly()
-        
+
         # Verify generate_forecast was called with altitude=100.0
         call_args = weather_entity._hourly_generator.generate_forecast.call_args
         assert call_args is not None
@@ -138,13 +145,15 @@ class TestMicroWeatherEntity:
     async def test_async_forecast_hourly_exception(self, weather_entity, coordinator):
         """Test exception handling in hourly forecast (Lines 473-476)."""
         coordinator.data = {KEY_TEMPERATURE: 20.0}
-        
+
         # Force the generator to raise an exception
         weather_entity._hourly_generator = MagicMock()
-        weather_entity._hourly_generator.generate_forecast.side_effect = Exception("Test Error")
-        
+        weather_entity._hourly_generator.generate_forecast.side_effect = Exception(
+            "Test Error"
+        )
+
         result = await weather_entity.async_forecast_hourly()
-        
+
         # Should catch exception and return None
         assert result is None
 
@@ -329,6 +338,7 @@ class TestMicroWeatherEntity:
         """Test apparent temperature property with data."""
         coordinator.data = {KEY_APPARENT_TEMPERATURE: 28.5}
         assert weather_entity.native_apparent_temperature == 28.5
+
     def test_native_dew_point_no_data(self, weather_entity, coordinator):
         """Test dew point property when no data."""
         coordinator.data = None
@@ -1764,7 +1774,11 @@ class TestMicroWeatherEntity:
         result = await weather_entity.async_forecast_daily()
         assert result is None
 
-        # Test with empty forecast list
+        # Test with empty forecast list: an empty list means detector-side
+        # generation failed, so the entity must NOT return [] verbatim
+        # (the #49 dead-end — the card spins forever on an empty list).
+        # It falls through to local generation, which yields None with this
+        # bare mock coordinator.
         coordinator.data = {
             "temperature": 20.0,
             "condition": ATTR_CONDITION_SUNNY,
@@ -1772,7 +1786,7 @@ class TestMicroWeatherEntity:
         }
 
         result = await weather_entity.async_forecast_daily()
-        assert result == []
+        assert result != []
 
         # Test with incomplete forecast data
         coordinator.data = {

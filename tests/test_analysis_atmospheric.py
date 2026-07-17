@@ -97,7 +97,10 @@ class TestAtmosphericAnalyzer:
 
         # Test twilight with moderate humidity - should NOT be fog
         # Use the configured HUMIDITY_HIGH constant to ensure tests follow defaults.
-        from custom_components.micro_weather.meteorological_constants import HUMIDITY_HIGH
+        from custom_components.micro_weather.meteorological_constants import (
+            HUMIDITY_HIGH,
+        )
+
         moderate_humidity = float(HUMIDITY_HIGH) - 5.0
         result_twilight_clear = analyzer.analyze_fog_conditions(
             54.0, moderate_humidity, 53.0, 1.0, 3.0, 50.0, False
@@ -294,3 +297,39 @@ class TestAtmosphericAnalyzer:
             0.0
         )
         assert thresholds["normal_low"] < sea_level_thresholds["normal_low"]
+
+    def test_adjust_pressure_for_altitude_direction(self, analyzer):
+        """Station pressure converted to sea level must INCREASE with
+        altitude (pressure drops as you go up, so the sea-level equivalent
+        of a mountain station's reading is higher). The barometric factor
+        was applied in the wrong direction, lowering it instead."""
+        station_pressure = 29.00  # inHg at 300 m
+        sea_level = analyzer.adjust_pressure_for_altitude(
+            station_pressure, 300.0, "relative"
+        )
+        # Physics: 29.00 / (1 - 0.0065*300/288.15)^5.257 ≈ 30.05 inHg
+        assert sea_level == pytest.approx(30.05, abs=0.1)
+
+        # "atmospheric" (already sea-level) passes through unchanged
+        assert analyzer.adjust_pressure_for_altitude(30.0, 300.0, "atmospheric") == 30.0
+
+    def test_wind_direction_stability_handles_north_crossing(self, analyzer):
+        """A steady northerly wind oscillating across 0°/360° must read as
+        highly stable. Linear stdev on raw degrees saw ~180° of spread."""
+        history = {"wind_direction": deque(maxlen=192)}
+        base_time = datetime.now()
+        directions = [355.0, 358.0, 2.0, 5.0, 359.0, 3.0, 356.0, 1.0]
+        for i, direction in enumerate(directions):
+            history["wind_direction"].append(
+                {
+                    "timestamp": base_time
+                    - timedelta(minutes=5 * (len(directions) - i)),
+                    "value": direction,
+                }
+            )
+        from custom_components.micro_weather.analysis.trends import TrendsAnalyzer
+
+        local_analyzer = AtmosphericAnalyzer(history, TrendsAnalyzer(history))
+        result = local_analyzer._analyze_wind_direction()
+        assert result["direction_stability"] > 0.9
+        assert result["significant_shift"] is False

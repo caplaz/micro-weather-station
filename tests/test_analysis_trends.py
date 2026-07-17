@@ -284,3 +284,61 @@ class TestTrendsAnalyzer:
         patterns = analyzer.analyze_historical_patterns()
         assert "temperature" in patterns
         assert 0.0 < patterns["temperature"]["seasonal_factor"] <= 1.0
+
+    def test_get_historical_trends_requires_minimum_span(self):
+        """Two samples minutes apart must not produce a 'trend' — the
+        regression slope would extrapolate sensor noise into huge 3h/24h
+        pressure changes and fabricate storm probability at startup."""
+        history = {"pressure": deque(maxlen=192)}
+        now = datetime.now()
+        history["pressure"].append(
+            {"timestamp": now - timedelta(minutes=10), "value": 29.92}
+        )
+        history["pressure"].append({"timestamp": now, "value": 29.91})
+        analyzer = TrendsAnalyzer(history)
+        assert analyzer.get_historical_trends("pressure", hours=3) == {}
+
+    def test_storm_probability_dampened_on_short_history(self):
+        """A falling trend measured over <1h of samples must not produce
+        full-strength storm probability (fresh-start noise guard)."""
+        history = {"pressure": deque(maxlen=192)}
+        now = datetime.now()
+        # 50 minutes of sharply falling pressure — slope is storm-grade if
+        # extrapolated, but the record is far too short to be confident.
+        for i in range(11):
+            history["pressure"].append(
+                {
+                    "timestamp": now - timedelta(minutes=50 - i * 5),
+                    "value": 29.92 - i * 0.02,
+                }
+            )
+        analyzer = TrendsAnalyzer(history)
+        result = analyzer.analyze_pressure_trends()
+        assert result["storm_probability"] <= 20.0
+
+    def test_pressure_acceleration_in_hpa(self):
+        """compute_pressure_acceleration returns hPa/h slope difference so
+        the lifecycle engine compares it against hPa-tuned thresholds."""
+        history = {"pressure": deque(maxlen=192)}
+        now = datetime.now()
+        # First 12h flat, second 12h falling 0.01 inHg per hour
+        for i in range(24):
+            hours_ago = 23 - i
+            value = 29.92 if hours_ago >= 12 else 29.92 - (12 - hours_ago) * 0.01
+            history["pressure"].append(
+                {"timestamp": now - timedelta(hours=hours_ago), "value": value}
+            )
+        analyzer = TrendsAnalyzer(history)
+        acceleration = analyzer.compute_pressure_acceleration()
+        # slope difference is ~-0.01 inHg/h = ~-0.34 hPa/h
+        assert acceleration == pytest.approx(-0.34, abs=0.15)
+
+    def test_analyze_historical_patterns_emits_humidity_and_wind(self, analyzer):
+        """The daily forecast reads historical_patterns['humidity'] and
+        ['wind'] — these keys must exist or the humidity/wind trend
+        influence silently defaults to zero (same defect class as #35/#46)."""
+        patterns = analyzer.analyze_historical_patterns()
+        assert "humidity" in patterns
+        assert "wind" in patterns
+        assert isinstance(patterns["humidity"].get("trend"), (int, float))
+        assert isinstance(patterns["wind"].get("trend"), (int, float))

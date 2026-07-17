@@ -358,42 +358,43 @@ The weather detection system implements **enhanced hysteresis** to prevent rapid
 
 ### How Hysteresis Works
 
-**Enhanced Condition Stability Check:**
+**Condition Stability Check (Version 4.4.x):**
 
 ```
-IF new_condition ≠ previous_condition:
-    → Check recent condition history (last 3 readings within 1-hour window)
-    → Count how many times new_condition appeared recently
+IF new_condition ≠ current_condition:
+    → IF the last 2 readings ALSO proposed new_condition:
+        → Allow the change (sustained-proposal acceptance — bounds how long
+          a persistent disagreement can be suppressed to 3 readings)
+    → ELSE compare cloud cover against the BASELINE — the cloud cover
+      recorded when current_condition was last established (the start of
+      the current condition run), NOT the previous reading:
 
-    IF new_condition appeared ≥1 time recently:
-        → Allow condition change (stable transition)
-    ELIF condition pair is in major_changes list:
-        → Allow immediate change (severe weather transition)
-    ELIF cloud_cover_change > 30% (extreme jump prevention):
-        → Keep previous_condition (prevent unrealistic jumps)
-        → Log: "Preventing extreme cloud cover jump: keeping X instead of Y"
-    ELSE:
-        → Keep previous_condition (prevent oscillation)
-        → Log: "Preventing condition oscillation: keeping X instead of Y"
+        IF |current_cloud_cover − baseline| ≥ transition threshold:
+            → Allow the change
+        ELSE:
+            → Keep current_condition (record the rejected proposal)
 ```
 
-**Transition-Specific Thresholds (Version 4.0.0):**
+**Why the baseline matters:** comparing against the *previous reading*
+ratchets the comparison point forward every cycle, so a gradual change
+(a few percent per update — normal cloud build-up) could never cross the
+threshold and the condition would stay stale indefinitely (issue #51).
+Measuring from the start of the condition run means slow drifts
+accumulate until they legitimately cross the threshold.
 
-The hysteresis system now uses different thresholds based on the type of condition transition:
+**Transition-Specific Thresholds:**
 
 ```
-Adjacent condition transitions (e.g., sunny ↔ partlycloudy, partlycloudy ↔ cloudy):
-    → Threshold: 15% cloud cover change required
-
-Non-adjacent condition transitions (e.g., sunny ↔ cloudy):
-    → Threshold: 25% cloud cover change required
-
-Trend-based threshold reduction:
-    IF cloud cover trend is consistent (moving in same direction):
-        → Reduce threshold by 3-5% for smoother transitions
+sunny → partlycloudy: 15%      partlycloudy → sunny: 12%
+partlycloudy → cloudy: 15%     cloudy → partlycloudy: 12%
+sunny → cloudy: 25%            cloudy → sunny: 20%
+other transitions: 10%
 ```
 
-This prevents rapid oscillation between conditions while still allowing responsive updates when weather genuinely changes.
+A separate rate limiter (`_apply_cloud_cover_hysteresis`) caps the cloud
+cover value itself to a 30-point change per reading when the raw jump
+exceeds 40 points, smoothing sensor glitches without blocking real
+transitions.
 
 ### Major Changes (Immediate Transitions)
 
@@ -592,7 +593,8 @@ solar_cloud_cover = 100 - (solar_radiation / expected_solar_radiation * 100)
 lux_cloud_cover = 100 - (solar_lux / 100000 * 100)
 uv_cloud_cover = 100 - (uv_index / 11 * 100)
 
-Weighted: solar_radiation × 0.8 + solar_lux × 0.15 + uv_index × 0.05
+Weighted over AVAILABLE sensors, normalized (a missing lux/UV sensor is excluded — it must not read as 100% cloud):
+  all sensors: solar_radiation × 0.8 + solar_lux × 0.15 + uv_index × 0.05
 ```
 
 **Intelligent Weighting (adapts to sensor availability):**

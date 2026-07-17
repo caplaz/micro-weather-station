@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes — condition detection (issue #51)
+
+- **Condition hysteresis ratchet**: rejected condition changes stored the old condition with the new cloud cover, advancing the comparison baseline every cycle — a gradual cloud build-up (or clearing) slower than ~12%/update could never flip the condition (verified: cover climbing 20%→88% stayed "sunny"). The change is now measured against the cloud cover recorded when the current condition was established, and a proposal that persists for 3 consecutive readings is accepted outright. This path was inert before the 4.4.1 persistent-detector change and is a primary suspect for #51.
+- **Forecast rendering polluted shared cloud-cover state**: every hourly forecast render called `analyze_state()` with no solar readings on the shared solar analyzer, computing ~100% cloud and appending it to the shared history — corrupting the `cloud_coverage` attribute and dragging the rate limiter toward phantom overcast. Forecast paths now pass `update_history=False`, and with no solar signal they reuse the detection path's last known cloud cover instead of inventing one.
+- **Missing lux sensor read as full overcast**: the cloud-cover blend always included the lux term at 0.15 weight; with no lux sensor, `solar_lux=0` mapped to 100% cloud — a permanent +15% cloud floor even on perfectly clear days. The blend is now normalized over sensors that actually report data.
+- **Pressure-trend cloud adjustment signs inverted**: falling pressure (approaching system) *reduced* the cloud estimate and rising pressure (clearing) *increased* it. Signs corrected; the duplicate (and opposite-sign) second adjustment in `MeteorologicalAnalyzer._analyze_cloud_cover_comprehensive` is removed — the trend is applied exactly once, inside `analyze_cloud_cover()`.
+- **Clear-sky model double-counted atmospheric extinction**: `zenith_max_radiation` is calibrated as what the sensor reads at zenith (through one air mass), but the model applied `exp(k·AM)` on top, predicting ~467 W/m² at 45° elevation where real clear-sky GHI is ~650. Clear days read as "sensor exceeds model", spamming miscalibration warnings that told users to recalibrate upward (buying a permanent cloudy bias). Extinction is now normalized to AM=1: `exp(k·(AM−1))`.
+- **Altitude sea-level correction went the wrong direction**: the barometric factor was multiplied instead of divided, *lowering* mountain-station readings; simultaneously the pressure thresholds were altitude-lowered, double-counting altitude (the two errors roughly cancelled below ~500 m but skewed high stations ~20 hPa toward "high pressure"). The reading is now correctly raised to sea level and compared against sea-level thresholds.
+- **Wind direction stability used linear stdev on circular data**: a steady northerly oscillating across 0°/360° read as fully unstable. Replaced with the circular mean resultant length.
+- **Fog suppressed on radiation-fog mornings**: the "day was clear → skip fog" gate applied all night; clear day + clear night + radiative cooling is the classic radiation-fog setup and pre-dawn is when it peaks. The gate now applies only in the early evening (18:00–24:00).
+
+### Bug Fixes — forecasting
+
+- **Pressure-trend unit incoherence** (follow-up to #46): `current_trend` has been produced in hPa/3h since 4.4.0, but the lifecycle engine's thresholds (`PressureTrendConstants`, labeled inHg/3h) and inline literals in evolution/daily/hourly were never converted — `STABLE_THRESHOLD=0.2` treated a barely-detectable 0.2 hPa/3h drift as an active system, fabricating frontal passages (and their rain) from noise. All thresholds are retuned to hPa/3h per WMO practice (stable < 1.0 hPa/3h; front 2–4+), and `compute_pressure_acceleration()` now returns hPa/h to share the unit regime.
+- **Startup noise fabricated storms**: a regression slope fit to minutes of data extrapolated sensor noise into storm-grade 3h/24h pressure changes right after a restart/reconfigure. Trends now require a ≥30-minute observation span, extrapolated changes are clamped to plausible synoptic rates (±15 hPa/3h, ±40 hPa/24h), and storm probability is scaled down until ~6h of history exists.
+- **Storm override painted all 5 days**: a storm probability measured *now* forced lightning-rainy/pouring onto every forecast day; it now decays with forecast distance.
+- **Daily forecast dead-ended on empty data** (follow-up to #49): the weather entity returned a detector-side empty forecast list verbatim, so its own local fallback generator was unreachable — the daily card spun forever. An empty list now falls through to local generation.
+- **Hourly forecast unit mixing**: the entity-side forecast paths fed metric coordinator data (°C/hPa/km-h) into the imperial analysis pipeline, converting only temperature — hourly wind was treated as mph and converted to km/h again (~1.6× too high). Pressure and wind are now converted too.
+- **Dead pattern keys**: `analyze_historical_patterns()` never emitted the `humidity`/`wind` keys the daily generator reads, so their trend influence silently defaulted to zero (same defect class as #35/#46). The keys are now produced.
+- **Unreachable pressure-volatility thresholds**: `TrendConstants.VOLATILITY_ACTIVE/MODERATE` were hPa-scale values compared against an inHg stdev — `cycle_type` was permanently "stable". Retuned to inHg.
+- A dewpoint reading of exactly 0° is no longer treated as missing; forecast-generation failures now log the full traceback (`_LOGGER.exception` — a bare message cost days of diagnosis in #49); removed the dead severe-turbulence clause in `_check_severe_weather` (dry "lightning" requires extreme gusts outright, matching the `test_detect_gusty_wind_no_lightning` false-positive guard).
+
+- **Hourly diurnal cycle fixes**: diurnal offsets are offsets from the daily mean but were applied to the *current* temperature without subtracting the current hour's own offset, shifting the whole 24h curve by however far from the mean "now" happens to be; the offset is now applied relative to the current hour. The amplitude constants were labeled °C but applied in the °F pipeline (halving the swing) — rescaled to °F. Wind/humidity used a forecast slot one hour offset from temperature's — unified.
+- **Daily rows are noon-representative**: the day/night conversion was evaluated at the generation wall-clock time, so daily cards generated at night could show "clear-night"; daily rows now always use daytime semantics (only clear-night → sunny applies).
+- **Forecast cloud analysis without a sun sensor** now estimates solar elevation from radiation intensity (same heuristic as the detection path) instead of assuming a fixed 45°.
+
+### Testing
+
+- 20+ new regression tests covering the hysteresis ratchet (both directions), shared-history pollution, missing-sensor weighting, adjustment signs, clear-sky calibration, hPa unit coherence, minimum-span/storm dampening, altitude direction, north-crossing wind stability, and the patterns-key contract.
+- New `tests/test_end_to_end_simulation.py`: drives the real (unmocked) `WeatherDetector` through a synthetic clear day and an approaching front with frozen time — a structural guard against the producer/consumer dict mismatches behind #35/#46/#49/#51. Asserts: clear midday reads sunny with <30% cloud, stable pressure yields zero storm probability, forecast renders don't corrupt shared state, and a genuine 3 hPa/3h fall still produces a storm signal and a wet forecast.
+
 ## 4.4.2 (2026-07-16)
 
 ### Bug Fixes
