@@ -161,8 +161,13 @@ class TestHourlyForecastGenerator:
             assert isinstance(hour_forecast["wind_speed"], float)
             assert isinstance(hour_forecast["humidity"], (int, float))
 
-    def test_forecast_temperature(self, hourly_forecast_generator, mock_analyzers):
+    def test_forecast_temperature(
+        self, hourly_forecast_generator, mock_analyzers, freezer
+    ):
         """Test hourly temperature forecasting."""
+        # Freeze to noon so the current-hour diurnal anchor is deterministic:
+        # hour_idx=2 forecasts 14:00, matching hour_of_day below.
+        freezer.move_to("2026-07-20 12:00:00")
         hour_idx = 2
         current_temp = 22.0
         astronomical_context = {

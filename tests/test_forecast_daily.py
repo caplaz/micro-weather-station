@@ -1078,11 +1078,16 @@ class TestDailyForecastGenerator:
 class TestIssue35BugFixes:
     """Test cases for GitHub Issue #35 bug fixes."""
 
-    def test_day0_max_temp_uses_hourly_trend_projection(self, daily_forecast_generator):
-        """Test that day-0 max temp uses hourly trend projection (Bug Fix #1).
+    def test_day0_max_temp_reflects_bounded_diurnal_projection(
+        self, daily_forecast_generator
+    ):
+        """Day-0 high reflects a warming trend but stays physically bounded.
 
-        When there's a positive temperature trend, the daily max should reflect
-        the projected high from the trend, not just the current temp.
+        A positive temperature trend should lift the day-0 high above the
+        current reading, but the projection is bounded to the diurnal peak
+        horizon — it must NOT linearly extrapolate the sub-diurnal slope
+        across the whole day (issue #51: a morning slope projected 23h gave
+        a 39.7°C forecast from a 20°C reading).
         """
         current_temp = 70.0
         temp_trend_per_hour = 0.5  # Rising trend
@@ -1113,19 +1118,76 @@ class TestIssue35BugFixes:
             system_evolution,
         )
 
-        hourly_estimates = [
-            current_temp + temp_trend_per_hour * h for h in range(1, 24)
-        ]
-        expected_max = max(hourly_estimates + [current_temp])
+        # Warmer than the current reading (a real trend is reflected)...
+        assert result > current_temp
+        # ...but bounded — never the unbounded 23h projection (70 + 0.5*23).
+        assert result <= current_temp + 10.0, (
+            f"Day-0 high ({result}) should be a bounded diurnal projection, "
+            f"not the runaway 23-hour extrapolation"
+        )
 
-        assert (
-            result >= expected_max
-        ), f"Day-0 temp ({result}) should be at least the hourly max ({expected_max}) when trend is positive"
+    def test_day0_high_does_not_runaway_with_strong_morning_trend(
+        self, daily_forecast_generator
+    ):
+        """Regression for issue #51: a strong morning warming slope must not
+        produce an absurd daily high.
+
+        Reproduces nsleigh's report: current 68.9°F (20.5°C) at midday with a
+        ~1.5°F/h 24h regression slope produced a forecast high of 103.5°F
+        (39.7°C). The high must instead stay near the recent diurnal peak.
+        """
+        current_temp = 68.9  # 20.5°C, mid-morning/noon reading
+        meteorological_state = {
+            "pressure_analysis": {
+                "pressure_system": "normal",
+                "current_trend": 0.0,
+                "long_term_trend": 0.0,
+            },
+            "atmospheric_stability": 0.7,
+            # 24h regression slope dominated by the morning warming ramp.
+            "temp_trends": {
+                "current": 68.9,
+                "average": 62.0,
+                "trend": 1.5,  # °F/h — steep, diurnal artifact
+                "min": 55.0,
+                "max": 77.0,  # real observed diurnal peak
+                "volatility": 6.0,
+            },
+        }
+        # Production pattern shape (no inner "trend").
+        historical_patterns = {
+            "temperature": {
+                "volatility": 6.0,
+                "trend_strength": 1.5,
+                "seasonal_factor": 0.5,
+            },
+        }
+        system_evolution = {"confidence_levels": [0.9, 0.7, 0.5, 0.4, 0.3]}
+
+        highs = [
+            daily_forecast_generator.forecast_temperature(
+                day_idx,
+                current_temp,
+                meteorological_state,
+                historical_patterns,
+                system_evolution,
+            )
+            for day_idx in range(5)
+        ]
+
+        # Day-0 high tracks the observed diurnal peak (~77°F), not 103°F.
+        assert highs[0] <= 85.0, f"Day-0 high ran away to {highs[0]}°F"
+        assert highs[0] >= 75.0, f"Day-0 high {highs[0]}°F ignored the diurnal peak"
+        # No day should ramp into the runaway warm range.
+        assert all(
+            h <= 90.0 for h in highs
+        ), f"Multi-day highs ramped into runaway warm bias: {highs}"
 
     def test_day0_max_temp_with_negative_trend(self, daily_forecast_generator):
-        """Test day-0 max temp with negative trend includes current temp in max calculation.
+        """Test day-0 high with negative trend stays at the current temp.
 
-        When trend is negative, the max should still consider the current temp as potential max.
+        When the trend is negative and there is no observed diurnal peak to
+        anchor on, the day-0 high should not project upward.
         """
         current_temp = 70.0
         temp_trend_per_hour = -0.5  # Falling trend
@@ -1156,14 +1218,10 @@ class TestIssue35BugFixes:
             system_evolution,
         )
 
-        hourly_estimates = [
-            current_temp + temp_trend_per_hour * h for h in range(1, 24)
-        ]
-        expected_max = max(hourly_estimates + [current_temp])
-
-        assert (
-            result == expected_max
-        ), f"Day-0 temp ({result}) should equal max of hourly estimates + current ({expected_max})"
+        assert result == pytest.approx(current_temp, abs=0.01), (
+            f"Day-0 high ({result}) should stay at the current temp when the "
+            f"trend is negative and no diurnal peak is observed"
+        )
 
     def test_day0_max_reflects_diurnal_peak_with_production_patterns(
         self, daily_forecast_generator

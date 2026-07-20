@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.5.1 (2026-07-20)
+
+### Bug Fixes — forecasting
+
+- **Runaway daily forecast high** (issue #51 follow-up): the daily forecast high was computed by linearly extrapolating the 24-hour temperature regression slope across the whole day (`current_temp + trend × h` for `h` up to 23), and across days (`trend × (day+1) × 24h`). That slope is dominated by the diurnal cycle — during the morning warming ramp it can be ~1.5 °F/h, but temperature peaks mid-afternoon and then falls, so projecting it forward a full day is physically meaningless. A real report showed a 39.7 °C (103.5 °F) forecast high from a 20.5 °C (68.9 °F) reading, with every subsequent day ramping toward a warm clamp.
+
+  Fix: the daily high now anchors on the **diurnal peak** — the greater of the recent observed 24 h maximum and a *bounded* projection of the current warming slope toward the mid-afternoon peak (capped at both a 6-hour horizon and the observed diurnal amplitude). For the reported case the day-0 high drops from 39.7 °C to ~25.5 °C and the 5-day highs settle into a realistic 24–28 °C band instead of ramping into the 30s. The #35 behavior (the day-0 high must not collapse to a cool morning reading) is preserved via the observed-peak anchor.
+
+### Testing
+
+- Regression tests reproducing the reported runaway (a steep morning slope must not produce an absurd high) and confirming the multi-day highs stay bounded.
+- Froze a wall-clock-dependent hourly temperature test that could fail depending on the time of day it ran (a consequence of the 4.5.0 relative-diurnal-offset change).
+
 ## 4.5.0 (2026-07-17)
 
 ### Bug Fixes — condition detection (issue #51)
