@@ -77,6 +77,7 @@ from .weather_utils import (
     convert_altitude_to_meters,
     convert_ms_to_mph,
     convert_to_celsius,
+    convert_to_fahrenheit,
     convert_to_hpa,
     convert_to_inhg,
     convert_to_kmh,
@@ -306,6 +307,10 @@ class WeatherDetector:
             temp_f = sensor_data.get(KEY_OUTDOOR_TEMP) or sensor_data.get(
                 KEY_TEMPERATURE
             )
+            # calculate_dewpoint expects Fahrenheit; sensor_data holds the
+            # sensor's native unit, so convert Celsius readings first
+            if sensor_data.get(KEY_TEMPERATURE_UNIT) in ["°C", "C", "celsius"]:
+                temp_f = convert_to_fahrenheit(temp_f)
             humidity = sensor_data.get("humidity")
             if temp_f is not None and humidity is not None:
                 dewpoint_value = self.analysis.calculate_dewpoint(temp_f, humidity)
