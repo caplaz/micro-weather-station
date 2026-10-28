@@ -162,6 +162,59 @@ class TestDewpointFallback:
         # Should be approximately 59.6°F = 15.3°C, allow ±2.5°C tolerance
         assert abs(result[KEY_DEWPOINT] - 15.3) < 2.5
 
+    def test_dewpoint_fallback_calculation_celsius(
+        self, mock_hass, mock_options_without_dewpoint_sensor
+    ):
+        """Test the fallback calculation with a Celsius temperature sensor.
+
+        The fallback must convert the Celsius reading to Fahrenheit before
+        calling calculate_dewpoint; otherwise 13.6 °C is treated as 13.6 °F
+        and a near-saturated reading yields a dewpoint of about -10 °C.
+        """
+        mock_states = {
+            "sensor.outdoor_temperature": Mock(
+                state="13.6", attributes={"unit_of_measurement": "°C"}
+            ),
+            "sensor.humidity": Mock(
+                state="99.0", attributes={"unit_of_measurement": "%"}
+            ),
+            "sensor.pressure": Mock(
+                state="1015.2", attributes={"unit_of_measurement": "hPa"}
+            ),
+            "sensor.wind_speed": Mock(
+                state="3.0", attributes={"unit_of_measurement": "km/h"}
+            ),
+            "sensor.wind_direction": Mock(
+                state="180.0", attributes={"unit_of_measurement": "°"}
+            ),
+            "sensor.wind_gust": Mock(
+                state="5.0", attributes={"unit_of_measurement": "km/h"}
+            ),
+            "sensor.rain_rate": Mock(
+                state="0.0", attributes={"unit_of_measurement": "mm/h"}
+            ),
+            "sensor.rain_state": Mock(state="Dry", attributes={}),
+            "sensor.solar_radiation": Mock(
+                state="20.0", attributes={"unit_of_measurement": "W/m²"}
+            ),
+            "sensor.solar_lux": Mock(
+                state="2000.0", attributes={"unit_of_measurement": "lx"}
+            ),
+            "sensor.uv_index": Mock(
+                state="0.0", attributes={"unit_of_measurement": "UV index"}
+            ),
+        }
+
+        mock_hass.states.get = lambda entity_id: mock_states.get(entity_id)
+
+        detector = WeatherDetector(mock_hass, mock_options_without_dewpoint_sensor)
+        result = detector.get_weather_data()
+
+        # 13.6 °C at 99% humidity -> dewpoint ~13.4 °C (Magnus formula)
+        assert KEY_DEWPOINT in result
+        assert result[KEY_DEWPOINT] is not None
+        assert abs(result[KEY_DEWPOINT] - 13.4) < 0.5
+
     def test_dewpoint_missing_temp_or_humidity(
         self, mock_hass, mock_options_without_dewpoint_sensor
     ):
