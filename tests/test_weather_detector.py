@@ -321,16 +321,13 @@ class TestWeatherDetector:
         self, mock_hass, mock_options, mock_sensor_data
     ):
         """Test detection of partly cloudy conditions."""
-        # At 45° elevation, clear-sky max is ~496 W/m²
-        # For ~45% cloud cover (partly cloudy is 30-60%): need radiation at ~55% of max → ~273 W/m²
-        # With updated thresholds: <30% = sunny, 30-60% = partly cloudy, >60% = cloudy
+        # Use moderate measurements comfortably within the partly cloudy range
+        # throughout the year, as the clear-sky model varies seasonally.
         mock_states = {}
         for sensor_key, value in mock_sensor_data.items():
             if sensor_key == "solar_radiation":
                 state = Mock()
-                state.state = (
-                    "270.0"  # ~55% of 496 W/m² clear-sky max → ~45% cloud cover
-                )
+                state.state = "350.0"
                 mock_states[f"sensor.{sensor_key}"] = state
             elif sensor_key == "solar_lux":
                 state = Mock()
