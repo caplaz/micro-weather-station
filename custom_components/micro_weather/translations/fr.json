@@ -2,7 +2,9 @@
   "config": {
     "error": {
       "missing_outdoor_temp": "❌ Le capteur de température extérieure est requis. Veuillez sélectionner un capteur de température qui mesure les conditions extérieures.",
-      "unknown": "❌ Une erreur inattendue s'est produite pendant la configuration. Veuillez vérifier vos sélections de capteurs et réessayer."
+      "unknown": "❌ Une erreur inattendue s'est produite pendant la configuration. Veuillez vérifier vos sélections de capteurs et réessayer.",
+      "sun_sensor_not_numeric": "❌ Le capteur solaire sélectionné doit indiquer l'élévation solaire en degrés sous forme de nombre (par exemple `sensor.sun_solar_elevation`).",
+      "sun_sensor_unavailable": "❌ Le capteur solaire sélectionné est indisponible. Sélectionnez une entité qui indique l'élévation solaire en degrés."
     },
     "step": {
       "atmospheric": {
@@ -120,7 +122,9 @@
   "options": {
     "error": {
       "missing_outdoor_temp": "❌ Le capteur de température extérieure est requis. Veuillez sélectionner un capteur de température qui mesure les conditions extérieures.",
-      "unknown": "❌ Une erreur inattendue s'est produite pendant la configuration. Veuillez vérifier vos sélections de capteurs et réessayer."
+      "unknown": "❌ Une erreur inattendue s'est produite pendant la configuration. Veuillez vérifier vos sélections de capteurs et réessayer.",
+      "sun_sensor_not_numeric": "❌ Le capteur solaire sélectionné doit indiquer l'élévation solaire en degrés sous forme de nombre (par exemple `sensor.sun_solar_elevation`).",
+      "sun_sensor_unavailable": "❌ Le capteur solaire sélectionné est indisponible. Sélectionnez une entité qui indique l'élévation solaire en degrés."
     },
     "step": {
       "atmospheric": {

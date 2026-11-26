@@ -438,36 +438,68 @@ class WeatherDetector:
                         "Could not convert sensor %s value: %s", entity_id, state.state
                     )
 
-        # Get sun.sun sensor data for solar position calculations
+        # Get sun/elevation sensor data for solar position calculations
         sun_entity_id = self.sensors.get(KEY_SUN)
         if sun_entity_id:
-            sun_state = self.hass.states.get(sun_entity_id)
-            if sun_state and sun_state.state not in (STATE_UNKNOWN, STATE_UNAVAILABLE):
-                # Additional validation for sun sensor
-                if sun_state.state is None or sun_state.state == "":
-                    _LOGGER.warning(
-                        "Sun sensor %s has empty or None state, "
-                        "using default elevation",
-                        sun_entity_id,
-                    )
-                else:
-                    try:
-                        # Get solar elevation from sun.sun attributes
-                        solar_elevation = float(
-                            sun_state.attributes.get("elevation", 0)
-                        )
-                        sensor_data["solar_elevation"] = solar_elevation
-                    except (ValueError, TypeError):
-                        _LOGGER.warning(
-                            "Could not get solar elevation from sun sensor %s",
-                            sun_entity_id,
-                        )
+            solar_elevation = self._get_solar_elevation(sun_entity_id)
+            if solar_elevation is not None:
+                sensor_data["solar_elevation"] = solar_elevation
         else:
             # Don't set a default - let the analysis handle missing
             # solar elevation
             pass
 
         return sensor_data
+
+    def _get_solar_elevation(self, sun_entity_id: str) -> float | None:
+        """Read the solar elevation in degrees from the configured entity.
+
+        Two kinds of entity are supported:
+
+        - the built-in ``sun.*`` entity, whose state is a string
+          (``above_horizon``) and whose ``elevation`` attribute carries the
+          angle;
+        - a ``sensor.*`` entity that reports the angle directly as its state,
+          for example ``sensor.sun_solar_elevation``.
+
+        Args:
+            sun_entity_id: Entity id configured as the sun sensor.
+
+        Returns:
+            The solar elevation in degrees, or None when the entity cannot
+            provide a usable value. None is safe: the analysis falls back to
+            estimating the elevation instead of failing the whole update.
+        """
+        state = self.hass.states.get(sun_entity_id)
+        if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+            _LOGGER.warning(
+                "Sun sensor %s is unavailable, estimating the solar elevation instead",
+                sun_entity_id,
+            )
+            return None
+
+        if sun_entity_id.startswith("sun."):
+            raw_elevation = state.attributes.get("elevation")
+        else:
+            raw_elevation = state.state
+
+        if raw_elevation is None:
+            _LOGGER.warning(
+                "Could not read a solar elevation from %s (%s), estimating it instead",
+                sun_entity_id,
+                state.state,
+            )
+            return None
+
+        try:
+            return float(raw_elevation)
+        except (TypeError, ValueError):
+            _LOGGER.warning(
+                "Could not read a solar elevation from %s (%s), estimating it instead",
+                sun_entity_id,
+                state.state,
+            )
+            return None
 
     def _determine_weather_condition(self, sensor_data: Dict[str, Any]) -> str:
         """

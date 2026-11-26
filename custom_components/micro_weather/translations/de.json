@@ -2,7 +2,9 @@
   "config": {
     "error": {
       "missing_outdoor_temp": "❌ Außentemperatur-Sensor ist erforderlich. Bitte wählen Sie einen Temperatursensor aus.",
-      "unknown": "❌ Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+      "unknown": "❌ Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+      "sun_sensor_not_numeric": "❌ Der ausgewählte Sonnensensor muss die Sonnenhöhe in Grad als Zahl melden (zum Beispiel `sensor.sun_solar_elevation`).",
+      "sun_sensor_unavailable": "❌ Der ausgewählte Sonnensensor ist nicht verfügbar. Wählen Sie eine Entität, die die Sonnenhöhe in Grad meldet."
     },
     "step": {
       "atmospheric": {
@@ -120,7 +122,9 @@
   "options": {
     "error": {
       "missing_outdoor_temp": "❌ Außentemperatur-Sensor ist erforderlich. Bitte wählen Sie einen Temperatursensor aus.",
-      "unknown": "❌ Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+      "unknown": "❌ Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+      "sun_sensor_not_numeric": "❌ Der ausgewählte Sonnensensor muss die Sonnenhöhe in Grad als Zahl melden (zum Beispiel `sensor.sun_solar_elevation`).",
+      "sun_sensor_unavailable": "❌ Der ausgewählte Sonnensensor ist nicht verfügbar. Wählen Sie eine Entität, die die Sonnenhöhe in Grad meldet."
     },
     "step": {
       "atmospheric": {

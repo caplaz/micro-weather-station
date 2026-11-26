@@ -106,6 +106,76 @@ class TestConfigFlow:
         assert result["type"] == "create_entry"
         assert result["title"] == "Micro Weather Station"
 
+    async def test_sun_sensor_selector_accepts_sun_and_sensor_domains(
+        self, hass: HomeAssistant
+    ):
+        """The sun sensor field accepts sun.* and sensor.* entities."""
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        result = await flow.async_step_user()
+        sun_selector = result["data_schema"].schema[CONF_SUN_SENSOR]
+
+        assert sun_selector.config["domain"] == ["sun", "sensor"]
+
+    async def test_form_accepts_numeric_elevation_sensor(self, hass: HomeAssistant):
+        """A sensor.* entity reporting the elevation in degrees is accepted."""
+        hass.states.async_set("sensor.sun_solar_elevation", "12.5")
+
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        with patch(
+            "custom_components.micro_weather.async_setup_entry",
+            return_value=True,
+        ):
+            result = await flow.async_step_user(
+                {
+                    "outdoor_temp_sensor": "sensor.outdoor_temperature",
+                    "sun_sensor": "sensor.sun_solar_elevation",
+                    "update_interval": 30,
+                }
+            )
+            await hass.async_block_till_done()
+
+        assert result["type"] == "create_entry"
+
+    async def test_form_rejects_non_numeric_elevation_sensor(self, hass: HomeAssistant):
+        """A sensor.* entity that does not report a number is rejected."""
+        hass.states.async_set("sensor.not_an_elevation", "above_horizon")
+
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        result = await flow.async_step_user(
+            {
+                "outdoor_temp_sensor": "sensor.outdoor_temperature",
+                "sun_sensor": "sensor.not_an_elevation",
+                "update_interval": 30,
+            }
+        )
+
+        assert result["type"] == "form"
+        assert result["errors"] == {"base": "sun_sensor_not_numeric"}
+
+    async def test_form_rejects_unavailable_elevation_sensor(self, hass: HomeAssistant):
+        """An unavailable sensor.* entity is rejected."""
+        hass.states.async_set("sensor.sun_solar_elevation", "unavailable")
+
+        flow = ConfigFlowHandler()
+        flow.hass = hass
+
+        result = await flow.async_step_user(
+            {
+                "outdoor_temp_sensor": "sensor.outdoor_temperature",
+                "sun_sensor": "sensor.sun_solar_elevation",
+                "update_interval": 30,
+            }
+        )
+
+        assert result["type"] == "form"
+        assert result["errors"] == {"base": "sun_sensor_unavailable"}
+
     async def test_get_altitude_unit_metric(self, hass: HomeAssistant):
         """Test _get_altitude_unit returns 'm' for metric system."""
         # Set metric system

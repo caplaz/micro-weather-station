@@ -267,7 +267,7 @@ Configure additional sensors for enhanced weather detection:
 | **Solar Radiation** | Solar radiation sensor (W/m²) | Cloud cover detection and solar analysis               |
 | **Solar Lux**       | Light level sensor (lx)       | Day/night and cloud detection (backup)                 |
 | **UV Index**        | UV index sensor               | Clear sky detection and solar intensity                |
-| **Sun Sensor**      | Solar elevation sensor        | Precise cloud cover calculations based on sun position |
+| **Sun Sensor**      | Solar elevation sensor        | Precise cloud cover calculations based on sun position (accepts `sun.sun` or a `sensor.*` entity reporting the elevation in degrees, e.g. `sensor.sun_solar_elevation`) |
 
 #### Unit Conversion Support
 
