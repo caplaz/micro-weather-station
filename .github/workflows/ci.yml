@@ -128,12 +128,24 @@ jobs:
           "
 
   test:
-    name: Run Tests
+    name: Run Tests (${{ matrix.python-version }}, ${{ matrix.home-assistant-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.13"]
         home-assistant-version: ["2025.1.4", "2026.2.3"]
+        include:
+          # pytest-homeassistant-custom-component pins the exact Home Assistant
+          # release it was built against, so every leg pins the matching pair.
+          - home-assistant-version: "2025.1.4"
+            phcc-version: "0.13.205"
+          - home-assistant-version: "2026.2.3"
+            phcc-version: "0.13.316"
+          # Home Assistant 2026.3.0 and later require Python >= 3.14.2, and
+          # pytest-homeassistant-custom-component follows the same schedule.
+          - python-version: "3.14"
+            home-assistant-version: "2026.10.4"
+            phcc-version: "0.13.375"
 
     steps:
       - uses: actions/checkout@v4
@@ -147,8 +159,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           # Use --only-binary to prefer pre-built wheels and avoid compilation issues
-          pip install --only-binary=aiohttp,yarl,multidict homeassistant==${{ matrix.home-assistant-version }}
-          pip install -r requirements-dev.txt
+          pip install --prefer-binary -r requirements-dev.txt
+          # Pin the pair last: requirements-dev.txt asks for the newest release
+          # of both, which would silently move this leg off its matrix version.
+          pip install --prefer-binary \
+            "homeassistant==${{ matrix.home-assistant-version }}" \
+            "pytest-homeassistant-custom-component==${{ matrix.phcc-version }}"
+          python -c "from homeassistant.const import __version__; print('Home Assistant', __version__)"
 
       - name: Run tests
         run: |

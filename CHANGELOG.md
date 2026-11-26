@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Requirements
+
+- **Minimum Home Assistant version is now 2025.1.4**: `hacs.json` declared
+  2023.1.0, but that version is not tested. The declared minimum now matches the
+  oldest Home Assistant release the test matrix actually runs (2025.1.4), and
+  the README, installation guide and development requirements say the same.
+
+### CI / maintenance
+
+- **Test against the latest Home Assistant** (issue #56): the dependency
+  workflow asked for compatibility with Home Assistant 2026.10.4. That release
+  requires Python >= 3.14.2 (Home Assistant 2026.3.0 and later do), and
+  `pytest-homeassistant-custom-component` follows the same schedule, so the
+  Python 3.13 matrix could never install it. The test matrix now pins the
+  Home Assistant / pytest-homeassistant-custom-component pair per leg and adds
+  a Python 3.14 leg for Home Assistant 2026.10.4, so "tested in CI" means what
+  it says.
+- **Dependency issue reports the Python floor**: the weekly dependency workflow
+  now also reports the Python version the latest Home Assistant release
+  requires and the Python versions the matrix tests on, so a future issue says
+  whether a new Python leg is needed.
+
 ## 4.5.1 (2026-07-20)
 
 ### Bug Fixes — forecasting
