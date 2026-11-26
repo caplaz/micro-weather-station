@@ -133,7 +133,7 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.13"]
-        home-assistant-version: ["2025.1.4"]
+        home-assistant-version: ["2025.1.4", "2026.2.3"]
 
     steps:
       - uses: actions/checkout@v4

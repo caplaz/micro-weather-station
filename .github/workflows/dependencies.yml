@@ -26,27 +26,36 @@ jobs:
           echo "latest_ha=$LATEST_HA" >> $GITHUB_OUTPUT
           echo "Latest Home Assistant version: $LATEST_HA"
 
-          # Check current compatibility in manifest
+          # Minimum supported version is declared in hacs.json, not manifest.json
           MIN_HA_VERSION=$(python -c "
           import json
-          with open('custom_components/micro_weather/manifest.json') as f:
-              manifest = json.load(f)
-          print(manifest.get('homeassistant', 'Not specified'))
+          with open('hacs.json') as f:
+              hacs = json.load(f)
+          print(hacs.get('homeassistant', 'Not specified'))
           ")
+          echo "Minimum supported HA version: $MIN_HA_VERSION"
+          echo "min_ha=$MIN_HA_VERSION" >> $GITHUB_OUTPUT
 
-          echo "Current minimum HA version: $MIN_HA_VERSION"
-          echo "current_ha=$MIN_HA_VERSION" >> $GITHUB_OUTPUT
+          # Version the CI test matrix actually exercises
+          TESTED_HA=$(sed -n 's/.*home-assistant-version: \[\(.*\)\].*/\1/p' .github/workflows/ci.yml | head -1 | tr -d '" ' )
+          echo "Tested HA version(s): $TESTED_HA"
+          echo "tested_ha=$TESTED_HA" >> $GITHUB_OUTPUT
 
       - name: Check if update needed
         id: update_needed
         run: |
-          if [ "${{ steps.ha_check.outputs.latest_ha }}" != "${{ steps.ha_check.outputs.current_ha }}" ]; then
-            echo "update_needed=true" >> $GITHUB_OUTPUT
-            echo "Home Assistant update available"
-          else
-            echo "update_needed=false" >> $GITHUB_OUTPUT
-            echo "No Home Assistant update needed"
-          fi
+          LATEST="${{ steps.ha_check.outputs.latest_ha }}"
+          TESTED="${{ steps.ha_check.outputs.tested_ha }}"
+          case ",$TESTED," in
+            *",$LATEST,"*)
+              echo "update_needed=false" >> $GITHUB_OUTPUT
+              echo "Home Assistant $LATEST is already in the CI test matrix"
+              ;;
+            *)
+              echo "update_needed=true" >> $GITHUB_OUTPUT
+              echo "Home Assistant update available"
+              ;;
+          esac
 
       - name: Create Issue for Updates
         if: steps.update_needed.outputs.update_needed == 'true'
@@ -72,12 +81,14 @@ jobs:
                 body: `## Dependency Updates Available
 
                 ### Home Assistant
-                - **Current**: ${{ steps.ha_check.outputs.current_ha }}
-                - **Latest**: ${{ steps.ha_check.outputs.latest_ha }}
+                - **Latest release**: ${{ steps.ha_check.outputs.latest_ha }}
+                - **Tested in CI**: ${{ steps.ha_check.outputs.tested_ha }}
+                - **Minimum supported**: ${{ steps.ha_check.outputs.min_ha }}
 
                 ### Actions Required
-                - [ ] Test compatibility with latest Home Assistant version
-                - [ ] Update manifest.json if compatible
+                - [ ] Test compatibility with the latest Home Assistant version
+                - [ ] Add it to the CI test matrix in \`.github/workflows/ci.yml\` if compatible
+                - [ ] Update \`hacs.json\` if the minimum supported version changes
                 - [ ] Update documentation if needed
                 - [ ] Create new release if necessary
 
