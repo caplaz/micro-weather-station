@@ -26,6 +26,12 @@ jobs:
           echo "latest_ha=$LATEST_HA" >> $GITHUB_OUTPUT
           echo "Latest Home Assistant version: $LATEST_HA"
 
+          # Python floor of that release - the latest Home Assistant releases
+          # require a newer Python than the one this repository tests on
+          LATEST_HA_PYTHON=$(curl -s "https://pypi.org/pypi/homeassistant/$LATEST_HA/json" | jq -r '.info.requires_python // "unknown"')
+          echo "Latest Home Assistant requires Python: $LATEST_HA_PYTHON"
+          echo "latest_ha_python=$LATEST_HA_PYTHON" >> $GITHUB_OUTPUT
+
           # Minimum supported version is declared in hacs.json, not manifest.json
           MIN_HA_VERSION=$(python -c "
           import json
@@ -36,10 +42,18 @@ jobs:
           echo "Minimum supported HA version: $MIN_HA_VERSION"
           echo "min_ha=$MIN_HA_VERSION" >> $GITHUB_OUTPUT
 
-          # Version the CI test matrix actually exercises
-          TESTED_HA=$(sed -n 's/.*home-assistant-version: \[\(.*\)\].*/\1/p' .github/workflows/ci.yml | head -1 | tr -d '" ' )
+          # Version the CI test matrix actually exercises (matrix list plus the
+          # versions pinned in the include block)
+          TESTED_HA=$(grep -oE 'home-assistant-version: *(\[[^]]*\]|"[0-9.]+")' .github/workflows/ci.yml \
+            | grep -oE '[0-9]{4}\.[0-9]+\.[0-9]+' | sort -u | tr '\n' ',' | sed 's/,$//')
           echo "Tested HA version(s): $TESTED_HA"
           echo "tested_ha=$TESTED_HA" >> $GITHUB_OUTPUT
+
+          # Python versions the test matrix uses
+          TESTED_PYTHON=$(grep -oE 'python-version: *(\[[^]]*\]|"[0-9.]+")' .github/workflows/ci.yml \
+            | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | sort -u | tr '\n' ',' | sed 's/,$//')
+          echo "Tested Python version(s): $TESTED_PYTHON"
+          echo "tested_python=$TESTED_PYTHON" >> $GITHUB_OUTPUT
 
       - name: Check if update needed
         id: update_needed
@@ -84,10 +98,13 @@ jobs:
                 - **Latest release**: ${{ steps.ha_check.outputs.latest_ha }}
                 - **Tested in CI**: ${{ steps.ha_check.outputs.tested_ha }}
                 - **Minimum supported**: ${{ steps.ha_check.outputs.min_ha }}
+                - **Latest release requires**: Python ${{ steps.ha_check.outputs.latest_ha_python }}
+                - **CI tests on Python**: ${{ steps.ha_check.outputs.tested_python }}
 
                 ### Actions Required
                 - [ ] Test compatibility with the latest Home Assistant version
                 - [ ] Add it to the CI test matrix in \`.github/workflows/ci.yml\` if compatible
+                - [ ] If it needs a newer Python than the matrix uses, add a matching Python leg
                 - [ ] Update \`hacs.json\` if the minimum supported version changes
                 - [ ] Update documentation if needed
                 - [ ] Create new release if necessary
