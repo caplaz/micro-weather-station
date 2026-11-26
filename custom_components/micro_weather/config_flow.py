@@ -5,6 +5,8 @@ from typing import Any
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 from homeassistant.util.unit_system import US_CUSTOMARY_SYSTEM
@@ -36,6 +38,37 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _validate_sun_sensor(hass: HomeAssistant, entity_id: str | None) -> str | None:
+    """Check that the selected sun sensor can report a solar elevation.
+
+    Both the built-in ``sun.*`` entity and a ``sensor.*`` entity that reports
+    the elevation angle in degrees are accepted.
+
+    Args:
+        hass: Home Assistant instance, used to read the entity state.
+        entity_id: The selected entity, if any.
+
+    Returns:
+        An error key when the entity cannot be used, None otherwise.
+    """
+    if not entity_id:
+        return None
+
+    if entity_id.startswith("sun."):
+        return None
+
+    state = hass.states.get(entity_id)
+    if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE):
+        return "sun_sensor_unavailable"
+
+    try:
+        float(state.state)
+    except (TypeError, ValueError):
+        return "sun_sensor_not_numeric"
+
+    return None
 
 
 class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
@@ -75,6 +108,10 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             # Validate at least outdoor temp sensor is provided
             if not user_input.get(CONF_OUTDOOR_TEMP_SENSOR):
                 errors["base"] = "missing_outdoor_temp"
+            elif sun_error := _validate_sun_sensor(
+                self.hass, user_input.get(CONF_SUN_SENSOR)
+            ):
+                errors["base"] = sun_error
             else:
                 return self.async_create_entry(
                     title="Micro Weather Station",
@@ -152,7 +189,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                     selector.EntitySelectorConfig(domain="sensor")
                 ),
                 vol.Optional(CONF_SUN_SENSOR): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sun")
+                    selector.EntitySelectorConfig(domain=["sun", "sensor"])
                 ),
                 vol.Optional(CONF_LIGHTNING_COUNT_SENSOR): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor")
@@ -514,7 +551,18 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle solar/sun sensors configuration."""
+        # Get current options for defaults
+        current_options = self._current_options()
+
         if user_input is not None:
+            sun_error = _validate_sun_sensor(self.hass, user_input.get(CONF_SUN_SENSOR))
+            if sun_error:
+                return self.async_show_form(
+                    step_id="solar",
+                    data_schema=self._build_solar_schema(current_options),
+                    errors={"base": sun_error},
+                )
+
             # Ensure optional fields are present in user_input
             optional_fields = [
                 CONF_SOLAR_RADIATION_SENSOR,
@@ -553,9 +601,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
             return await self.async_step_init()
 
-        # Get current options for defaults
-        current_options = self._current_options()
+        return self.async_show_form(
+            step_id="solar",
+            data_schema=self._build_solar_schema(current_options),
+        )
 
+    def _build_solar_schema(self, current_options: dict[str, Any]) -> vol.Schema:
+        """Build the schema of the solar step."""
         # Check if solar radiation sensor is configured
         has_solar_radiation = bool(current_options.get(CONF_SOLAR_RADIATION_SENSOR))
 
@@ -599,16 +651,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         )
 
         schema_dict[vol.Optional(CONF_SUN_SENSOR, default=vol.UNDEFINED)] = (
-            selector.EntitySelector(selector.EntitySelectorConfig(domain="sun"))
+            selector.EntitySelector(
+                selector.EntitySelectorConfig(domain=["sun", "sensor"])
+            )
         )
 
-        data_schema = self.add_suggested_values_to_schema(
+        return self.add_suggested_values_to_schema(
             vol.Schema(schema_dict), current_options
-        )
-
-        return self.async_show_form(
-            step_id="solar",
-            data_schema=data_schema,
         )
 
     async def async_step_lightning(

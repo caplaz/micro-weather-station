@@ -1445,3 +1445,104 @@ class TestLifecycleForecastArc:
         assert isinstance(system_evolution["lifecycle"], list)
         assert len(system_evolution["lifecycle"]) > 0
         assert system_evolution["lifecycle"][-1].end_hour >= 120.0
+
+
+class TestSolarElevationSource:
+    """Test how the solar elevation is read from the configured entity."""
+
+    @pytest.fixture
+    def mock_hass(self):
+        """Create a mock Home Assistant instance."""
+        from homeassistant.util.unit_system import METRIC_SYSTEM
+
+        hass = Mock(spec=HomeAssistant)
+        hass.states = Mock()
+        hass.config = Mock()
+        hass.config.units = METRIC_SYSTEM
+        return hass
+
+    @pytest.fixture
+    def mock_options(self):
+        """Create mock options for WeatherDetector."""
+        return {
+            "outdoor_temp_sensor": "sensor.outdoor_temperature",
+            "solar_radiation_sensor": "sensor.solar_radiation",
+            "solar_lux_sensor": "sensor.solar_lux",
+            "uv_index_sensor": "sensor.uv_index",
+        }
+
+    @staticmethod
+    def _state(state_value, attributes=None):
+        """Build a mock entity state."""
+        state = Mock()
+        state.state = state_value
+        state.attributes = attributes or {}
+        return state
+
+    def test_elevation_read_from_sun_entity_attribute(self, mock_hass, mock_options):
+        """The built-in sun entity is read from its elevation attribute."""
+        sun_state = self._state("above_horizon", {"elevation": 45.0})
+        mock_hass.states.get = lambda entity_id: (
+            sun_state if entity_id == "sun.sun" else None
+        )
+
+        detector = WeatherDetector(mock_hass, {**mock_options, "sun_sensor": "sun.sun"})
+
+        assert detector._get_sensor_values()["solar_elevation"] == 45.0
+
+    def test_elevation_read_from_numeric_sensor_entity(self, mock_hass, mock_options):
+        """A sensor.* entity reporting the angle in degrees is accepted."""
+        elevation_state = self._state("12.5")
+        mock_hass.states.get = lambda entity_id: (
+            elevation_state if entity_id == "sensor.sun_solar_elevation" else None
+        )
+
+        detector = WeatherDetector(
+            mock_hass, {**mock_options, "sun_sensor": "sensor.sun_solar_elevation"}
+        )
+
+        assert detector._get_sensor_values()["solar_elevation"] == 12.5
+
+    def test_non_numeric_sensor_entity_is_ignored(self, mock_hass, mock_options):
+        """A sensor entity that does not report a number is not used."""
+        broken_state = self._state("above_horizon")
+        mock_hass.states.get = lambda entity_id: (
+            broken_state if entity_id == "sensor.sun_solar_elevation" else None
+        )
+
+        detector = WeatherDetector(
+            mock_hass, {**mock_options, "sun_sensor": "sensor.sun_solar_elevation"}
+        )
+
+        assert "solar_elevation" not in detector._get_sensor_values()
+
+    def test_unavailable_sun_sensor_keeps_update_working(self, mock_hass, mock_options):
+        """An unusable sun sensor must not break the weather update."""
+        unavailable_state = self._state("unavailable")
+        mock_hass.states.get = lambda entity_id: (
+            unavailable_state if entity_id == "sensor.sun_solar_elevation" else None
+        )
+
+        detector = WeatherDetector(
+            mock_hass, {**mock_options, "sun_sensor": "sensor.sun_solar_elevation"}
+        )
+
+        assert "solar_elevation" not in detector._get_sensor_values()
+
+        # The full update still succeeds - the analysis estimates the elevation
+        result = detector.get_weather_data()
+        assert result["condition"]
+        assert "forecast" in result
+
+    def test_missing_sun_entity_keeps_update_working(self, mock_hass, mock_options):
+        """A sun entity that does not exist must not break the weather update."""
+        mock_hass.states.get = lambda entity_id: None
+
+        detector = WeatherDetector(
+            mock_hass, {**mock_options, "sun_sensor": "sensor.sun_solar_elevation"}
+        )
+
+        assert "solar_elevation" not in detector._get_sensor_values()
+
+        result = detector.get_weather_data()
+        assert result["condition"]

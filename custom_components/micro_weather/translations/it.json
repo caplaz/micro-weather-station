@@ -2,7 +2,9 @@
   "config": {
     "error": {
       "missing_outdoor_temp": "❌ È richiesto il sensore di temperatura esterna. Seleziona un sensore di temperatura che misuri le condizioni esterne.",
-      "unknown": "❌ Si è verificato un errore imprevisto durante la configurazione. Controlla le tue selezioni di sensori e riprova."
+      "unknown": "❌ Si è verificato un errore imprevisto durante la configurazione. Controlla le tue selezioni di sensori e riprova.",
+      "sun_sensor_not_numeric": "❌ Il sensore solare selezionato deve riportare l'elevazione solare in gradi come numero (ad esempio `sensor.sun_solar_elevation`).",
+      "sun_sensor_unavailable": "❌ Il sensore solare selezionato non è disponibile. Seleziona un'entità che riporta l'elevazione solare in gradi."
     },
     "step": {
       "atmospheric": {
@@ -120,7 +122,9 @@
   "options": {
     "error": {
       "missing_outdoor_temp": "❌ È richiesto il sensore di temperatura esterna. Seleziona un sensore di temperatura che misuri le condizioni esterne.",
-      "unknown": "❌ Si è verificato un errore imprevisto durante la configurazione. Controlla le tue selezioni di sensori e riprova."
+      "unknown": "❌ Si è verificato un errore imprevisto durante la configurazione. Controlla le tue selezioni di sensori e riprova.",
+      "sun_sensor_not_numeric": "❌ Il sensore solare selezionato deve riportare l'elevazione solare in gradi come numero (ad esempio `sensor.sun_solar_elevation`).",
+      "sun_sensor_unavailable": "❌ Il sensore solare selezionato non è disponibile. Seleziona un'entità che riporta l'elevazione solare in gradi."
     },
     "step": {
       "atmospheric": {

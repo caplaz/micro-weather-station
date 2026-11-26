@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes — sun/elevation sensor (issue #6)
+
+- **The sun sensor field rejected numeric elevation sensors**: the config flow
+  only offered `sun.*` entities, so a template or weather-station entity such
+  as `sensor.sun_solar_elevation` was refused with
+  `Entity sensor.sun_solar_elevation belongs to domain sensor, expected
+  ['sun']`. The field now accepts `sun.*` and `sensor.*` entities, and a
+  selected `sensor.*` entity is checked at configuration time to report the
+  elevation in degrees.
+- **A `sensor.*` elevation entity was read as 0°**: the detector only looked at
+  the `elevation` attribute, which a plain sensor does not have, so the angle
+  silently became 0°. It now reads the numeric state of a `sensor.*` entity
+  and keeps reading the `elevation` attribute of a `sun.*` entity.
+- **A missing sun sensor could abort the weather update**: an unavailable or
+  non-numeric entity now logs a warning and falls back to the estimated solar
+  elevation instead of propagating `None` into the analysis.
+
+### Documentation
+
+- The README notes which entities the sun sensor field accepts.
+
 ## 4.5.1 (2026-07-20)
 
 ### Bug Fixes — forecasting
