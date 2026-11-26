@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Documentation
+
+- **Historical data, documented accurately** (issue #54): the integration does
+  **not** download historical weather data on setup — it has no archive to fetch
+  from and reads only the Home Assistant entities you mapped. The README now
+  states this explicitly, explains that forecasting uses a rolling 48-hour
+  in-memory trend window (rebuilt from live readings after each restart), and
+  points at the Home Assistant recorder for long-term history. The installation
+  guide repeats the "no download on setup" point. The wording used on the
+  portfolio website ("downloads two years of monthly data, 90 days of daily
+  data, and 30 days of hourly readings") describes functionality that does not
+  exist in this repository.
+
 ## 4.5.1 (2026-07-20)
 
 ### Bug Fixes — forecasting

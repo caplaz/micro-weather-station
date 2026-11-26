@@ -239,6 +239,13 @@ Enhance weather detection by configuring additional sensors:
    - You should see a success message
    - The integration appears in your Devices & Services list
 
+3. **No Historical Download Happens**:
+   - Setup does not download any historical weather data
+   - The integration reads only the entities you mapped, from your own Home
+     Assistant instance
+   - Forecasts build up from live readings (a rolling 48-hour window kept in
+     memory); see [Historical Data](README.md#historical-data) for the details
+
 ## Post-Installation Verification
 
 ### Step 1: Check Integration Status

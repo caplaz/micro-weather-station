@@ -401,6 +401,33 @@ For comprehensive information about the advanced forecasting algorithms, meteoro
 - **Confidence Dampening**: Accuracy estimates that decrease with forecast distance
 - **Local Pattern Learning**: Adapts to your specific microclimate patterns over time
 
+## Historical Data
+
+**The integration never downloads historical weather data.** It has no archive or
+external weather service to fetch from: on setup it reads only the Home
+Assistant entities you mapped in the configuration flow, and every later update
+reads those same entities again. Nothing is transferred at startup, so setup is
+fast and the integration keeps working offline.
+
+Two different things are called "history" here:
+
+| History | Source | Retention |
+| ------- | ------ | --------- |
+| Trend window (used for forecasting) | Readings collected in memory since the last Home Assistant restart | Rolling 48 h, at least 192 samples (576 samples at the default 5-minute update interval) |
+| Long-term history (dashboards, analysis) | The Home Assistant recorder, which stores this integration's weather entity | Whatever your recorder retention is set to |
+
+What this means in practice:
+
+- **After a restart the trend window starts empty.** Forecasts need a few update
+  cycles to fill it; until then the forecast falls back to the current
+  conditions instead of extrapolating from nothing.
+- **The trend window is in memory only.** It is rebuilt from live readings and
+  is not persisted between restarts.
+- **For anything older than 48 hours, use Home Assistant's own tools.** The
+  recorder stores this integration's entities automatically when the recorder is
+  enabled: the History panel, the Logbook, Developer Tools → Statistics, and the
+  `home-assistant_v2.db` database all keep the long-term record.
+
 ## Automation Examples
 
 ### Weather-Based Lighting
