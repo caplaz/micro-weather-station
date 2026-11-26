@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Requirements
+
+- **Minimum Home Assistant version is now 2025.1.4**: `hacs.json` declared
+  2023.1.0, but that version is not tested. The declared minimum now matches the
+  oldest Home Assistant release the test matrix actually runs (2025.1.4), and
+  the README, installation guide and development requirements say the same.
+
 ### CI / maintenance
 
 - **Test against the latest Home Assistant** (issue #56): the dependency

@@ -49,7 +49,7 @@ HACS (Home Assistant Community Store) is the easiest way to install and manage c
 #### Prerequisites
 
 - [HACS](https://hacs.xyz/) must be installed in your Home Assistant instance
-- Home Assistant version 2023.1.0 or higher (CI-tested against 2025.1.4, 2026.2.3 and 2026.10.4)
+- Home Assistant version 2025.1.4 or higher (CI-tested against 2025.1.4, 2026.2.3 and 2026.10.4)
 
 #### Installation Steps
 
